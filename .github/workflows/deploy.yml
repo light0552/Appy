@@ -1,0 +1,49 @@
+name: Deploy to Netlify
+
+# Deploys to Netlify production on every push to main.
+# Equivalent of Netlify's GitHub App continuous deployment, driven by CLI.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: netlify-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Import site env vars stored as GitHub variables (VITE_* vars are
+      # public by design: they are baked into the client bundle anyway)
+      - name: Write env file
+        run: |
+          cat > .env <<EOF
+          VITE_TMDB_TOKEN=${{ vars.VITE_TMDB_TOKEN }}
+          VITE_TMDB_API_KEY=${{ vars.VITE_TMDB_API_KEY }}
+          VITE_FAMILY_KEY=${{ vars.VITE_FAMILY_KEY }}
+          EOF
+
+      - name: Build
+        run: npm run build
+
+      # FAMILY_KEY (server-side function runtime) is configured on the
+      # Netlify site itself via netlify env:import — it is not a build var.
+      - name: Deploy to Netlify
+        run: npm i -g netlify-cli@latest && netlify deploy --build=false --prod --dir=dist --site $NETLIFY_SITE_ID --auth $NETLIFY_AUTH_TOKEN --message "Deploy from commit ${GITHUB_SHA::7}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ vars.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
