@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Lighthook">
+  <title>Lighthook</title>
+  <defs>
+    <radialGradient id="bg" cx="32" cy="16" r="55.04" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#151d2a"/>
+      <stop offset="1" stop-color="#0b0f14"/>
+    </radialGradient>
+    <linearGradient id="beam" x1="32.49" y1="22.3" x2="17.81" y2="14.46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00acc1" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#00acc1" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="32.49" cy="22.3" r="15.36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00acc1" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#00acc1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <circle cx="32.49" cy="22.3" r="15.36" fill="url(#glow)"/>
+  <path d="M 32.49 22.3 L 20.12 10.15 L 15.51 18.78 Z" fill="url(#beam)"/>
+  <path d="M 49.51 35.38 L 49.51 35.16 L 49.5 34.89 L 49.48 34.63 L 49.45 34.37 L 49.41 34.11 L 49.36 33.85 L 49.3 33.59 L 49.24 33.33 L 49.17 33.08 L 49.09 32.83 L 49 32.58 L 48.9 32.33 L 48.8 32.09 L 48.68 31.85 L 48.56 31.62 L 48.44 31.4 L 48.09 31.01 L 47.74 30.64 L 47.39 30.27 L 47.04 29.89 L 46.7 29.52 L 46.35 29.14 L 46 28.77 L 45.66 28.4 L 45.31 28.02 L 44.96 27.65 L 44.61 27.27 L 44.27 26.9 L 43.92 26.52 L 43.57 26.15 L 43.22 25.78 L 42.88 25.4 L 42.53 25.03 L 42.18 24.65 L 41.74 24.91 L 41.89 25.4 L 42.04 25.89 L 42.19 26.37 L 42.34 26.86 L 42.49 27.35 L 42.64 27.84 L 42.79 28.32 L 42.94 28.81 L 43.09 29.3 L 43.24 29.79 L 43.39 30.28 L 43.54 30.76 L 43.69 31.25 L 43.84 31.74 L 43.99 32.23 L 44.14 32.72 L 44.29 33.2 L 44.44 33.68 L 44.5 33.79 L 44.55 33.89 L 44.6 33.99 L 44.64 34.1 L 44.69 34.2 L 44.72 34.31 L 44.76 34.42 L 44.79 34.53 L 44.82 34.64 L 44.84 34.75 L 44.86 34.86 L 44.88 34.97 L 44.89 35.08 L 44.9 35.19 L 44.91 35.31 L 44.91 35.46 Z" fill="#00acc1"/>
+  <circle cx="32.49" cy="22.3" r="3.26" fill="#00acc1"/>
+  <path d="M 47.21 35.42 L 47.21 43.42 A 7.36 7.36 0 0 1 32.49 43.42 L 32.49 22.3" fill="none" stroke="#00acc1" stroke-width="4.61" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

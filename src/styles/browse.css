@@ -1,0 +1,195 @@
+/* ==================================================================
+   Browse page (/browse/:kind) — imported by pages/Browse.tsx
+   Tokens and shared primitives come from src/styles.css.
+   ================================================================== */
+
+.browse-page {
+  position: relative;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--page-x) calc(48px + env(safe-area-inset-bottom));
+}
+
+/* Header ----------------------------------------------------------- */
+
+.browse-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: calc(env(safe-area-inset-top) + 14px) 0 18px;
+}
+
+.browse-head-text {
+  min-width: 0;
+}
+
+/* Beam-dot eyebrow: a glowing pip before the caps label. Scoped past
+   the shared .eyebrow rule, which wins ties (styles.css loads last). */
+.browse-head .browse-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+}
+
+.browse-eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* Bolder page title with a gradient sweep, echoing the hero type. */
+.browse-title {
+  font-size: clamp(26px, 7vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  margin-top: 2px;
+  background-image: linear-gradient(
+    100deg,
+    var(--text) 58%,
+    var(--accent-bright) 78%,
+    var(--accent) 94%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Grid ------------------------------------------------------------- */
+/* 2 columns on phones, 3 on tablets, 4-5 on wide screens. */
+
+.browse-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 12px;
+}
+
+@media (min-width: 560px) {
+  .browse-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 820px) {
+  .browse-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .browse-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Freshly fetched cards fade up together; transform/opacity only and
+   never under prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .browse-grid {
+    animation: browse-grid-in 0.4s var(--ease) both;
+  }
+}
+
+@keyframes browse-grid-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* Footer — load more / end of list --------------------------------- */
+
+.browse-foot {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 30px 0 8px;
+}
+
+/* The Load more button gets a little more presence than a stock .btn. */
+.browse-foot .btn {
+  min-width: 170px;
+  min-height: 48px;
+  font-size: 15px;
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.browse-page .browse-more-error,
+.browse-page .browse-more-error .muted {
+  text-align: center;
+  font-size: 13px;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* "That's everything." — flanked by tiny beam lines for a satisfying
+   full-stop to the catalogue. The right-hand line is mirrored via the
+   animation's end state so it draws outward too. */
+.browse-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--muted-2);
+}
+
+.browse-end-beam {
+  width: 44px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-line) 100%
+  );
+  animation: none;
+}
+
+.browse-end-beam:last-child {
+  transform: scaleX(-1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .browse-end-beam {
+    animation: browse-beam-in 0.6s var(--ease) 0.1s both;
+  }
+
+  .browse-end-beam:last-child {
+    animation-name: browse-beam-in-flip;
+  }
+}
+
+@keyframes browse-beam-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+
+@keyframes browse-beam-in-flip {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(-1);
+  }
+}
+
+/* Pointer hover — desktop mice only, never touch --------------------- */
+
+@media (hover: hover) {
+  .browse-page .browse-foot .btn:hover {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 26px var(--accent-glow);
+  }
+}

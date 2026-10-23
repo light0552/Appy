@@ -1,0 +1,357 @@
+/* ==================================================================
+   Player surface + Watch page — imported by Player, ServerChips, Watch
+   Tokens and shared primitives come from src/styles.css.
+   NOTE: styles.css loads AFTER this file in the cascade (App's import
+   chain), so rules overriding shared primitives (.chip, .btn, .icon-btn)
+   are scoped through parent classes to win on specificity.
+   ================================================================== */
+
+/* Iframe fills its container; borderless and black behind the video. */
+
+.player-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.player-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+/* Watch page layout ------------------------------------------------- */
+
+.watch {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.watch-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #000;
+}
+
+/* The no-server state sits centered in the stage, not stranded at the
+   top of it. */
+.watch-stage .empty-state {
+  min-height: 100%;
+  align-content: center;
+}
+
+/* Top overlay: back button + server chips, safe-area aware.          */
+/* The strip itself lets touches through to the player underneath.    */
+
+.watch-top {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 10px) 12px 12px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg) 78%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 42%, transparent) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.watch-top-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+/* Back button: glassy and a touch brighter over raw video. */
+.watch-top-row .icon-btn {
+  flex: 0 0 auto;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Title rides the top bar from tablets up; phones already show it in
+   the bottom bar where there's room. Purely decorative (aria-hidden) —
+   the footer is the accessible copy. */
+.watch-top-title {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .watch-top-title {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+    user-select: none;
+  }
+}
+
+.watch-top-row .server-chips {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+/* Server chips ------------------------------------------------------ */
+/* The escape hatch when a server is stuck: glassy pills over video,
+   loud enough to spot instantly, full 44px targets. */
+
+.watch-top-row .server-chips .chip {
+  min-height: 44px;
+  padding: 0 15px;
+  gap: 8px;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  backdrop-filter: blur(12px) saturate(1.3);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+/* Higher specificity than styles.css's .chip--active / [aria-pressed]
+   so the glow survives the cascade. */
+.watch-top-row .server-chips .chip.chip--active,
+.watch-top-row .server-chips .chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: var(--accent-line);
+  color: var(--accent-bright);
+  box-shadow: 0 0 20px var(--accent-glow), 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
+.watch-top-row .server-chips .chip:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .watch-top-row .server-chips .chip:hover {
+    transform: translateY(-2px);
+  }
+
+  .watch-top-row .server-chips .chip.chip--active:hover,
+  .watch-top-row .server-chips .chip[aria-pressed="true"]:hover {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 0 26px var(--accent-glow), 0 8px 22px rgba(0, 0, 0, 0.4);
+  }
+}
+
+.server-chip-hint {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.watch-top-row .server-chips .chip--active .server-chip-hint,
+.watch-top-row .server-chips .chip[aria-pressed="true"] .server-chip-hint {
+  color: var(--accent);
+}
+
+/* Watchdog bar ------------------------------------------------------ */
+/* "Not playing? Try the next server" — a friendly lifeline, not an
+   error: soft glass, a hint of beam glow, and a springy entrance. */
+
+.watchdog-bar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 560px;
+  padding: 11px 12px 11px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow: var(--shadow), 0 0 28px var(--accent-glow);
+  font-size: 13.5px;
+  font-weight: 650;
+  animation: watchdog-in var(--dur-med) var(--ease);
+}
+
+@keyframes watchdog-in {
+  from {
+    transform: translateY(-10px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+.watchdog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.watchdog-actions .btn-primary {
+  white-space: nowrap;
+}
+
+/* 44px dismiss target — scopes past styles.css's .icon-btn sizing. */
+.watchdog-actions .watchdog-close {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  background: transparent;
+  border-color: transparent;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .watchdog-actions .btn:hover {
+    transform: translateY(-2px) scale(1.03);
+  }
+}
+
+/* Bottom bar -------------------------------------------------------- */
+
+.watch-bar {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px var(--page-x) calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: linear-gradient(to bottom, var(--surface-2) 0%, var(--surface) 100%);
+  box-shadow: 0 -16px 36px rgba(0, 0, 0, 0.45);
+}
+
+/* A thin beam of light along the top edge of the bar. */
+.watch-bar::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-glow) 50%,
+    transparent 100%
+  );
+}
+
+.watch-now {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.watch-now-title {
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+.watch-now-sub {
+  color: var(--muted);
+}
+
+.watch-now-sk {
+  width: 160px;
+}
+
+.watch-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.watch-actions .btn {
+  flex: 1 1 auto;
+  min-height: 46px;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.watch-actions .btn-primary {
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+.watch-actions .btn:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .watch-actions .btn:hover {
+    transform: translateY(-2px) scale(1.02);
+  }
+
+  .watch-actions .btn-primary:hover {
+    box-shadow: 0 14px 38px var(--accent-glow);
+  }
+}
+
+.watch-note {
+  line-height: 1.45;
+}
+
+/* Tablet and up (>= 640px) ------------------------------------------- */
+
+@media (min-width: 640px) {
+  /* One clean row: what's playing, the actions, the honest footnote. */
+  .watch-bar {
+    flex-direction: row;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .watch-now {
+    flex: 1 1 auto;
+  }
+
+  .watch-actions {
+    flex: 0 0 auto;
+  }
+
+  .watch-actions .btn {
+    flex: 0 0 auto;
+    min-width: 136px;
+  }
+
+  .watch-note {
+    flex: 0 1 320px;
+    text-align: right;
+  }
+}
+
+/* Desktop (>= 1024px) ------------------------------------------------ */
+
+@media (min-width: 1024px) {
+  .watch-top {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .watch-bar {
+    padding-left: max(var(--page-x), env(safe-area-inset-left));
+    padding-right: max(var(--page-x), env(safe-area-inset-right));
+  }
+}

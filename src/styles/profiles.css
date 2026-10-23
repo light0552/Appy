@@ -1,0 +1,517 @@
+/* ==================================================================
+   Profiles — "Who's watching?" picker, tiles, menu + add sheets.
+   Tokens and shared primitives come from src/styles.css.
+   The first screen users land on: warm, playful, beam-lit.
+   ================================================================== */
+
+.profiles-page {
+  position: relative;
+  isolation: isolate;
+  padding-top: calc(env(safe-area-inset-top) + 30px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 36px);
+}
+
+/* Lighthouse beam washes down from the top of the page. Sits behind
+   every child via a negative z-index inside this isolated context. */
+.profiles-page::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: min(58dvh, 540px);
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      85% 100% at 50% -12%,
+      color-mix(in srgb, var(--accent) 15%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      55% 70% at 10% -4%,
+      color-mix(in srgb, var(--accent) 10%, transparent) 0%,
+      transparent 70%
+    );
+}
+
+/* Headline ---------------------------------------------------------- */
+
+/* Gradient display type: a static beam wash across the words, plus a
+   one-time springy entrance (transform/opacity only).
+   Scoped past the shared .display rule, which wins single-class ties
+   (styles.css loads after page CSS in the bundle). */
+.profiles-page .profiles-title {
+  font-size: clamp(30px, 8.5vw, 52px);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  background-image: linear-gradient(
+    100deg,
+    var(--text) 32%,
+    var(--accent-bright) 47%,
+    var(--accent) 60%,
+    var(--text) 82%
+  );
+  background-size: 240% 100%;
+  background-position: 62% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.profiles-sub {
+  margin-top: 12px;
+  max-width: 430px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.profiles-meta {
+  margin-top: 18px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.profiles-sync-error {
+  margin-top: 8px;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .profiles-page .profiles-title {
+    animation: profiles-title-in 0.55s var(--ease) 0.1s both;
+  }
+}
+
+@keyframes profiles-title-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+/* Tile grid -------------------------------------------------------- */
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px 14px;
+  margin-top: 26px;
+}
+
+@media (min-width: 560px) {
+  .profile-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .profile-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    max-width: 780px;
+  }
+}
+
+.profiles-page .profiles-empty {
+  margin-top: 14px;
+  padding: 40px 24px 14px;
+}
+
+.profiles-page .profiles-empty::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--accent-soft), transparent 70%);
+  z-index: -1;
+}
+
+.profiles-page .empty-state {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Avatar ------------------------------------------------------------ */
+
+.profile-tile {
+  position: relative;
+}
+
+.profile-tile__select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 4px 6px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: none;
+  color: inherit;
+}
+
+.profile-avatar-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+/* Each avatar is a glossy gradient built from the profile's colour
+   (--profile-color, set inline) with a soft glow shadow beneath. */
+.profile-tile .profile-avatar {
+  width: 100%;
+  aspect-ratio: 1;
+  font-size: clamp(24px, 8vw, 40px);
+  background:
+    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.4), transparent 46%),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--profile-color, var(--accent)) 74%, white) 0%,
+      var(--profile-color, var(--accent)) 52%,
+      color-mix(in srgb, var(--profile-color, var(--accent)) 84%, black) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -12px 22px rgba(0, 0, 0, 0.2),
+    0 10px 26px color-mix(in srgb, var(--profile-color, var(--accent)) 36%, transparent);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-med) ease;
+}
+
+/* Springy press + a satisfying scale-down. */
+.profile-tile__select:active .profile-avatar {
+  transform: scale(0.94);
+}
+
+/* Active profile: accent ring + glow + check badge. */
+.profile-tile.profile-tile--active .profile-avatar {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 0 0 3px var(--bg),
+    0 0 0 5px var(--accent),
+    0 0 32px var(--accent-glow);
+}
+
+.profile-tile--active .profile-name {
+  color: var(--accent-bright);
+}
+
+.profile-check {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+  color: var(--accent-ink);
+  border: 3px solid var(--bg);
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.profile-name {
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  transition: color var(--dur-fast) ease;
+}
+
+/* Per-tile "..." menu — 44px hit area from .icon-btn, pinned to the
+   avatar's top-right corner (matching the select's 8px top / 4px side pad). */
+.profile-menu-btn {
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+/* Entrance: tiles pop in one by one. Transform/opacity only, and never
+   under prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .profile-tile {
+    animation: tile-pop 0.5s var(--ease) both;
+  }
+
+  .profile-tile:nth-child(1) { animation-delay: 0.03s; }
+  .profile-tile:nth-child(2) { animation-delay: 0.07s; }
+  .profile-tile:nth-child(3) { animation-delay: 0.11s; }
+  .profile-tile:nth-child(4) { animation-delay: 0.15s; }
+  .profile-tile:nth-child(5) { animation-delay: 0.19s; }
+  .profile-tile:nth-child(6) { animation-delay: 0.23s; }
+  .profile-tile:nth-child(7) { animation-delay: 0.27s; }
+  .profile-tile:nth-child(8) { animation-delay: 0.31s; }
+  .profile-tile:nth-child(9) { animation-delay: 0.35s; }
+  .profile-tile:nth-child(10) { animation-delay: 0.39s; }
+}
+
+@keyframes tile-pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+}
+
+/* Add-profile tile ------------------------------------------------- */
+
+.profile-add__box {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px dashed var(--border-strong);
+  border-radius: 24%;
+  color: var(--muted);
+  background: radial-gradient(
+    100% 100% at 50% 0%,
+    var(--accent-soft) 0%,
+    transparent 72%
+  );
+  transition:
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-med) ease;
+}
+
+.profile-add__glyph {
+  font-size: clamp(28px, 9vw, 42px);
+  font-weight: 300;
+  line-height: 1;
+  transition: transform var(--dur-med) var(--ease);
+}
+
+.profile-add:active .profile-add__box {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(0.95);
+}
+
+/* Sign out ---------------------------------------------------------- */
+
+.profiles-page .profiles-signout {
+  margin-top: 34px;
+  max-width: 420px;
+  color: var(--muted);
+}
+
+/* Sheets (rendered inside .profiles-page) --------------------------- */
+
+/* Glassy, rounded, beam-lit. Scoped so the shared .sheet primitives
+   from styles.css stay authoritative everywhere else. */
+.profiles-page .sheet {
+  position: relative;
+  padding-top: 30px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Beam-lit top edge. */
+.profiles-page .sheet::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 28px;
+  right: 28px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-line) 50%,
+    transparent 100%
+  );
+}
+
+/* Grabber handle. */
+.profiles-page .sheet::after {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  pointer-events: none;
+}
+
+.profiles-page .sheet h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.sheet-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* Sheet actions read best as softly elevated glass buttons. Ghost and
+   danger variants keep their own semantics. */
+.profiles-page .sheet-stack .btn:not(.btn-ghost):not(.btn-danger) {
+  justify-content: flex-start;
+  min-height: 48px;
+  border-color: var(--border);
+  background: linear-gradient(
+    160deg,
+    var(--surface-3) 0%,
+    var(--surface-2) 100%
+  );
+}
+
+.sheet-field {
+  margin-top: 14px;
+}
+
+.sheet-note {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sheet-error {
+  margin-top: 12px;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sheet-swatch-label {
+  margin-top: 18px;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.sheet-actions .btn {
+  flex: 1 1 120px;
+  min-height: 48px;
+}
+
+/* Colour swatches --------------------------------------------------- */
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.swatch {
+  width: 100%;
+  min-height: 44px; /* comfortable tap target even on the narrowest phone */
+  aspect-ratio: 1;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: var(--swatch-color, var(--surface-2));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.18),
+    0 6px 16px color-mix(in srgb, var(--swatch-color, transparent) 28%, transparent);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.swatch:active {
+  transform: scale(0.9);
+}
+
+.swatch--active {
+  border-color: var(--text);
+  transform: scale(1.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 0 0 2px var(--bg),
+    0 0 22px color-mix(in srgb, var(--swatch-color, transparent) 45%, transparent);
+}
+
+/* Pressing any swatch (active or not) springs it down. */
+.swatch--active:active {
+  transform: scale(0.9);
+}
+
+/* Pointer hover — desktop mice only, never touch --------------------- */
+
+@media (hover: hover) {
+  .profile-tile__select:hover .profile-avatar {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.34),
+      inset 0 -12px 22px rgba(0, 0, 0, 0.2),
+      0 18px 36px rgba(0, 0, 0, 0.45),
+      0 0 34px color-mix(in srgb, var(--profile-color, var(--accent)) 55%, transparent);
+  }
+
+  .profile-tile.profile-tile--active .profile-tile__select:hover .profile-avatar {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.34),
+      0 0 0 3px var(--bg),
+      0 0 0 5px var(--accent-bright),
+      0 0 40px var(--accent-glow);
+  }
+
+  .profile-tile__select:hover .profile-name {
+    color: var(--text);
+  }
+
+  .profile-tile--active .profile-tile__select:hover .profile-name {
+    color: var(--accent-bright);
+  }
+
+  .profiles-page .profile-menu-btn:hover {
+    background: var(--surface-3);
+    border-color: var(--border-strong);
+  }
+
+  .profile-add:hover .profile-add__box {
+    border-color: var(--accent-line);
+    color: var(--accent-bright);
+    transform: scale(1.04);
+    box-shadow: 0 0 30px var(--accent-glow);
+  }
+
+  .profile-add:hover .profile-add__glyph {
+    transform: scale(1.18);
+  }
+
+  .profiles-page .sheet-stack .btn:not(.btn-ghost):not(.btn-danger):hover {
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+  }
+
+  .swatch:hover {
+    transform: scale(1.09);
+  }
+
+  .profiles-page .profiles-signout:hover {
+    color: var(--danger);
+    background: var(--danger-soft);
+  }
+}

@@ -1,0 +1,666 @@
+/* ==================================================================
+   Title page (/title/:type/:id) — imported by pages/Title.tsx
+   Tokens and shared primitives come from src/styles.css.
+   NOTE: styles.css loads AFTER this file in the cascade (App's import
+   chain), so any rule that overrides a shared primitive needs equal
+   or higher specificity — scope through parent classes.
+   ================================================================== */
+
+.title-page {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+/* Fixed back button, clear of the iOS status bar on every axis —
+   the env() left inset keeps it off the notch in landscape. */
+
+.title-back {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: calc(env(safe-area-inset-left) + 14px);
+  z-index: 60;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.title-back:active {
+  transform: scale(0.92);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .title-back:hover {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), 0 0 18px var(--accent-glow);
+  }
+}
+
+/* The error state has no hero; let its empty-state span the whole
+   desktop grid instead of the first column only. */
+.title-page > .empty-state {
+  grid-column: 1 / -1;
+}
+
+/* Hero -------------------------------------------------------------- */
+
+/* Full-bleed cinematic stage, echoing Home's hero: the art sits behind
+   a layered scrim that fades into --bg, with a soft beam glow up top. */
+.title-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 58dvh;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(120% 90% at 50% 0%, var(--surface-3) 0%, var(--bg) 70%);
+}
+
+.title-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+}
+
+/* No backdrop: blow the poster up, blur it, let the scrim do the rest. */
+.title-hero--poster img {
+  filter: blur(24px) saturate(1.25);
+  transform: scale(1.3);
+}
+
+.title-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(
+      80% 55% at 50% 0%,
+      color-mix(in srgb, var(--accent) 14%, transparent) 0%,
+      transparent 65%
+    ),
+    linear-gradient(
+      to top,
+      var(--bg) 0%,
+      color-mix(in srgb, var(--bg) 88%, transparent) 30%,
+      color-mix(in srgb, var(--bg) 28%, transparent) 62%,
+      color-mix(in srgb, var(--bg) 55%, transparent) 100%
+    );
+}
+
+.title-hero--empty {
+  aspect-ratio: 16 / 7;
+  max-height: 220px;
+}
+
+/* Body -------------------------------------------------------------- */
+
+.title-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--page-x);
+  margin-top: -56px;
+}
+
+.title-body .title-eyebrow {
+  margin-top: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.6);
+}
+
+/* Big, confident title treatment with a beam-washed gradient. Scoped
+   through .title-body so it outranks styles.css's shared .display. */
+.title-body .title-heading {
+  margin-top: 4px;
+  font-size: clamp(30px, 8vw, 54px);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  text-wrap: balance;
+  background: linear-gradient(
+    115deg,
+    var(--text) 30%,
+    var(--accent-bright) 78%,
+    var(--accent) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 18px 46px rgba(0, 0, 0, 0.45);
+}
+
+.title-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 12px;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+
+.title-meta .title-rating {
+  color: var(--accent-bright);
+}
+
+.title-tagline {
+  margin-top: 10px;
+  font-size: 14.5px;
+  font-style: italic;
+  color: color-mix(in srgb, var(--accent) 65%, var(--text));
+}
+
+.title-genres {
+  margin-top: 14px;
+}
+
+/* Genre pills read as quiet glass labels, not buttons. */
+.title-genres .chip {
+  background: var(--surface-glass);
+  border-color: var(--border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Action pair — mirrors Home's hero-actions: a bold glowing Play plus
+   a translucent glass My List that lights up when pressed. */
+.cluster.title-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.title-actions .btn {
+  min-height: 48px;
+  padding: 0 22px;
+  font-size: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.title-actions .btn-primary {
+  flex: 1 1 auto;
+  min-width: 148px;
+  box-shadow: 0 14px 40px var(--accent-glow);
+}
+
+.title-actions .btn-primary:active {
+  transform: scale(0.96);
+}
+
+.title-actions .btn-secondary {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.title-actions .btn-secondary[aria-pressed="true"] {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+@media (hover: hover) {
+  .title-actions .btn-secondary:hover {
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    border-color: var(--border-strong);
+  }
+
+  .title-actions .btn-secondary[aria-pressed="true"]:hover {
+    background: var(--accent-soft);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .title-actions .btn:hover {
+    transform: translateY(-2px) scale(1.02);
+  }
+
+  .title-actions .btn-primary:hover {
+    box-shadow: 0 18px 48px var(--accent-glow);
+  }
+}
+
+.title-overview {
+  margin-top: 16px;
+  max-width: 640px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.title-more {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+@media (hover: hover) {
+  .title-more:hover {
+    text-decoration: underline;
+  }
+}
+
+/* Sections ---------------------------------------------------------- */
+
+.title-section {
+  margin-top: 30px;
+}
+
+/* Section titles carry a small beam divider. */
+.title-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight);
+  margin-bottom: 12px;
+}
+
+.title-section-title::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  max-width: 140px;
+  background: linear-gradient(90deg, var(--accent-line), transparent);
+}
+
+/* Season chips are the main interaction here — give them a 44px target
+   plus a springy lift and an active glow. */
+.title-section .chip-row .chip {
+  min-height: 44px;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.title-section .chip-row .chip:active {
+  transform: scale(0.94);
+}
+
+/* Higher specificity than styles.css's .chip--active so the glow sticks. */
+.title-section .chip-row .chip--active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-bright);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .title-section .chip-row .chip:not(.chip--active):hover {
+    transform: translateY(-2px);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  .title-section .chip-row .chip--active:hover {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 0 22px var(--accent-glow);
+  }
+}
+
+/* Episodes ---------------------------------------------------------- */
+
+.episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Scoped at .episode-list so styles.css's generic .episode-row:hover
+   (loaded later, same specificity) can't win the cascade. */
+.episode-list .episode-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.episode-list .episode-row:active {
+  transform: scale(0.985);
+  background: var(--surface-3);
+}
+
+.episode-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 116px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.episode-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--dur-med) var(--ease);
+}
+
+/* A little glass play badge in the corner of every still. */
+.episode-thumb::before {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  z-index: 1;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.episode-thumb::after {
+  content: "";
+  position: absolute;
+  right: 17px;
+  bottom: 15px;
+  z-index: 1;
+  border-style: solid;
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent var(--text);
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.6));
+}
+
+/* The fallback tile already shows "E{n}" — the badge would only crowd it. */
+.episode-thumb:has(.episode-thumb-fallback)::before,
+.episode-thumb:has(.episode-thumb-fallback)::after {
+  display: none;
+}
+
+.episode-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  background: radial-gradient(120% 100% at 30% 0%, var(--accent-soft), var(--surface-3) 70%);
+}
+
+.episode-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.episode-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.episode-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--muted);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .episode-list .episode-row:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-line);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 0 20px var(--accent-glow);
+  }
+
+  .episode-list .episode-row:hover .episode-thumb img {
+    transform: scale(1.07);
+  }
+
+  .episode-list .episode-row:hover .episode-thumb::before {
+    transform: scale(1.15);
+  }
+}
+
+.episode-sk {
+  height: 78px;
+  border-radius: var(--radius);
+}
+
+/* Cast -------------------------------------------------------------- */
+
+.cast-row {
+  display: flex;
+  gap: 14px;
+  padding: 6px 0 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: var(--page-x);
+}
+
+.cast-card {
+  flex: 0 0 auto;
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  scroll-snap-align: start;
+  transition: transform var(--dur-med) var(--ease);
+}
+
+.cast-avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  background: radial-gradient(
+    120% 120% at 30% 0%,
+    var(--accent-soft) 0%,
+    var(--surface-2) 65%
+  );
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 22px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.cast-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cast-name {
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+  max-width: 100%;
+}
+
+.cast-character {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--muted);
+  max-width: 100%;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .cast-card:hover {
+    transform: translateY(-4px);
+  }
+
+  .cast-card:hover .cast-avatar {
+    border-color: var(--accent-line);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 18px var(--accent-glow);
+  }
+}
+
+/* Loading skeleton -------------------------------------------------- */
+
+.skeleton.sk-hero {
+  aspect-ratio: 16 / 9;
+  max-height: 58dvh;
+  border-radius: 0;
+}
+
+.sk-title {
+  height: 40px;
+  width: 70%;
+  margin-top: 18px;
+}
+
+.sk-meta {
+  height: 12px;
+  width: 55%;
+  margin-top: 14px;
+}
+
+.sk-line {
+  height: 12px;
+  margin-top: 10px;
+}
+
+.sk-line--full {
+  width: 100%;
+}
+
+.sk-line--long {
+  width: 88%;
+}
+
+.sk-line--short {
+  width: 46%;
+}
+
+.sk-btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.skeleton.sk-btn {
+  height: 48px;
+  flex: 1 1 auto;
+  border-radius: 999px;
+}
+
+.sk-btn--narrow {
+  flex: 0 0 40%;
+}
+
+/* Tablet and up (>= 640px) ------------------------------------------- */
+
+@media (min-width: 640px) {
+  .episode-list .episode-row {
+    gap: 16px;
+    padding: 12px;
+  }
+
+  .episode-thumb {
+    width: 148px;
+    border-radius: var(--radius);
+  }
+}
+
+/* Desktop (>= 1024px) ------------------------------------------------ */
+
+@media (min-width: 1024px) {
+  /* Align the fixed back button with the centered content column as the
+     viewport grows, keeping it inside the safe area. */
+  .title-back {
+    left: calc(
+      max(0px, (100% - 1280px) / 2) + max(var(--page-x), env(safe-area-inset-left))
+    );
+  }
+
+  /* Two columns instead of one stacked column: the hero becomes a tall
+     sticky panel on the left, the info column scrolls beside it. The
+     DOM already has exactly two flow children (hero, body), so this is
+     pure auto-placement — no markup changes, and the loading skeleton
+     falls into the same slots. */
+  .title-page {
+    display: grid;
+    grid-template-columns: minmax(0, 44fr) minmax(0, 56fr);
+    column-gap: 36px;
+    align-items: start;
+    padding-left: max(var(--page-x), env(safe-area-inset-left));
+    padding-right: max(var(--page-x), env(safe-area-inset-right));
+  }
+
+  .title-hero,
+  .skeleton.sk-hero {
+    aspect-ratio: 4 / 3;
+    max-height: min(64dvh, 560px);
+    border-radius: var(--radius-lg);
+  }
+
+  .title-hero {
+    position: sticky;
+    top: calc(env(safe-area-inset-top) + 16px);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* No hero overlap up here — the body sits in its own column. */
+  .title-body {
+    margin-top: 0;
+    padding: 0;
+  }
+
+  .episode-list .episode-row {
+    gap: 16px;
+  }
+
+  .cast-card {
+    width: 96px;
+  }
+
+  .cast-avatar {
+    width: 78px;
+    height: 78px;
+  }
+}

@@ -1,0 +1,165 @@
+/* ==================================================================
+   Search page — sticky field, idle hero, result grid, suggestion chips.
+   Tokens and shared primitives come from src/styles.css.
+   ================================================================== */
+
+.search-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: 24px;
+}
+
+/* Sticky field keeps the input reachable above the tab bar while the
+   keyboard is up; safe-area padding keeps it clear of the notch on all
+   sides (landscape included). A soft beam-glow blooms behind the field
+   on focus via the shared .field:focus-within ring + this halo. */
+.search-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: calc(env(safe-area-inset-top) + 12px)
+    max(var(--page-x), env(safe-area-inset-right))
+    12px
+    max(var(--page-x), env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Idle hero --------------------------------------------------------- */
+
+.search-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px var(--page-x) 4px;
+  text-align: center;
+}
+
+.search-idle__icon {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 26px;
+  color: var(--accent-bright);
+  background:
+    radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 62%),
+    var(--surface-2);
+  border: 1px solid var(--accent-line);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.4),
+    0 0 44px var(--accent-glow);
+}
+
+/* The friendly headline — gradient display text where it pops. */
+.search-idle__title {
+  max-width: 420px;
+  font-size: clamp(21px, 5.5vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  text-wrap: balance;
+  background-image: linear-gradient(
+    100deg,
+    var(--text) 36%,
+    var(--accent-bright) 55%,
+    var(--text) 76%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.search-idle__sub {
+  max-width: 340px;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .search-idle__icon {
+    animation: search-icon-bob 3.6s var(--ease) infinite;
+  }
+}
+
+@keyframes search-icon-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+
+/* Meta + results ----------------------------------------------------- */
+
+.search-meta {
+  padding: 2px var(--page-x) 14px;
+}
+
+.search-results {
+  margin-top: 2px;
+}
+
+/* Suggestion chips -------------------------------------------------- */
+
+.search-chips {
+  padding: 0 var(--page-x) 4px;
+  gap: 8px;
+}
+
+/* Bump the shared chip to a comfortable, lively iOS touch target. */
+.search-chips .chip {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-med) ease;
+}
+
+.search-chips .chip:active {
+  transform: scale(0.95);
+}
+
+.search-chip-skeleton {
+  width: 96px;
+  height: 44px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+/* Desktop (>= 1024px) ------------------------------------------------ */
+
+@media (min-width: 1024px) {
+  /* The primary nav is a sticky top bar here; the field parks right
+     under it instead of hiding behind it. */
+  .search-sticky {
+    top: calc(var(--nav-height) + env(safe-area-inset-top));
+    padding-top: 12px;
+  }
+
+  /* A full-1280px input reads badly on a monitor — cap it. The
+     SearchBar itself is untouched; this targets its .field wrapper. */
+  .search-sticky .field {
+    max-width: 680px;
+  }
+}
+
+/* Pointer hover — desktop mice only, never touch --------------------- */
+
+@media (hover: hover) {
+  .search-page .search-chips .chip:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-line);
+    color: var(--text);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  }
+}

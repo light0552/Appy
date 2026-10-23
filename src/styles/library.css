@@ -1,0 +1,148 @@
+/* ==================================================================
+   Library — active profile's Watchlist / History shelf.
+   Tokens and shared primitives come from src/styles.css.
+   ================================================================== */
+
+.library-page {
+  padding-top: calc(env(safe-area-inset-top) + 20px);
+}
+
+/* Beam-dot eyebrow: a glowing pip before the caps label. Scoped past
+   the shared .eyebrow rule, which wins ties (styles.css loads last). */
+.library-page .library-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+}
+
+.library-eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* The profile name tints toward the profile's own colour via the
+   --library-color custom property set inline from activeProfile.color. */
+.library-title {
+  margin-top: 2px;
+  background-image: linear-gradient(
+    100deg,
+    var(--library-color, var(--accent-bright)) 0%,
+    var(--text) 62%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.library-count {
+  margin-top: 8px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+/* Segmented control ------------------------------------------------- */
+
+.library-tabs {
+  margin-top: 18px;
+}
+
+/* Bump the shared segmented control to a comfortable iOS touch target
+   and give the active segment a springy, beam-lit feel. */
+.library-page .library-tabs button {
+  position: relative;
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 650;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-med) ease;
+}
+
+.library-page .library-tabs button:active {
+  transform: scale(0.96);
+}
+
+/* Higher specificity than the shared .segmented button[aria-pressed="true"]
+   rule so the accent treatment wins regardless of stylesheet order. */
+.library-page .library-tabs button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-radius: var(--radius-pill);
+  color: var(--accent-bright);
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    0 6px 18px var(--accent-glow);
+}
+
+/* Grid -------------------------------------------------------------- */
+
+/* .poster-grid already carries --page-x padding; .page supplies it here. */
+.library-grid {
+  padding: 0;
+  margin-top: 18px;
+}
+
+.library-note {
+  margin: 20px var(--page-x) 0;
+  text-align: center;
+}
+
+/* Empty states ------------------------------------------------------ */
+
+.library-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  margin-bottom: 4px;
+  border-radius: 22px;
+  color: var(--accent-bright);
+  background:
+    radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 62%),
+    var(--surface-2);
+  border: 1px solid var(--accent-line);
+  box-shadow: 0 0 34px var(--accent-glow);
+}
+
+.library-page .empty-state .btn {
+  margin-top: 10px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .library-empty__icon {
+    animation: library-icon-bob 3.8s var(--ease) infinite;
+  }
+}
+
+@keyframes library-icon-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+
+/* Pointer hover — desktop mice only, never touch --------------------- */
+
+@media (hover: hover) {
+  .library-page .library-tabs button:not([aria-pressed="true"]):hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .library-page .library-tabs button[aria-pressed="true"]:hover {
+    background: var(--accent-soft);
+    box-shadow:
+      inset 0 0 0 1px var(--accent-line),
+      0 8px 24px var(--accent-glow);
+  }
+}
