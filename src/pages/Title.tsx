@@ -1,6 +1,7 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { backdropUrl, getSeason, getTitle, posterUrl, profileUrl } from "../lib/tmdb";
+import { resolveRip } from "../lib/rip";
 import { useSession } from "../lib/session";
 import { liveHistory, mediaKey } from "../lib/store";
 import type { Media, MediaType, SeasonDetail, TitleDetail } from "../types";
@@ -96,6 +97,30 @@ export default function Title() {
     const first = detail.seasons.find((s) => s.episodeCount > 0);
     setSelectedSeason((prev) => prev ?? first?.seasonNumber ?? null);
   }, [detail]);
+
+  /**
+   * Pre-warm the ad-free resolve (2026-10-24) — the big "Preparing… feels
+   * slow" fix for movies: the sidecar race starts 1.5s after the detail
+   * lands, so by the time Play is tapped the resolve is either already
+   * cached (instant video) or sharing an in-flight race via the server's
+   * dedup. TV is deliberately NOT pre-warmed: the resolve key carries
+   * season/episode, which this page cannot know.
+   * StrictMode-safe: the id ref means a remount never double-fires, and the
+   * first mount's timer survives the cleanup (server-side dedup absorbs the
+   * redundant request anyway).
+   */
+  const prewarmedRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!detail || detail.type !== "movie" || !validId) return;
+    if (prewarmedRef.current === tmdbId) return;
+    prewarmedRef.current = tmdbId;
+    window.setTimeout(() => {
+      void resolveRip({ type: "movie", tmdbId, imdbId: detail.imdbId }).catch(
+        () => undefined,
+      );
+    }, 1500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail, tmdbId, validId]);
 
   useEffect(() => {
     if (!validId || selectedSeason === null) return;

@@ -20,7 +20,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,webmanifest}"],
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/rip\//],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
@@ -52,6 +52,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": { target: "http://localhost:8888", changeOrigin: true },
+      "/rip": { target: "http://127.0.0.1:5174", changeOrigin: false },
     },
   },
   build: {

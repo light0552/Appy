@@ -355,3 +355,625 @@
     padding-right: max(var(--page-x), env(safe-area-inset-right));
   }
 }
+
+/* ==================================================================
+   Lighthook surfaces (2026-10-24) — appended for the ad-free mode:
+   the "preparing" stage, the HlsPlayer custom chrome, and the
+   first-class Lighthook chip distinction. Tokens only, like above.
+   ================================================================== */
+
+/* Preparing stage — same frame geometry as the players. */
+
+.rip-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    color-mix(in srgb, var(--accent) 7%, var(--bg)) 0%,
+    var(--bg) 62%
+  );
+}
+
+.rip-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  animation: rip-spin 0.9s linear infinite;
+}
+
+@keyframes rip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rip-text {
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.rip-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+
+.rip-stage .btn {
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+/* HlsPlayer — a <video> we own, with custom chrome.                   */
+
+.hp {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.hp-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Full-surface tap layer: toggles the chrome. Decorative — the chrome's
+   buttons carry the accessible labels. */
+.hp-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* Keep the browser's 300ms double-tap-zoom from stealing the skip gesture. */
+  touch-action: manipulation;
+}
+
+/* Gradient scrim behind the chrome (VidFast legibility on bright frames). */
+.hp-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 104px;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(6, 9, 14, 0.82) 0%,
+    rgba(6, 9, 14, 0.45) 55%,
+    transparent 100%
+  );
+  animation: hp-scrim-in var(--dur-fast, 180ms) ease;
+}
+
+@keyframes hp-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* VidFast-style feedback pill ("Quality: 720p", "Speed: 1.5×"). */
+.hp-toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 116px);
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(8, 11, 16, 0.88);
+  border: 1px solid var(--border-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: hp-toast-in 0.16s ease;
+}
+
+/* Double-tap ripple ("+10s" / "−10s"). */
+.hp-flash {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: rgba(20, 26, 34, 0.55);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 750;
+  pointer-events: none;
+  animation: hp-flash-pop 0.6s ease forwards;
+}
+
+.hp-flash--left {
+  left: 25%;
+}
+
+.hp-flash--right {
+  left: 75%;
+}
+
+@keyframes hp-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes hp-flash-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.35);
+  }
+}
+
+/* Center play / replay button. */
+.hp-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  color: var(--text);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5), 0 0 22px var(--accent-glow);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.hp-center:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+/* Delayed buffering indicator (>1.2s wait, see HlsPlayer). */
+.hp-buffering {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  pointer-events: none;
+}
+
+.hp-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  animation: rip-spin 0.8s linear infinite;
+}
+
+/* Stall watchdog escape hatch — sits just above the control bar. */
+.hp-stuck {
+  position: absolute;
+  left: 50%;
+  bottom: 86px;
+  z-index: 5;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 24px);
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--accent-line);
+  background: color-mix(in srgb, var(--surface-2) 85%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow: var(--shadow), 0 0 26px var(--accent-glow);
+  font-size: 13.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  animation: watchdog-in var(--dur-med) var(--ease);
+}
+
+.hp-stuck .btn {
+  white-space: nowrap;
+}
+
+/* Bottom glass control bar. Hidden via opacity+visibility so taps fall
+   through to the tap layer while it's away. */
+.hp-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 30px 10px calc(8px + env(safe-area-inset-bottom));
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 45%,
+    color-mix(in srgb, var(--bg) 88%, transparent) 100%
+  );
+  /* No backdrop blur here: it smeared the CC/quality glyphs and made the
+     control strip look out of focus on the phone (2026-10-24 user report).
+     The gradient alone keeps contrast without touching the glyphs. */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--dur-med) var(--ease),
+    visibility var(--dur-med) var(--ease);
+}
+
+.hp-controls.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Seek: a real range input riding over buffered/played layers. */
+.hp-seek {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+}
+
+.hp-seek-track {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.hp-seek-buffered,
+.hp-seek-played {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+
+.hp-seek-buffered {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.hp-seek-played {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.hp-seek-input {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.hp-seek-input::-webkit-slider-runnable-track {
+  height: 22px;
+  background: transparent;
+}
+
+.hp-seek-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.hp-seek-input::-moz-range-track {
+  height: 22px;
+  background: transparent;
+}
+
+.hp-seek-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Button row. */
+.hp-buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Narrow phones: 7 × 44px controls + the clock do not fit a 390px screen —
+   Fullscreen rendered 17px past the right edge and was half untappable.
+   Lift the clock above the scrubber and let the buttons share the full row
+   with even spacing (44px tap targets kept). */
+@media (max-width: 480px) {
+  .hp-buttons {
+    justify-content: space-between;
+    gap: 0;
+  }
+
+  .hp-time {
+    position: absolute;
+    top: 5px;
+    right: 12px;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--text-2, #aab4c4);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  }
+}
+
+/* Scopes past styles.css's .icon-btn sizing (44px targets kept). */
+.hp-controls .hp-btn {
+  min-width: 44px;
+  height: 44px;
+  color: var(--text);
+  background: transparent;
+  border-color: transparent;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.hp-controls .hp-btn:active {
+  transform: scale(0.92);
+}
+
+.hp-time {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.hp-spacer {
+  flex: 1 1 auto;
+}
+
+/* Quality sheet — Auto + one entry per hls.js level. */
+.hp-sheet {
+  position: absolute;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 106px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 132px;
+  padding: 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  /* No backdrop blur: on mobile Chrome it smeared the sheet's own labels into
+     the video behind it (ghosting) and made the menu look out of focus.
+     96% opaque surface keeps contrast crisp on any frame. */
+  box-shadow: var(--shadow);
+  animation: watchdog-in var(--dur-med) var(--ease);
+}
+
+.hp-sheet button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+/* VidFast section captions inside the sheets. */
+.hp-sheet .hp-cap {
+  padding: 6px 8px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  opacity: 0.85;
+}
+
+.hp-sheet .hp-check {
+  color: var(--accent-bright);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.hp-sheet button.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+/* Honest empty state: the CC control exists, the title simply has no tracks. */
+.hp-sheet .hp-sub-empty {
+  padding: 10px 12px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+/* Subtitle sync — provider VTTs sometimes run early against the video.
+   Compact −/+ half-second taps with a tap-to-reset value. */
+.hp-sub-sync {
+  margin: 2px 4px 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hp-sheet .hp-sub-sync-label {
+  margin: 0 0 6px;
+  padding: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  opacity: 0.85;
+}
+
+.hp-sub-sync-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hp-sheet .hp-sub-sync-btn {
+  flex: 0 0 auto;
+  justify-content: center;
+  min-width: 52px;
+  height: 32px;
+  padding: 0 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.hp-sheet .hp-sub-sync-btn:disabled {
+  opacity: 0.38;
+}
+
+.hp-sheet .hp-sub-sync-value {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 54px;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--accent-bright);
+  font-size: 12.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.hp-sub-sync-hint {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--text-2);
+}
+
+/* Activated CC / speed states on the chrome buttons. */
+.hp-btn--on {
+  color: var(--accent-bright);
+  text-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* Keep the browser's loud blue focus ring off touch/mouse clicks, but keep a
+   visible accent ring for keyboard users (the phone taps were leaving a blue
+   halo on Fullscreen/CC). */
+.hp-controls .hp-btn:focus,
+.hp-sheet button:focus {
+  outline: none;
+}
+
+.hp-controls .hp-btn:focus-visible,
+.hp-sheet button:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+/* "No ad-free stream" note shown briefly before the embed fallback. */
+.rip-note {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  transform: translateX(-50%);
+  max-width: min(92vw, 480px);
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+  font-size: var(--text-2xs, 11px);
+  color: var(--text-2, #aab4c4);
+  pointer-events: none;
+  z-index: 5;
+  animation: watchdog-in var(--dur-fast, 180ms) ease;
+}
+
+/* Lighthook chip — a subtle accent tint so it reads as different in
+   kind from the provider chips (active glow still comes from
+   .chip--active above). */
+.watch-top-row .server-chips .chip--lighthook {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+  color: var(--accent-bright);
+}

@@ -28,6 +28,15 @@ export interface ProviderDefinition {
   id: string;
   name: string;
   hint: string;
+  /**
+   * Excluded from all CLIENT-side lists (chips, manual fallbacks, advance
+   * order) per user mandate 2026-10-24 ("remove Vidsrc"). The sidecar's
+   * extractor still races it server-side — there its ad infra is irrelevant:
+   * the phone never loads the provider page, only the ripped stream passes
+   * through the home box. Removing it from the race entirely would strand
+   * most titles (measured: Vidsrc won the strongest catalogue share).
+   */
+  hidden?: boolean;
   /** Returns null when the provider cannot address this title. */
   movie: (ref: MediaRef) => string | null;
   tv: (ref: MediaRef) => string | null;
@@ -48,7 +57,8 @@ export const PROVIDERS: readonly ProviderDefinition[] = [
   {
     id: "vidsrc",
     name: "Vidsrc",
-    hint: "Works — ad-heavy",
+    hint: "Hidden from clients — raced server-side only",
+    hidden: true,
     movie: (ref) => (ref.imdbId ? `https://vidsrc.to/embed/movie/${ref.imdbId}` : null),
     tv: (ref) =>
       ref.imdbId
@@ -92,6 +102,7 @@ export function buildUrl(provider: ProviderDefinition, ref: MediaRef): string | 
 export function availableProviders(ref: MediaRef): ProviderOption[] {
   const out: ProviderOption[] = [];
   for (const provider of PROVIDERS) {
+    if (provider.hidden) continue; // user mandate 2026-10-24: client never sees Vidsrc
     const url = buildUrl(provider, ref);
     if (url) out.push({ provider, url });
   }

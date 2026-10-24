@@ -333,3 +333,117 @@ alive first — restart if needed). Only after they approve: install Git, push, 
 - **Cross-device sync only provable after deploy** (no local Blobs backend).
 - **Player copy rules (BUILD.md §15):** label is "Continue" (never timestamp resume); no
   disclaimers/warnings/"educational purposes" text anywhere.
+
+---
+
+## 7. Ripstream sidecar — ad-free own player (2026-10-24, built + E2E-verified)
+
+**User mandate:** "app blocker kinda thing… no ads in the player when I use my mobile on 192.168.0.35:5173; default VidFast; 0 popups; no git/netlify yet; use subagents; test like a user." Deliverable: the ripstream sidecar the extractor anticipated (`server.mjs` was referenced by extract.mjs's header but never existed), plus a first-class "Lighthook — ad-free" playback mode in the app.
+
+**Topology change that reopens D7:** D7/§8.1/§15 verdicts measure a NETLIFY-hosted app with remote viewers (function timeouts, datacenter-IP nulling, byte-proxy ban, `ip_cidr` mismatch for off-home viewers). Today's real usage is the HOME box + the user's phone on the same LAN — headless Chrome runs here for free, the sidecar is the only client stream CDNs ever see (Cookies/JWT bindings trivially satisfied), and video bytes flow home machine → phone over LAN (§15's Netlify-only ban unaffected). O1's own records said the real route is a self-hosted source — the sidecar IS that, at appliance scale.
+
+**Architecture:**
+- `scripts/ripstream/server.mjs` (loopback **127.0.0.1:5174**):
+  - `/rip/resolve?type,t-MDBId,imdbId,s,e` → runs the extractor race; SQLite none — in-memory cache TTL 2 h (Vidsrc JWT measured 4 h), 200-entry LRU, in-flight dedup (two pages asking the same title share ONE rip), plus a 90 s negative cache for dead titles.
+  - `/rip/hls/<encodeURIComponent(upstream)>` → byte-proxy: replays the extractor's captured headers (exact URL → origin → longest-suffix CDN match), rewrites every child URI (bare lines + `KEY/MAP/MEDIA` quoted attrs) to `/rip/hls/…`, drops ad-host children as blocks (master `STREAM-INF`+URI, variant `EXTINF`+URI), streams segments unbuffered with Range passthrough, aborts on client close/30 s stall.
+- `scripts/dev-all.mjs` = `npm run dev:live` — spawns Vite (5173, `--host`) + sidecar; tree-kill on exit. `vite.config.ts` proxies `/rip` → 5174; PWA `navigateFallbackDenylist` gained `/^\/rip\//` (SW never owns rip traffic).
+
+**Player:** `src/components/HlsPlayer.tsx` — own `<video>`, native HLS on Safari/iPhone (HW decode/AirPlay/PiP), hls.js (already a dep; dynamic-imported → own 185 kB gz chunk) elsewhere; custom mobile chrome (center play, ±10 s, buffered seek bar, quality sheet when master has levels, PiP/fullscreen, 3.2 s auto-hide, 1.2 s buffering spinner, 8 s stall watchdog → [Retry]/[Switch to backup]); fatal-error ladder (1 network retry → recoverMediaError → unrecoverable). Watch.tsx state machine: preparing (live elapsed ticker + "Play with regular servers →" escape hatch) → owned → embed, auto-fallback without touching prefs; user chip picks persist exactly as before; `preferredProvider === "lighthook"` resumes rip mode.
+
+**Mandate compliance — VidFast:** raced FIRST in `providerEmbeds` (reordered 2026-10-24). Live re-verify showed it still returns no stream (yesterday's HTTP 500 persists) — in the race that costs ZERO wait (parallel start, first winner takes the crown; both Vidsrc and VidLink win titles independently). Order is one line to revert if the mandate changes.
+
+**Measured (E2E `qa/e2e-rip.js`, LAN origin, iPhone UA, real user path profile→home→tap→player):**
+| Metric | Serial build (1st E2E) | Race build (final) |
+|---|---|---|
+| Cold resolve (The Matrix, imdb given) | 78.0 s → client abort at 45 s → embed fallback + 3 popups | **8.1 s** |
+| Cache re-hit | n/a (abandoned) | **93 ms** (/cli) / video in **386 ms** (E2E) |
+| Owned-mode popups/ad-host requests | n/a | **0 / 0** (across both titles) |
+| `/rip/*` responses | 0 (aborted) | all < 400 |
+| Headless autoplay note | — | holds at t=0 until gesture (real phone's center-tap is that gesture); post-tap playback advances at full rate |
+
+**Honest limits:** DRM-only titles (extractor flags Widevine et al.) auto-fall back to the iframe path — provider ads reappear there by nature (Vidsrc ordered per its 0-popunder measurement underneath VIDLink in the chips? Order stays providers.ts registry: VidFast first per mandate — dead-but-free in race land — then VidLink, Vidsrc, Videasy). First tap per title (~8-15 s typical, worst ≈44 s wall guard) shows the Preparing stage; the 2 h cache then makes repeats instant. Resolution drift may someday need extractor touch-ups; it sniffs traffic by design, so shape changes are tolerated automatically. If the user later NETLIFIES, the sidecar does NOT go — `ripath` becomes impossible on the function runtime; the app falls back to iframes there BY DESIGN (documented, not silent).
+
+**NOT done (per mandate):** zero git commands (git isn't even installed — untouched), zero netlify/deploy commands, `.env` untouched. QA harness cleaned up: no orphan node/chrome processes (rebooting `npm run dev:live` is the user's single command; currently left RUNNING for their phone test).
+
+---
+
+## 8. Player polish round — CC/speed/quality, faster "Preparing", Vidsrc hidden, honest fallback note (2026-10-24, built + E2E-verified)
+
+**User feedback driving it:** "Ligh hook player is good" + three asks: subtitle setting with playback speed and quality; optimize the "Preparing ad-free stream…" wait; "Remove Vidsrc No need for that keep VidLink VidFast VidEasy"; plus another "LIGHhook unable to resolve" sighting.
+
+**Infrastructure root cause found + fixed (the real "unable to resolve"):** during the user's live session the shared headless Chrome **crashed mid-race** ("Connection closed" ×4 at 21:45) and the 90 s negative cache treated that crash as a verdict — rapid re-taps got instant "no stream" instead of a retry. Two hardening layers in `extract.mjs`:
+- All-providers-crashed (zero genuine misses) is now a TRANSIENT infra failure: fast crashes (< 15 s) trigger ONE quiet auto-retry on a relaunched Chrome (`race(ref, log, depth)`; you just see the spinner a bit longer); slow/repeat crashes `throw` so the sidecar answers 503 and **never lands in the 90s negative cache** — the next tap relaunches Chrome free.
+- Genuine provider misses (they answered, no stream exists) remain the only thing the negative cache ever remembers.
+
+**"Preparing" wait optimized (three layers):**
+- **Title-page pre-warm (biggest win):** movies now start the sidecar race **1.5 s after detail loads** (`Title.tsx`, `prewarmedRef`; StrictMode-safe; TV excluded — its resolve key is season/episode-dependent). By Play-tap the resolve is cached (~instant video) or sharing an in-flight race via server dedup.
+- Measured user-visible effect: Title → Play lands at ~0-3 s on the spinner for movies (race runs while reading the page), **1 ms-instant on every repeat** within 2 h.
+- Speed-inner-limits noted for the record: cold first-tap on a brand-new TV episode still pays the honest headless-browser cost (~7-15 s — the price of ripping instead of loading ad-infested iframes); the escape hatch stays one tap away.
+
+**Player settings (HlsPlayer.tsx + player.css):** three chrome buttons on the control row — **CC** (visible only when tracks exist; hls.js `SUBTITLE_TRACKS_UPDATED` + native `textTracks` sync paths, `subIdx` applies to whichever engine is live), **speed** (0.5×-2×, `SPEED_OPTIONS`, re-applied on engine restarts via `[speed, retryNonce]`), **quality** (existing level picker, now `sheet`-consolidated: `SettingsSheet = "none" | "quality" | "subs" | "speed"`, every pick closes the sheet, active states glow via new `.hp-btn--on`).
+
+**Vidsrc — hidden from all clients, KEPT in the server race (deliberate):** new `hidden?: boolean` in providers.ts; Vidsrc is filtered out of `availableProviders` so chips/fallback/advance never show it (client lists now: Lighthook | VidLink | VidFast | Videasy). It still races server-side where its ad infra is irrelevant (the phone never loads the provider page — only the ripped stream crosses the home box); removing it from the race entirely would strand most titles (measured: it wins the strongest catalogue share — e.g. The Matrix 7.8 s, Dune Prophecy 6.3 s this session). Interpretation of the mandate "remove Vidsrc, keep VidLink/VidFast/VidEasy": remove it from what the user SEES and deliberately picks.
+
+**Honest fallback note (`ripNote`):** when the ad-free path gives up (genuine no-stream, sidecar timeout, or extractor death past auto-retry) embed mode takes over as designed and a one-line translucent note flashes ~4.5 s: "No ad-free source for this title right now — regular servers below." (or "…ended —" after a mid-play death). Wired at all three handoffs + param-reset + unmount cleanup; `.rip-note` styled in player.css.
+
+**Verification:** `npx tsc --noEmit` clean; `npm run build` green (64 modules; hls chunk 592 kB / 185 kB gz — the known dynamic-import trade-off); E2E `qa/e2e-rip.js` **16 PASS / 0 FAIL** re-run with everything live — chips row rendered without Vidsrc, resolve still `ok:true` (vidsrc winning the race server-side), owned mode, 0 popups, 0 ad hosts, 9 segment rides, cached re-hit video in 7.6 s run-end.
+
+---
+
+## 9. VidFast-style player chrome + iPhone engine swap (2026-10-24, built + 19/16 E2E-verified)
+
+**User push round 2:** "Quality 800p why" (provider's raw oddball rung), "like VidFast", "FIQ NOW": make player's UI/behavior like VidFast.
+
+**ENGINE SWAP (the quality-gone fix):** previous choose-native-on-iPhone meant the phone's real Safari never parsed levels → no quality/subs sheet there (headless Chromium was fine → tests lied). Now `HlsPlayer.tsx`: **hls.js first for every HLS it can attach to** — desktop, Android, and iPhone/iPad since iOS 17.1 via ManagedMediaSource (`disableRemotePlayback=true` scoped to MSS devices per hls.js docs). Native HLS is the LAST-RESORT fallback only (MP4 always native; iOS < 17.1 keeps playback but has no in-app picker — Safari offers no levels API there).
+
+**Quality ladder snap (`ladderLabel`):** provider masters serve raw oddballs (measured live: an **800p** rung). Every height snaps to standard [2160/1440/1080/720/480/360/240/144] within ±14%; rungs dedupe (same label keeps its tallest level index) → sheet always reads Auto + 1440/1080/720/360…, still fully dynamic from the manifest. Button appears the moment ANY rung exists (`qualityAvailable`, was `>1`). Auto shows a live sub-label from `LEVEL_SWITCHED` ("Auto · 1080p" while it adapts).
+
+**VidFast chrome polish (HlsPlayer.tsx + player.css):** gradient bottom scrim behind chrome (bright-frame legibility); double-tap left/right half = ±10s with ripple flash (320ms tap classifier, functional-updater toggle so no stale closures); VidFast-style toast pill on every change ("Quality: 1080p", "Speed: 1.5×", "Subtitles: Off"); sheets get caps (SPEED/QUALITY/SUBTITLES), §-check ✓ on the active item and pick-closes-sheet semantics; speed button label shows current rate (1×/1.5×…); CC button GATED on real tracks, so it only renders when subs exist (user asked "SUBTITLES AVAILABLE ONLY KINDA"); subs sheet = Off first + each track.
+
+**Verification:** type-check + build green; new harness `qa/e2e-quality.js` **19 PASS / 0 FAIL** (owned → playing; quality sheet labels canonical + Auto-first + sorted desc; rung switch → toast + sheet closes; speed sheet full list + 1.5x actually applied on engine; CC correctly hidden on a no-subs stream; double-tap skip Δ exactly 10.0s; flash ripple; single-tap chrome toggle). `qa/e2e-rip.js` re-run **16 PASS / 0 FAIL** (owned, 0 popups/ad-hosts, cache re-hit 363 ms). Shots in `qa\shots\quality-sheet|subs-sheet|quality-toast|after-skip.png`.
+
+---
+
+## 10. Subtitles delivered + race-hold quality swap + PiP removed (2026-10-24, built + 83/0 E2E-verified)
+
+**User push round 3:** "no button for CC on the main player", "quality is 720p", "stream taking too long", "pop out player — we don't need that". All four landed.
+
+**SUBTITLES — real CC now reaches the own-player (the fix that made the button appear):**
+the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed players DO fetch plain WebVTT files for their own CC buttons. `extract.mjs` now sniff-listens for `.vtt` responses (passive snarfing) and clicks the embed's captions control once per rip (`inPageCaptionKick`; JW `icon-cc`, VJS `subs-caps`, aria/title captions + the "c" key) so the lazy-load actually fires before resolve; each VTT is captured with its replay headers, label guessed from `?lang=` style params (fallback `Subtitle N`). Server composes `subs[]` (`kind:"vtt"`, proxied path), registers per-URL replay headers, caches them, returns them in fresh + cache-hit payloads. `rip.ts` guards/normalizes (`RipSub`, leading slash + label fallback + dedupe); `Watch.tsx` passes them through. `HlsPlayer.tsx` mounts real `<track kind="subtitles">` children, **unified CC index space** (external tracks first, manifest renditions after with offset; picking an external pins `hls.subtitleTrack=-1`, picking a rendition disables externals — no double-render; same logic for the native path, whose addtrack sync now excludes our own track elements). CC button shows iff ANY source exists (engine/native renditions OR externals) and lights `hp-btn--on` while a pick is active. **Proxy forces `text/vtt; charset=utf-8`** for `.vtt` responses — Chromium refuses `<track>` cues otherwise (verified: 200 + correct MIME + real cue text).
+
+**RACE-HOLD quality swap (`#holdForBetter` + `#peekRip`):** the first winner no longer ends the race. A short hold window (`RIP_RACE_HOLD_MS`, now **600 ms** — was 1300) keeps listening for rival rips and swaps when a rival's master peaks higher on `RESOLUTION` or offers subs where the head has none; failed peeks are ignorance, never verdicts. Fixed the ordering bug: the deadline is set FIRST, the head's own peek runs inside the window, and each rival peek is budget-capped — held resolves cost about race + 0.6 s, not twice that. Rivals rarely arrive in-window tonight (they miss at ~36 s), so logs correctly show `[hold] kept videosrc` on 1396; a rival rip carrying a `-0-0-1080-` master on another title proves 1080 material exists when sources answer.
+
+**PIP REMOVED entirely** (button, handler, availability flag, icon, webkit cast) — the pop-out mini-window carried a second player chrome. Only `webkitEnterFullscreen` stays for iOS fullscreen.
+
+**Ground truth (live, this build):** 1396 BB S1E1 = subs **1** ("Subtitle 1", a 41 KB real WebVTT with actual English cues), master has NO `EXT-X-MEDIA` sub renditions, rungs 720/360; 220542 Dune = subs **0**, rungs 1080/720/360 — its CC button is correctly ABSENT (the source genuinely carries no subs) while its 1080 proves the ladder works where the source serves it.
+
+**Verification:** `npx tsc --noEmit` clean; `npm run build` green. QA BOT SWEEP: `e2e-rip.js` **16 PASS / 0 FAIL**, `e2e-quality.js` **19 PASS / 0 FAIL**, updated `e2e-user-rigorous.js` **48 PASS / 0 FAIL** = **83 PASS / 0 FAIL total** (CC-positive flow end-to-end on 1396: button present → sheet `Off | Subtitle 1` → toast → exactly one textTrack showing → Off teardown works; CC-negative gate on 220542 with zero `<track>` children; forced-MIME 200; PiP absent everywhere; zero ad-hosts; zero popups; owned flip ~610 ms). The single flake was the OLD `e2e-rip` harness' wrong cache-warm assumption for movie|603 (cold resolve, not an app bug); its completed resolve made the rerun clean at 16/0 with a 360 ms re-hit. Shots refreshed under `C:\Users\LIGHTHOOK\AppData\Local\Temp\opencode\qa\shots\`.
+
+**Speed story ("on-demand" feel):** cold fresh rip = race 6-9 s + hold <=0.6 s + caption-kick window <=0.9 s (skips early once a VTT lands) = about **8-11 s once**, then **instant** from cache (~2 h TTL). Title-page pre-warm starts the race while the user is still reaching for Play.
+
+---
+
+## 11. Always-on CC, adjustable subtitle sync, honest 1080p, no false fallback on S5E5 (2026-10-24, built + 195/0 E2E-verified)
+
+**User push round 4:** "no button for CC on the main player" came back after another device test; "Subtitles are a bit OFF on some movies — CC come first AND VID LATE — make it adjustable"; "quality is 720p" on a title that actually carries 1080p; and the exact URL `/watch/tv/1396?s=5&e=5` saying **"No ad-free source"** on first load, then working only after switching to VidFast and back.
+
+**CC is now unconditional (`HlsPlayer.tsx`):** the Subtitle button renders on every owned player, tracks or not. It opens the unified sheet (`Off` first, external WebVTTs then manifest renditions) and when a title genuinely carries nothing it says **"No subtitles found for this title"** instead of hiding the control. The sheet header reads **"Lighthook subtitles"** so it can never be mistaken for Chrome/Android **Live Caption**, which is a browser/OS overlay the page cannot toggle (Settings → Accessibility → Live Caption, or Chrome's caption settings).
+
+**Subtitle sync — the "VID LATE" fix:** a `Subtitle sync` block at the bottom of the CC sheet with **−0.5s / value / +0.5s**, range ±5.0s, positive = captions later. It mutates the live `TextTrackCue.startTime/endTime` of every loaded subtitle track; original times live in a `WeakMap` so repeated taps never compound, and the offset is re-applied on `timeupdate`, `seeked`, track changes and the first loaded cues. The sheet value doubles as **tap-to-reset**. Sync is hidden when the title has no tracks (no dead buttons). Verified live: S5E5 cue `0.060 → 1.060` after two +0.5s taps, reset back to `0.060`.
+
+**External subtitles (`server.mjs`):** the rips' masters still declare `CLOSED-CAPTIONS=NONE` and the provider embeds only expose a subset, so the sidecar now queries the OpenSubtitles-v3 Stremio catalogue per title (English first, max 3, in parallel with the race), downloads SRT, converts it to WebVTT, and serves it through `/rip/subs/<encoded>` as **`text/vtt; charset=utf-8`**. The merge is external-first plus snarfed VTT, capped at 6, so a title with no provider captions still gets real CC. Verified: `200`, correct MIME, body starts `WEBVTT`.
+
+**Honest quality labels:** `effectiveHeight(width, height) = max(height, round(width × 9/16))` for landscape sources. A cinematic **1920×800** master is a 1080p-class encode, not "720p"; the sheet now reads `1080p | 720p | 360p` for 969681 and the ladder still snaps oddballs to standard rungs. The ground-truth parser in QA uses the same rule, so the test and the UI can no longer disagree. Where a title truly tops out at 720/360 (e.g. 1396), the sheet says exactly that — no invented rung.
+
+**S5E5 false fallback, root-caused:** a cold resolve can hit four provider crashes; the fresh-Chrome retry then wins via vidsrc, but total wall time (54.9 s measured) exceeded the old **45 s** client timeout, so the UI declared "No ad-free source" and dropped to an iframe — switching servers later used the now-warm cache. Fixes: signal the all-crashed state immediately, retry once on a fresh Chrome, check for a late winner after the retry, and raise the client resolve timeout to **95 s**. The preparing stage keeps its elapsed counter and "Play with regular servers" escape hatch.
+
+**Chrome polish:** auto-hide is **2200 ms**; an open sheet keeps the bar visible; control bar and sheets use **no `backdrop-filter`** (mobile Chrome smeared the sheet's own labels into the video — the "blurred CC" in the user's screenshot); sheets are 96% opaque, sit above the control row and fully inside the player. Narrow phones got a real fix: seven 44px controls plus the clock overflowed a 390px row and clipped Fullscreen by 17px — the clock now sits above the scrubber and the buttons share the row exactly (`scrollWidth == clientWidth == 370`).
+
+**Verification (final tree, live LAN origin, iPhone UA):**
+- `npx tsc --noEmit` clean; `npm run build` green (dist current).
+- `e2e-user-rigorous.js` — **146 PASS / 0 FAIL**: S5E5 first load owned, no iframe, never flashed "No ad-free source"; CC/sheet/one-showing-track teardown; sync +1.0s and exact reset; 969681 `1080p`; Lighthook → VidFast → Lighthook with CC restored; 47s-held resolve still reaches owned video at 47.2s; zero ad-host requests, zero popups, 110 `/rip/*` calls all < 400.
+- `e2e-quality.js` — **33 PASS / 0 FAIL**: CC always present, empty-state message + no dead sync row, sheet header, ladder labels/order, speed, double-tap skip, control-row fit, clock/scrubber separation.
+- `e2e-rip.js` — **16 PASS / 0 FAIL**: owned playback, cached re-hit 348ms, zero ads/popups.
+- **195 PASS / 0 FAIL total.** Ground truth: S5E5 cold resolve 10.9s (vidsrc HLS, 4 subs), S1E1 8.3s, 969681 1080p, 220542 1080p. Screenshots under `qa\shots\` (`s5e5-cc-final.png`, `s5e5-sync.png`, `s5e5-cc-layout.png`, `969681-quality.png`, `subs-empty-sheet.png`).
+
+**NOT done (per mandate):** no git commands, no deploy/Netlify, `.env` untouched. Dev stack is still running on **http://192.168.0.35:5173** for a real phone check; approval is required before any git or deploy step.

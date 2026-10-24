@@ -43,7 +43,7 @@ jobs:
       # FAMILY_KEY (server-side function runtime) is configured on the
       # Netlify site itself via netlify env:import — it is not a build var.
       - name: Deploy to Netlify
-        run: npm i -g netlify-cli@latest && netlify deploy --build=false --prod --dir=dist --site $NETLIFY_SITE_ID --auth $NETLIFY_AUTH_TOKEN --message "Deploy from commit ${GITHUB_SHA::7}"
+        run: npm i -g netlify-cli@latest && netlify deploy --no-build --prod --dir=dist --site $NETLIFY_SITE_ID --auth $NETLIFY_AUTH_TOKEN --message "Deploy from commit ${GITHUB_SHA::7}"
         env:
           NETLIFY_AUTH_TOKEN: ${{ vars.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}

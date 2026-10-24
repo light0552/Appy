@@ -408,6 +408,15 @@ longer *impossible*, so the watchdog below is the working substitute for a hard 
 
 ### 8.1 Ads and the "own player" question (measured 2026-10-23 — do not re-attempt)
 
+> **Superseded for the HOME-LAN topology, 2026-10-24 — see WORKLOG §7 (ripstream
+> sidecar).** The verdict below holds for a Netlify/remote-viewer deployment and for any
+> purely client-side attempt (the SOP wall is real). The `scripts/ripstream/` sidecar
+> (run locally via `npm run dev:live`) sidesteps every premise measured here: headless
+> Chrome lives on the home machine, stream URLs never leave the household, and all bytes
+> ride the home server to the LAN phone. E2E: resolve 8.1 s cold / 386 ms cached, 0
+> popups, 0 ad-host requests from the page, owned player playing both a movie and an
+> episode.
+
 A user asked for a homemade `<video>` player to remove ads. Both the client-side and
 server-side paths were measured and are **dead ends**. Recorded here so no future build
 burns time re-attempting them.
@@ -613,8 +622,11 @@ horizontally with `scroll-snap-type: x mandatory` and hidden scrollbars.
 
 ## 15. Do not do
 
-- Do not proxy video bytes through Netlify.
-- Do not attempt server-side stream extraction (see §3.4 — geo-blocked and CORS-walled).
+- Do not proxy video bytes through Netlify. (The LOCAL ripstream sidecar byte-proxy is
+  the home-LAN carve-out of WORKLOG §7 — Netlify stays forbidden.)
+- Do not attempt server-side stream extraction **on Netlify** (see §3.4 — geo-blocked and
+  CORS-walled). The local sidecar (`scripts/ripstream/server.mjs`) is the sanctioned
+  home-machine version.
 - Do not try to style or script inside the provider iframe.
 - Do not promise second-level resume; the position is unreadable.
 - Do not add an "educational purposes" banner, disclaimer, or ad-blocker upsell.
