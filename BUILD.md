@@ -408,14 +408,15 @@ longer *impossible*, so the watchdog below is the working substitute for a hard 
 
 ### 8.1 Ads and the "own player" question (measured 2026-10-23 — do not re-attempt)
 
-> **Superseded for the HOME-LAN topology, 2026-10-24 — see WORKLOG §7 (ripstream
-> sidecar).** The verdict below holds for a Netlify/remote-viewer deployment and for any
-> purely client-side attempt (the SOP wall is real). The `scripts/ripstream/` sidecar
-> (run locally via `npm run dev:live`) sidesteps every premise measured here: headless
-> Chrome lives on the home machine, stream URLs never leave the household, and all bytes
-> ride the home server to the LAN phone. E2E: resolve 8.1 s cold / 386 ms cached, 0
-> popups, 0 ad-host requests from the page, owned player playing both a movie and an
-> episode.
+> **Superseded 2026-11-08: the whole ad-free "own player" path is DELETED.** The
+> `scripts/ripstream/` sidecar (server + browser-farm extractor + subtitle proxy),
+> the client `HlsPlayer`/`rip.ts` modules, the `hls.js` dependency and the `/rip`
+> dev proxy are gone. The household watches the provider frames in the watch page,
+> and the ad-blocker notice at the top of the app is the mitigation. Do not
+> rebuild this path without a fresh user mandate.
+>
+> The verdict below holds for a Netlify/remote-viewer deployment and for any
+> purely client-side attempt (the SOP wall is real).
 
 A user asked for a homemade `<video>` player to remove ads. Both the client-side and
 server-side paths were measured and are **dead ends**. Recorded here so no future build
@@ -622,11 +623,10 @@ horizontally with `scroll-snap-type: x mandatory` and hidden scrollbars.
 
 ## 15. Do not do
 
-- Do not proxy video bytes through Netlify. (The LOCAL ripstream sidecar byte-proxy is
-  the home-LAN carve-out of WORKLOG §7 — Netlify stays forbidden.)
+- Do not proxy video bytes through Netlify.
 - Do not attempt server-side stream extraction **on Netlify** (see §3.4 — geo-blocked and
-  CORS-walled). The local sidecar (`scripts/ripstream/server.mjs`) is the sanctioned
-  home-machine version.
+  CORS-walled). The local ripstream sidecar was the sanctioned home-machine version and
+  it has been deleted (2026-11-08) — do not recreate it without a user mandate.
 - Do not try to style or script inside the provider iframe.
 - Do not promise second-level resume; the position is unreadable.
 - Do not add an "educational purposes" banner, disclaimer, or ad-blocker upsell.

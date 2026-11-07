@@ -1,0 +1,709 @@
+/* ==================================================================
+   House signal — the cinematic status band above the main content.
+   Tokens come from src/styles.css; nothing here reaches outside
+   the .notice subtree.
+   ================================================================== */
+
+.notice {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  /* Gutter + safe-area: never tuck the band under a notch. */
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 12px)
+    max(var(--page-x), env(safe-area-inset-right, 0px))
+    0
+    max(var(--page-x), env(safe-area-inset-left, 0px));
+}
+
+/* Band ---------------------------------------------------------------- */
+
+.notice-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "beacon copy"
+    "chips  chips"
+    "actions actions";
+  gap: 12px;
+  padding: 15px 15px 14px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 68%, var(--border));
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text) 4%, transparent) 0%,
+      transparent 30%
+    ),
+    radial-gradient(
+      120% 170% at -10% 0%,
+      color-mix(in srgb, var(--accent) 15%, transparent) 0%,
+      transparent 46%
+    ),
+    radial-gradient(
+      85% 120% at 108% 118%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      70% 95% at 92% -30%,
+      var(--glow-secondary) 0%,
+      transparent 62%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-2) 94%, transparent) 0%,
+      color-mix(in srgb, var(--surface) 96%, transparent) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent),
+    inset 0 -1px 0 rgba(2, 5, 11, 0.4),
+    0 1px 2px rgba(2, 5, 11, 0.5),
+    0 22px 54px -14px rgba(2, 5, 11, 0.66),
+    0 0 70px -30px var(--accent-glow);
+  backdrop-filter: blur(20px) saturate(1.35);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  animation: notice-in 520ms var(--ease-out);
+}
+
+/* Dismissal exit — matches EXIT_MS (240ms) in NoticeBoard.tsx.
+   animation: none is essential: the entrance animation would otherwise
+   keep overriding the exit transform if the card is dismissed fast. */
+.notice-card--closing {
+  animation: none;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.988);
+  transition:
+    opacity 200ms var(--ease),
+    transform 220ms var(--ease);
+}
+
+/* Lit hairline along the top edge. */
+.notice-hairline {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 4;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 34%, transparent) 16%,
+    color-mix(in srgb, var(--accent-bright) 80%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 34%, transparent) 84%,
+    transparent 100%
+  );
+  opacity: 0.55;
+}
+
+/* A single soft pass of light across the glass on entry. */
+.notice-sheen {
+  position: absolute;
+  inset: -20% auto -20% 0;
+  z-index: 3;
+  width: 52%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent-bright) 13%, transparent) 48%,
+    transparent 100%
+  );
+  filter: blur(14px);
+  opacity: 0;
+  animation: notice-sheen 1.6s var(--ease-out) 0.18s;
+}
+
+@keyframes notice-sheen {
+  0% {
+    transform: translateX(-105%);
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(310%);
+    opacity: 0;
+  }
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.994);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes notice-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Beacon medallion ---------------------------------------------------- */
+
+.notice-beacon {
+  grid-area: beacon;
+  position: relative;
+  z-index: 2;
+  align-self: start;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--accent-bright);
+  border: 1px solid color-mix(in srgb, var(--accent-line) 58%, var(--border));
+  background:
+    radial-gradient(
+      120% 120% at 28% 18%,
+      color-mix(in srgb, var(--accent) 30%, transparent) 0%,
+      transparent 64%
+    ),
+    radial-gradient(
+      90% 90% at 72% 116%,
+      color-mix(in srgb, var(--accent) 10%, transparent) 0%,
+      transparent 72%
+    ),
+    color-mix(in srgb, var(--surface-3) 76%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 22%, transparent),
+    inset 0 -7px 16px rgba(2, 5, 11, 0.4),
+    inset 0 0 20px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 8px 22px -6px color-mix(in srgb, var(--accent-glow) 62%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--accent) 4%, transparent);
+  animation: notice-beacon-in 620ms var(--ease-out);
+}
+
+@keyframes notice-beacon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* A point of light travels the rim, like a beacon turning. */
+@supports ((-webkit-mask: radial-gradient(#000, transparent)) or (mask: radial-gradient(#000, transparent))) {
+  .notice-beacon::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    background: conic-gradient(
+      from 210deg,
+      transparent 0deg,
+      transparent 286deg,
+      color-mix(in srgb, var(--accent-bright) 46%, transparent) 330deg,
+      transparent 356deg
+    );
+    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+    mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
+    animation: notice-rim 9s linear infinite;
+  }
+}
+
+@keyframes notice-rim {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.notice-mark {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 31px;
+  height: 31px;
+}
+
+.notice-beam {
+  opacity: 0.4;
+  animation: notice-beam 7s ease-in-out infinite;
+}
+
+.notice-beam--b {
+  animation-delay: 3.5s;
+}
+
+.notice-lamp {
+  fill: var(--text);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent-bright) 90%, transparent));
+}
+
+/* Expanding signal rings — one slow heartbeat. */
+.notice-ring {
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: notice-ring 6s var(--ease-out) infinite;
+}
+
+.notice-ring--b {
+  animation-delay: 3s;
+}
+
+@keyframes notice-beam {
+  0%,
+  100% {
+    opacity: 0.24;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes notice-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.42;
+  }
+  70%,
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Copy ---------------------------------------------------------------- */
+
+.notice-copy {
+  grid-area: copy;
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  animation: notice-rise 520ms var(--ease-out) 60ms both;
+}
+
+.notice-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.notice-eyebrow-text {
+  white-space: nowrap;
+}
+
+.notice-pip {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  box-shadow: 0 0 9px var(--accent-glow);
+  animation: notice-blip 5.5s ease-in-out infinite;
+}
+
+@keyframes notice-blip {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.notice-title {
+  margin-top: 6px;
+  font-size: clamp(21px, 18px + 0.85vw, 30px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  text-wrap: balance;
+}
+
+/* The one accented phrase — the beam catches it. */
+.notice-title-accent {
+  color: var(--accent-bright);
+  text-shadow: 0 0 26px color-mix(in srgb, var(--accent-glow) 55%, transparent);
+}
+
+.notice-lede {
+  margin-top: 5px;
+  max-width: 46ch;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* Setup spec panel ----------------------------------------------------- */
+
+.notice-chips {
+  grid-area: chips;
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text) 3%, transparent) 0%,
+      transparent 44%
+    ),
+    color-mix(in srgb, var(--surface-2) 46%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent),
+    0 1px 0 rgba(2, 5, 11, 0.22);
+  animation: notice-rise 560ms var(--ease-out) 140ms both;
+}
+
+.notice-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 12px;
+}
+
+.notice-chip + .notice-chip {
+  border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.notice-chip-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-line) 42%, var(--border));
+  background:
+    radial-gradient(
+      130% 130% at 30% 20%,
+      color-mix(in srgb, var(--accent) 20%, transparent) 0%,
+      transparent 72%
+    ),
+    color-mix(in srgb, var(--surface-3) 62%, transparent);
+  color: var(--accent-bright);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent),
+    0 1px 3px rgba(2, 5, 11, 0.3);
+}
+
+.notice-chip-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.notice-chip-name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  color: var(--text);
+}
+
+.notice-chip-detail {
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* Actions -------------------------------------------------------------- */
+
+.notice-actions {
+  grid-area: actions;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  animation: notice-rise 560ms var(--ease-out) 200ms both;
+}
+
+.notice-got {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 19px;
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 62%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--beam-gradient);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -7px 14px rgba(4, 66, 104, 0.24),
+    0 10px 24px -8px var(--accent-glow),
+    0 2px 5px rgba(2, 5, 11, 0.35);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.notice-got > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Light passes over the beam on hover. */
+.notice-got::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 34%,
+    rgba(255, 255, 255, 0.32) 50%,
+    transparent 66%
+  );
+  transform: translateX(-140%);
+  transition: transform 0.6s var(--ease);
+}
+
+.notice-got:active {
+  transform: scale(0.965);
+  box-shadow:
+    inset 0 2px 6px rgba(4, 46, 74, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 3px 10px -4px var(--accent-glow);
+}
+
+.notice-got:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .notice-got:hover {
+    filter: brightness(1.06) saturate(1.04);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      inset 0 -7px 14px rgba(4, 66, 104, 0.22),
+      0 14px 30px -8px var(--accent-glow),
+      0 2px 5px rgba(2, 5, 11, 0.35);
+  }
+
+  .notice-got:hover::after {
+    transform: translateX(140%);
+  }
+}
+
+/* Short screens: the chips become one compact line so the notice still
+   leaves room for the page's first action (360x640 phones, landscape). */
+.notice-compact {
+  display: none;
+  margin-top: 8px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.notice-compact strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+@media (max-height: 720px) {
+  .notice {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  }
+
+  .notice-card {
+    gap: 8px 10px;
+    padding: 11px 12px;
+  }
+
+  .notice-beacon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .notice-mark {
+    width: 24px;
+    height: 24px;
+  }
+
+  .notice-title {
+    margin-top: 4px;
+    font-size: 18px;
+  }
+
+  .notice-lede,
+  .notice-chips {
+    display: none;
+  }
+
+  .notice-compact {
+    display: block;
+  }
+
+  .notice-got {
+    min-height: 44px;
+    padding: 0 16px;
+  }
+}
+
+/* Responsive ----------------------------------------------------------- */
+
+/* Two spec cells side by side, still one panel. */
+@media (min-width: 640px) {
+  .notice-chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notice-chip + .notice-chip {
+    border-top: 0;
+    border-left: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  }
+}
+
+/* Wide: a single editorial band — mark, story + spec panel, dismissal. */
+@media (min-width: 860px) {
+  .notice {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+  }
+
+  .notice-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "beacon copy actions"
+      "beacon chips actions";
+    align-items: center;
+    gap: 13px 22px;
+    padding: 20px 22px;
+  }
+
+  .notice-beacon {
+    align-self: center;
+    width: 58px;
+    height: 58px;
+  }
+
+  .notice-mark {
+    width: 37px;
+    height: 37px;
+  }
+
+  .notice-title {
+    margin-top: 7px;
+    font-size: clamp(24px, 1.4vw + 12px, 30px);
+  }
+
+  .notice-lede {
+    margin-top: 5px;
+    font-size: 14px;
+  }
+
+  .notice-chips {
+    align-self: start;
+  }
+
+  .notice-chip {
+    padding: 10px 13px;
+  }
+
+  .notice-actions {
+    justify-content: flex-end;
+  }
+
+  .notice-got {
+    width: auto;
+    min-width: 122px;
+  }
+}
+
+/* Very small phones: tighten the band, never overflow. */
+@media (max-width: 379px) {
+  .notice-card {
+    padding: 14px 13px 13px;
+    gap: 11px;
+  }
+
+  .notice-title {
+    font-size: 20px;
+  }
+
+  .notice-chip {
+    padding: 8px 10px;
+  }
+
+  .notice-got {
+    padding: 0 16px;
+  }
+}
+
+/* Reduced motion: appear at rest, no loops. */
+@media (prefers-reduced-motion: reduce) {
+  .notice-card,
+  .notice-copy,
+  .notice-chips,
+  .notice-actions,
+  .notice-beacon {
+    animation: none;
+  }
+
+  .notice-beam {
+    opacity: 0.36;
+    animation: none;
+  }
+
+  .notice-ring,
+  .notice-sheen,
+  .notice-pip,
+  .notice-beacon::after {
+    display: none;
+  }
+
+  .notice-card--closing {
+    transition: none;
+  }
+
+  .notice-got,
+  .notice-got::after {
+    transition: none;
+  }
+}

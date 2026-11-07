@@ -6,7 +6,66 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# API routing. This must stay ABOVE the SPA catch-all.
+#
+# The profiles function declares `config.path = "/api/profiles"`, and Netlify
+# matches serverless functions before redirects, so the direct route already
+# answers /api/profiles (GET/POST/DELETE) without ever reaching index.html.
+# This rewrite is the ordered guard for every other /api/* request: instead of
+# falling through to the SPA shell and returning HTML, it is rewritten to the
+# matching function path (and 404s if there is no such function). 200 rewrites
+# preserve the request method and body.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback. LAST redirect rule: every non-API, non-static path gets the app.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# ---------------------------------------------------------------------------
+# Headers
+# ---------------------------------------------------------------------------
+
+# Baseline security headers for every static response. No CSP on purpose: the
+# app embeds third-party players and loads TMDB images, and a policy that drifts
+# out of sync with those origins silently breaks playback.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+# Vite emits content-hashed bundles under /assets, so they can be cached forever.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The app shell must be revalidated so a new deploy is picked up immediately.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# The service worker and its registration shim must never be served stale.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/registerSW.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

@@ -1,7 +1,7 @@
 import type { ProfileMeta } from "../types";
 import { KEY_PROFILES, kvGet, kvSet } from "./store";
 
-export const MAX_PROFILES = 10;
+export const MAX_PROFILES = 50;
 
 export const PROFILE_COLORS = [
   "#00acc1",

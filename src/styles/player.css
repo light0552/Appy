@@ -1,5 +1,5 @@
 /* ==================================================================
-   Player surface + Watch page — imported by Player, ServerChips, Watch
+   Player surface + Watch page — imported by Player, ServerChips, Watch.
    Tokens and shared primitives come from src/styles.css.
    NOTE: styles.css loads AFTER this file in the cascade (App's import
    chain), so rules overriding shared primitives (.chip, .btn, .icon-btn)
@@ -26,28 +26,86 @@
 
 /* Watch page layout ------------------------------------------------- */
 
+/* The watch route owns the viewport: the shell keeps its slot (the sync
+   banner, when it appears) and the stage takes every remaining pixel. The
+   old `min-height: 100dvh` here ignored that slot, so on a phone with the
+   banner visible the transport row fell below the fold. `:has()` scopes
+   the shell fix to this route; without it the fallback below still works. */
+
+.app:has(.watch) {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.app:has(.watch) .app-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .watch {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-height: 100dvh;
+  width: 100%;
+  background: #000;
+  overscroll-behavior: none;
+}
+
+.app:has(.watch) .watch {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .watch-stage {
   position: relative;
+  isolation: isolate;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
   background: #000;
 }
 
-/* The no-server state sits centered in the stage, not stranded at the
-   top of it. */
-.watch-stage .empty-state {
-  min-height: 100%;
-  align-content: center;
+/* A cinematic vignette: the corners fall away so the eye lands in the
+   middle of the picture rather than on the frame of the frame. */
+
+.watch-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    122% 98% at 50% 44%,
+    transparent 54%,
+    rgba(0, 0, 0, 0.34) 86%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
 }
 
-/* Top overlay: back button + server chips, safe-area aware.          */
-/* The strip itself lets touches through to the player underneath.    */
+/* A quiet bottom blend so the deck feels attached to the frame. */
+
+.watch-stage::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  height: 132px;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--surface-2) 74%, transparent) 0%,
+    transparent 100%
+  );
+}
+
+/* Top chrome ------------------------------------------------------- */
+/* A luminous glass rail floating over the picture: back button, the
+   now-playing strapline, and the server chips. The strip lets touches
+   through to the player underneath. */
 
 .watch-top {
   position: absolute;
@@ -55,72 +113,211 @@
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: calc(env(safe-area-inset-top) + 10px) 12px 12px;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--bg) 78%, transparent) 0%,
-    color-mix(in srgb, var(--bg) 42%, transparent) 55%,
-    transparent 100%
-  );
+  gap: 12px;
+  padding:
+    calc(env(safe-area-inset-top) + 10px)
+    max(var(--page-x), env(safe-area-inset-right))
+    24px
+    max(var(--page-x), env(safe-area-inset-left));
+  background:
+    radial-gradient(
+      116% 100% at 84% 0%,
+      color-mix(in srgb, var(--accent) 15%, transparent) 0%,
+      transparent 62%
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--bg) 90%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 56%, transparent) 46%,
+      transparent 100%
+    );
   pointer-events: none;
 }
 
 .watch-top-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   pointer-events: auto;
 }
 
-/* Back button: glassy and a touch brighter over raw video. */
-.watch-top-row .icon-btn {
+/* Back button: a glass disc, brighter than the frame behind it. */
+
+.watch-top-row .icon-btn.watch-back {
   flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  background: color-mix(in srgb, var(--surface-glass) 94%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 10px 26px rgba(0, 0, 0, 0.5);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
-/* Title rides the top bar from tablets up; phones already show it in
-   the bottom bar where there's room. Purely decorative (aria-hidden) —
-   the footer is the accessible copy. */
-.watch-top-title {
-  display: none;
+.watch-top-row .icon-btn.watch-back:active {
+  transform: scale(0.92);
 }
 
-@media (min-width: 768px) {
-  .watch-top-title {
-    display: block;
-    flex: 0 1 auto;
-    min-width: 0;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: var(--text);
-    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
-    user-select: none;
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .watch-top-row .icon-btn.watch-back:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-line);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 14px 32px rgba(0, 0, 0, 0.55),
+      0 0 22px var(--accent-glow);
   }
 }
 
-.watch-top-row .server-chips {
-  flex: 1 1 auto;
+/* The strapline. Hidden on phones — the deck below already names the
+   title, and the picture is worth more room than a second heading. */
+
+.watch-top-copy {
+  display: none;
   min-width: 0;
-  padding-bottom: 2px;
+  flex: 0 1 auto;
+}
+
+.watch-top-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent-bright);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+}
+
+/* A live pip before the label — the stream is on air. */
+
+.watch-top-kicker::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .watch-top-kicker::before {
+    animation: watch-live 2.6s ease-in-out infinite;
+  }
+}
+
+@keyframes watch-live {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.78);
+  }
+}
+
+.watch-top-title {
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8);
+  user-select: none;
+}
+
+.watch-top-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+}
+
+.watch-top-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+@media (min-width: 768px) {
+  .watch-top-copy {
+    display: block;
+    flex: 0 1 auto;
+  }
+
+  .watch-top-title {
+    max-width: 320px;
+  }
 }
 
 /* Server chips ------------------------------------------------------ */
-/* The escape hatch when a server is stuck: glassy pills over video,
-   loud enough to spot instantly, full 44px targets. */
+/* The escape hatch when a server is stuck: glassy pills over the
+   picture, loud enough to spot instantly, full 44px targets. */
+
+.watch-top-row .server-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 2px 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* From a tablet up the strapline keeps its width and the servers
+   slide hard right. An auto margin (not justify-content) keeps the
+   scroll origin reachable when the chips overflow. */
+
+@media (min-width: 768px) {
+  .watch-top-row .server-chips {
+    flex: 0 1 auto;
+    margin-left: auto;
+  }
+}
+
+.watch-top-row .server-chips::-webkit-scrollbar {
+  display: none;
+}
 
 .watch-top-row .server-chips .chip {
+  flex: 0 0 auto;
   min-height: 44px;
-  padding: 0 15px;
+  padding: 0 16px;
   gap: 8px;
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-  backdrop-filter: blur(12px) saturate(1.3);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  background: color-mix(in srgb, var(--surface-glass) 90%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 650;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 10px 24px rgba(0, 0, 0, 0.45);
   transition:
     transform var(--dur-fast) var(--ease),
     background-color var(--dur-fast) ease,
@@ -131,12 +328,41 @@
 
 /* Higher specificity than styles.css's .chip--active / [aria-pressed]
    so the glow survives the cascade. */
+
 .watch-top-row .server-chips .chip.chip--active,
 .watch-top-row .server-chips .chip[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
   border-color: var(--accent-line);
   color: var(--accent-bright);
-  box-shadow: 0 0 20px var(--accent-glow), 0 8px 22px rgba(0, 0, 0, 0.4);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 30%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent) 100%
+    ),
+    color-mix(in srgb, var(--surface-glass) 88%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0 0 1px color-mix(in srgb, var(--accent-line) 55%, transparent),
+    0 0 28px var(--accent-glow),
+    0 12px 26px rgba(0, 0, 0, 0.5);
+}
+
+/* The live pip on the server that is currently feeding the frame. */
+
+.watch-top-row .server-chips .chip[aria-pressed="true"]::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--accent-bright);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .watch-top-row .server-chips .chip[aria-pressed="true"]::before {
+    animation: watch-live 2.4s ease-in-out infinite;
+  }
 }
 
 .watch-top-row .server-chips .chip:active {
@@ -146,56 +372,164 @@
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .watch-top-row .server-chips .chip:hover {
     transform: translateY(-2px);
+    border-color: var(--accent-line);
   }
 
   .watch-top-row .server-chips .chip.chip--active:hover,
   .watch-top-row .server-chips .chip[aria-pressed="true"]:hover {
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 0 26px var(--accent-glow), 0 8px 22px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 0 0 1px color-mix(in srgb, var(--accent-line) 70%, transparent),
+      0 0 34px var(--accent-glow),
+      0 12px 26px rgba(0, 0, 0, 0.5);
   }
 }
 
+/* The provider's own note ("plays most reliably") — a quiet tag
+   inside the active chip. Too wide for a phone, so phones drop it. */
+
 .server-chip-hint {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  padding-left: 9px;
+  border-left: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-2);
 }
 
-.watch-top-row .server-chips .chip--active .server-chip-hint,
+.watch-top-row .server-chips .chip.chip--active .server-chip-hint,
 .watch-top-row .server-chips .chip[aria-pressed="true"] .server-chip-hint {
-  color: var(--accent);
+  color: var(--accent-bright);
+  border-left-color: var(--accent-line);
+}
+
+@media (max-width: 767px) {
+  .watch-top-row .server-chips .server-chip-hint {
+    display: none;
+  }
 }
 
 /* Watchdog bar ------------------------------------------------------ */
-/* "Not playing? Try the next server" — a friendly lifeline, not an
-   error: soft glass, a hint of beam glow, and a springy entrance. */
+/* "Stream not starting?" — a friendly lifeline, not an error: soft
+   glass, a beacon pulsing at the edge, and a springy entrance. */
 
 .watchdog-bar {
   pointer-events: auto;
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  max-width: 560px;
-  padding: 11px 12px 11px 16px;
+  gap: 13px;
+  max-width: 660px;
+  padding: 13px 13px 13px 15px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--accent-line);
-  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  box-shadow: var(--shadow), 0 0 28px var(--accent-glow);
-  font-size: 13.5px;
-  font-weight: 650;
-  animation: watchdog-in var(--dur-med) var(--ease);
+  background:
+    radial-gradient(
+      120% 150% at 0% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent) 0%,
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      transparent 64%
+    ),
+    color-mix(in srgb, var(--surface-glass) 92%, transparent);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 0 44px color-mix(in srgb, var(--accent-glow) 60%, transparent),
+    var(--shadow);
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .watchdog-bar {
+    animation: watchdog-in var(--dur-med) var(--ease);
+  }
 }
 
 @keyframes watchdog-in {
   from {
-    transform: translateY(-10px) scale(0.98);
+    transform: translateY(-12px) scale(0.985);
     opacity: 0;
   }
+}
+
+/* The beacon: a lit core inside a ring that keeps pinging outward. */
+
+.watchdog-beacon {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(
+    circle at 50% 50%,
+    color-mix(in srgb, var(--accent) 28%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+.watchdog-beacon::before,
+.watchdog-beacon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-line);
+}
+
+.watchdog-beacon-core {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-bright);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .watchdog-beacon::after {
+    animation: watchdog-ping 2.2s ease-out infinite;
+  }
+}
+
+@keyframes watchdog-ping {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.watchdog-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.watchdog-kicker {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+.watchdog-text {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--muted);
 }
 
 .watchdog-actions {
@@ -209,11 +543,17 @@
   white-space: nowrap;
 }
 
+.watchdog-actions .watchdog-switch svg {
+  flex: 0 0 auto;
+}
+
 /* 44px dismiss target — scopes past styles.css's .icon-btn sizing. */
+
 .watchdog-actions .watchdog-close {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
+  color: var(--muted);
   background: transparent;
   border-color: transparent;
 }
@@ -222,77 +562,305 @@
   .watchdog-actions .btn:hover {
     transform: translateY(-2px) scale(1.03);
   }
+
+  .watchdog-actions .watchdog-close:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--surface-3) 70%, transparent);
+  }
 }
 
-/* Bottom bar -------------------------------------------------------- */
+/* Bottom deck ------------------------------------------------------- */
+/* A console, not a footer: the now-playing readout on the left, the
+   transport keys on the right, and a beam of light along the seam. */
 
 .watch-bar {
   position: relative;
+  z-index: 5;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px var(--page-x) calc(14px + env(safe-area-inset-bottom));
+  gap: 11px;
+  padding:
+    13px
+    max(var(--page-x), env(safe-area-inset-right))
+    calc(13px + env(safe-area-inset-bottom))
+    max(var(--page-x), env(safe-area-inset-left));
   border-top: 1px solid var(--border);
-  background: linear-gradient(to bottom, var(--surface-2) 0%, var(--surface) 100%);
-  box-shadow: 0 -16px 36px rgba(0, 0, 0, 0.45);
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--surface-2) 94%, transparent) 0%,
+      var(--surface) 100%
+    ),
+    var(--surface);
+  box-shadow: 0 -24px 52px rgba(0, 0, 0, 0.55);
 }
 
-/* A thin beam of light along the top edge of the bar. */
+/* A thin beam of light along the top edge of the deck. */
+
 .watch-bar::before {
   content: "";
   position: absolute;
   top: -1px;
-  left: 8%;
-  right: 8%;
+  left: 4%;
+  right: 4%;
   height: 1px;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    var(--accent-glow) 50%,
+    var(--accent-line) 22%,
+    var(--accent-bright) 50%,
+    var(--accent-line) 78%,
     transparent 100%
   );
+  opacity: 0.85;
 }
 
+/* Light spilling up out of the deck onto the frame. */
+
+.watch-bar::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
+  background: radial-gradient(
+    52% 100% at 50% 100%,
+    color-mix(in srgb, var(--accent) 18%, transparent) 0%,
+    transparent 72%
+  );
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .watch-bar::after {
+    animation: deck-breathe 11s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes deck-breathe {
+  from {
+    transform: translateX(-14%);
+    opacity: 0.45;
+  }
+  to {
+    transform: translateX(14%);
+    opacity: 0.8;
+  }
+}
+
+/* Now playing ------------------------------------------------------- */
+
 .watch-now {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.watch-poster {
+  width: 42px;
+  height: 58px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.5),
+    0 0 26px color-mix(in srgb, var(--accent) 16%, transparent);
+  transition:
+    transform var(--dur-med) var(--ease),
+    box-shadow var(--dur-med) ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .watch-poster:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow:
+      0 14px 30px rgba(0, 0, 0, 0.55),
+      0 0 32px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+
+/* Missing artwork: a lit monogram tile instead of a hole in the deck. */
+.watch-poster--fallback {
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--accent-bright);
+  text-transform: uppercase;
+  user-select: none;
+  background:
+    radial-gradient(
+      120% 100% at 30% 0%,
+      color-mix(in srgb, var(--accent) 26%, transparent) 0%,
+      transparent 68%
+    ),
+    var(--surface-3);
+}
+
+.watch-now-copy {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.watch-now-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .watch-now-title {
-  font-size: 15px;
-  font-weight: 750;
-  letter-spacing: -0.015em;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   color: var(--text);
+}
+
+.watch-now-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.watch-meta-year {
+  font-variant-numeric: tabular-nums;
+}
+
+.watch-provider {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-3) 70%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.watch-episode-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-bright);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent-glow) 55%, transparent);
 }
 
 .watch-now-sub {
   color: var(--muted);
 }
 
-.watch-now-sk {
-  width: 160px;
+/* The episode name hangs off a short gradient tick. */
+
+.watch-now-episode {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin-top: 2px;
 }
+
+.watch-now-episode::before {
+  content: "";
+  width: 2px;
+  height: 15px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to bottom, var(--accent), transparent);
+}
+
+.watch-episode-name {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.watch-now-sk {
+  width: 180px;
+}
+
+/* Transport keys ---------------------------------------------------- */
+
+/* The keys sit in a recessed well — a mixing desk, not a button row. */
 
 .watch-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+}
+
+.watch-actions--episodes {
+  padding: 5px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 58%, transparent);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.watch-actions .watch-episode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  font-size: 13.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Long labels are the default; the short ones take over on narrow
+   phones so all three controls fit on one row. */
+
+.watch-episode-btn__short {
+  display: none;
+}
+
+.watch-actions .watch-episode-btn.btn-primary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 28px var(--accent-glow);
 }
 
 .watch-actions .btn {
-  flex: 1 1 auto;
-  min-height: 46px;
   transition:
     transform var(--dur-fast) var(--ease),
     background-color var(--dur-fast) ease,
     border-color var(--dur-fast) ease,
     box-shadow var(--dur-fast) ease;
-}
-
-.watch-actions .btn-primary {
-  box-shadow: 0 10px 30px var(--accent-glow);
 }
 
 .watch-actions .btn:active {
@@ -305,675 +873,353 @@
   }
 
   .watch-actions .btn-primary:hover {
-    box-shadow: 0 14px 38px var(--accent-glow);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.34),
+      0 14px 38px var(--accent-glow);
   }
 }
 
-.watch-note {
-  line-height: 1.45;
+/* Source readout ---------------------------------------------------- */
+/* A movie deck has no transport, so it gets a hardware module instead:
+   which server is feeding the frame. */
+
+.watch-source {
+  display: none;
+  align-items: center;
+  gap: 11px;
+  max-width: 240px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 46%, transparent);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
-/* Tablet and up (>= 640px) ------------------------------------------- */
+.watch-source-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+}
 
-@media (min-width: 640px) {
-  /* One clean row: what's playing, the actions, the honest footnote. */
+.watch-source-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.watch-source-label {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.watch-source-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* No-server state --------------------------------------------------- */
+
+.watch-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(
+      80% 70% at 50% 18%,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      transparent 66%
+    ),
+    #000;
+}
+
+.watch-empty-card {
+  width: min(100%, 430px);
+  padding: 26px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.watch-empty-card h3 {
+  margin-top: 8px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.watch-empty-card p {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.watch-empty-card .btn {
+  margin-top: 18px;
+  min-height: 44px;
+}
+
+/* Phones ----------------------------------------------------------- */
+
+/* Short labels so Previous / Reload / Next share one row even on a
+   narrow phone, and a tighter well so the picture keeps the height. */
+
+@media (max-width: 560px) {
+  .watch-episode-btn__long {
+    display: none;
+  }
+
+  .watch-episode-btn__short {
+    display: inline;
+  }
+
+  /* Tighten the deck so the picture keeps the height on a phone. */
+  .watch-bar {
+    gap: 9px;
+    padding-top: 11px;
+    padding-bottom: calc(11px + env(safe-area-inset-bottom));
+  }
+
+  .watch-now {
+    gap: 10px;
+  }
+
+  .watch-now-copy {
+    gap: 2px;
+  }
+
+  .watch-now-kicker {
+    font-size: 11px;
+    letter-spacing: 0.13em;
+  }
+
+  .watch-now-title {
+    font-size: 15.5px;
+  }
+
+  .watch-now-meta {
+    gap: 6px;
+    margin-top: 0;
+  }
+
+  .watch-poster {
+    width: 38px;
+    height: 52px;
+  }
+
+  .watch-poster--fallback {
+    font-size: 16px;
+  }
+
+  .watch-actions--episodes {
+    padding: 4px;
+    gap: 6px;
+  }
+
+  .watch-actions .watch-episode-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .watch-actions .watch-episode-btn svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .watch-actions .watch-episode-btn {
+    padding: 0 6px;
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .watch-actions .watch-episode-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .watch-now-title {
+    font-size: 15px;
+  }
+}
+
+/* The watchdog stacks on a phone: the lifeline reads first, the
+   button sits under it at full width. */
+
+@media (max-width: 560px) {
+  .watchdog-bar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 9px 11px;
+    padding: 12px;
+  }
+
+  .watchdog-copy {
+    /* A zero basis keeps the beacon on the same line as the headline
+       instead of letting the long text push it onto its own row. */
+    flex: 1 1 0;
+  }
+
+  .watchdog-actions {
+    width: 100%;
+  }
+
+  .watchdog-actions .watchdog-switch {
+    flex: 1 1 auto;
+  }
+}
+
+/* Tablet and up (>= 720px) ------------------------------------------ */
+
+@media (min-width: 720px) {
   .watch-bar {
     flex-direction: row;
     align-items: center;
-    gap: 18px;
+    gap: 22px;
+    padding-top: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
 
   .watch-now {
     flex: 1 1 auto;
   }
 
+  .watch-poster {
+    width: 50px;
+    height: 70px;
+  }
+
+  /* The transport is a module: it holds its own width. */
+
   .watch-actions {
     flex: 0 0 auto;
   }
 
-  .watch-actions .btn {
+  .watch-actions .watch-episode-btn {
     flex: 0 0 auto;
-    min-width: 136px;
+    min-width: 148px;
   }
 
-  .watch-note {
-    flex: 0 1 320px;
-    text-align: right;
+  /* A movie deck reads out its source in the same slot. */
+
+  .watch-source {
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  .watch-bar--movie .watch-now-meta .watch-provider {
+    display: none;
   }
 }
 
-/* Desktop (>= 1024px) ------------------------------------------------ */
+/* Desktop (>= 1024px) ----------------------------------------------- */
 
 @media (min-width: 1024px) {
-  .watch-top {
-    padding-left: max(12px, env(safe-area-inset-left));
-    padding-right: max(12px, env(safe-area-inset-right));
-  }
-
   .watch-bar {
     padding-left: max(var(--page-x), env(safe-area-inset-left));
     padding-right: max(var(--page-x), env(safe-area-inset-right));
   }
-}
 
-/* ==================================================================
-   Lighthook surfaces (2026-10-24) — appended for the ad-free mode:
-   the "preparing" stage, the HlsPlayer custom chrome, and the
-   first-class Lighthook chip distinction. Tokens only, like above.
-   ================================================================== */
+  .watch-now-title {
+    font-size: 18px;
+  }
 
-/* Preparing stage — same frame geometry as the players. */
+  .watch-now-episode {
+    margin-top: 4px;
+  }
 
-.rip-stage {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 24px;
-  text-align: center;
-  background: radial-gradient(
-    120% 90% at 50% 0%,
-    color-mix(in srgb, var(--accent) 7%, var(--bg)) 0%,
-    var(--bg) 62%
-  );
-}
+  .watch-episode-name {
+    font-size: 13px;
+  }
 
-.rip-spinner {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 3px solid color-mix(in srgb, var(--accent) 25%, transparent);
-  border-top-color: var(--accent);
-  animation: rip-spin 0.9s linear infinite;
-}
-
-@keyframes rip-spin {
-  to {
-    transform: rotate(360deg);
+  .watch-actions .watch-episode-btn {
+    min-width: 158px;
+    padding: 0 18px;
   }
 }
 
-.rip-text {
-  font-size: var(--text-md);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
+/* Landscape phones -------------------------------------------------- */
+/* A 375–430px-tall viewport has no room for a stacked deck. Fold the
+   console into a single row and use the short transport labels so the
+   picture keeps the height. */
 
-.rip-elapsed {
-  font-variant-numeric: tabular-nums;
-}
-
-.rip-stage .btn {
-  min-height: 44px;
-  padding: 0 18px;
-}
-
-/* HlsPlayer — a <video> we own, with custom chrome.                   */
-
-.hp {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background: #000;
-}
-
-.hp-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
-}
-
-/* Full-surface tap layer: toggles the chrome. Decorative — the chrome's
-   buttons carry the accessible labels. */
-.hp-hit {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  /* Keep the browser's 300ms double-tap-zoom from stealing the skip gesture. */
-  touch-action: manipulation;
-}
-
-/* Gradient scrim behind the chrome (VidFast legibility on bright frames). */
-.hp-scrim {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2;
-  height: 104px;
-  pointer-events: none;
-  background: linear-gradient(
-    to top,
-    rgba(6, 9, 14, 0.82) 0%,
-    rgba(6, 9, 14, 0.45) 55%,
-    transparent 100%
-  );
-  animation: hp-scrim-in var(--dur-fast, 180ms) ease;
-}
-
-@keyframes hp-scrim-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* VidFast-style feedback pill ("Quality: 720p", "Speed: 1.5×"). */
-.hp-toast {
-  position: absolute;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 116px);
-  transform: translateX(-50%);
-  z-index: 6;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: rgba(8, 11, 16, 0.88);
-  border: 1px solid var(--border-strong);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 650;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: hp-toast-in 0.16s ease;
-}
-
-/* Double-tap ripple ("+10s" / "−10s"). */
-.hp-flash {
-  position: absolute;
-  top: 50%;
-  z-index: 4;
-  transform: translate(-50%, -50%);
-  display: grid;
-  place-items: center;
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  background: rgba(20, 26, 34, 0.55);
-  border: 1px solid var(--border-strong);
-  color: var(--text);
-  font-size: 14.5px;
-  font-weight: 750;
-  pointer-events: none;
-  animation: hp-flash-pop 0.6s ease forwards;
-}
-
-.hp-flash--left {
-  left: 25%;
-}
-
-.hp-flash--right {
-  left: 75%;
-}
-
-@keyframes hp-toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 8px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
-
-@keyframes hp-flash-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.6);
-  }
-  25% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(1.35);
-  }
-}
-
-/* Center play / replay button. */
-.hp-center {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 3;
-  transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-  backdrop-filter: blur(14px) saturate(1.3);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  color: var(--text);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5), 0 0 22px var(--accent-glow);
-  transition: transform var(--dur-fast) var(--ease);
-}
-
-.hp-center:active {
-  transform: translate(-50%, -50%) scale(0.94);
-}
-
-/* Delayed buffering indicator (>1.2s wait, see HlsPlayer). */
-.hp-buffering {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 3;
-  transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  color: var(--text);
-  font-size: var(--text-sm);
-  font-weight: 650;
-  pointer-events: none;
-}
-
-.hp-spinner {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
-  border-top-color: var(--accent);
-  animation: rip-spin 0.8s linear infinite;
-}
-
-/* Stall watchdog escape hatch — sits just above the control bar. */
-.hp-stuck {
-  position: absolute;
-  left: 50%;
-  bottom: 86px;
-  z-index: 5;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 24px);
-  padding: 10px 12px 10px 16px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--accent-line);
-  background: color-mix(in srgb, var(--surface-2) 85%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  box-shadow: var(--shadow), 0 0 26px var(--accent-glow);
-  font-size: 13.5px;
-  font-weight: 650;
-  white-space: nowrap;
-  animation: watchdog-in var(--dur-med) var(--ease);
-}
-
-.hp-stuck .btn {
-  white-space: nowrap;
-}
-
-/* Bottom glass control bar. Hidden via opacity+visibility so taps fall
-   through to the tap layer while it's away. */
-.hp-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 30px 10px calc(8px + env(safe-area-inset-bottom));
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    color-mix(in srgb, var(--bg) 55%, transparent) 45%,
-    color-mix(in srgb, var(--bg) 88%, transparent) 100%
-  );
-  /* No backdrop blur here: it smeared the CC/quality glyphs and made the
-     control strip look out of focus on the phone (2026-10-24 user report).
-     The gradient alone keeps contrast without touching the glyphs. */
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    opacity var(--dur-med) var(--ease),
-    visibility var(--dur-med) var(--ease);
-}
-
-.hp-controls.is-visible {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-/* Seek: a real range input riding over buffered/played layers. */
-.hp-seek {
-  position: relative;
-  height: 22px;
-  display: flex;
-  align-items: center;
-}
-
-.hp-seek-track {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.16);
-  overflow: hidden;
-}
-
-.hp-seek-buffered,
-.hp-seek-played {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-}
-
-.hp-seek-buffered {
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.hp-seek-played {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
-.hp-seek-input {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 22px;
-  margin: 0;
-  background: transparent;
-  -webkit-appearance: none;
-  appearance: none;
-  cursor: pointer;
-}
-
-.hp-seek-input::-webkit-slider-runnable-track {
-  height: 22px;
-  background: transparent;
-}
-
-.hp-seek-input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent-bright);
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.hp-seek-input::-moz-range-track {
-  height: 22px;
-  background: transparent;
-}
-
-.hp-seek-input::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent-bright);
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-/* Button row. */
-.hp-buttons {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-/* Narrow phones: 7 × 44px controls + the clock do not fit a 390px screen —
-   Fullscreen rendered 17px past the right edge and was half untappable.
-   Lift the clock above the scrubber and let the buttons share the full row
-   with even spacing (44px tap targets kept). */
-@media (max-width: 480px) {
-  .hp-buttons {
-    justify-content: space-between;
-    gap: 0;
+@media (orientation: landscape) and (max-height: 540px) {
+  .watch-bar {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding-top: 9px;
+    padding-bottom: calc(9px + env(safe-area-inset-bottom));
   }
 
-  .hp-time {
-    position: absolute;
-    top: 5px;
-    right: 12px;
-    margin: 0;
-    font-size: 11px;
-    line-height: 1;
-    color: var(--text-2, #aab4c4);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  .watch-now {
+    flex: 1 1 auto;
   }
-}
 
-/* Scopes past styles.css's .icon-btn sizing (44px targets kept). */
-.hp-controls .hp-btn {
-  min-width: 44px;
-  height: 44px;
-  color: var(--text);
-  background: transparent;
-  border-color: transparent;
-  font-size: 13px;
-  font-weight: 750;
-}
+  .watch-now-kicker {
+    display: none;
+  }
 
-.hp-controls .hp-btn:active {
-  transform: scale(0.92);
-}
+  .watch-poster {
+    width: 36px;
+    height: 50px;
+  }
 
-.hp-time {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  white-space: nowrap;
-  user-select: none;
-}
+  .watch-poster--fallback {
+    font-size: 15px;
+  }
 
-.hp-spacer {
-  flex: 1 1 auto;
-}
+  .watch-episode-btn__long {
+    display: none;
+  }
 
-/* Quality sheet — Auto + one entry per hls.js level. */
-.hp-sheet {
-  position: absolute;
-  right: 12px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 106px);
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  min-width: 132px;
-  padding: 6px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-strong);
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
-  /* No backdrop blur: on mobile Chrome it smeared the sheet's own labels into
-     the video behind it (ghosting) and made the menu look out of focus.
-     96% opaque surface keeps contrast crisp on any frame. */
-  box-shadow: var(--shadow);
-  animation: watchdog-in var(--dur-med) var(--ease);
-}
+  .watch-episode-btn__short {
+    display: inline;
+  }
 
-.hp-sheet button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-  font-size: 13.5px;
-  font-weight: 650;
-}
+  .watch-actions {
+    flex: 0 0 auto;
+  }
 
-/* VidFast section captions inside the sheets. */
-.hp-sheet .hp-cap {
-  padding: 6px 8px 4px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
-  opacity: 0.85;
-}
+  .watch-actions--episodes {
+    padding: 4px;
+    gap: 5px;
+  }
 
-.hp-sheet .hp-check {
-  color: var(--accent-bright);
-  font-size: 14px;
-  font-weight: 800;
-}
+  .watch-actions .watch-episode-btn {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0 12px;
+    font-size: 12.5px;
+  }
 
-.hp-sheet button.is-active {
-  background: var(--accent-soft);
-  color: var(--accent-bright);
-}
-
-/* Honest empty state: the CC control exists, the title simply has no tracks. */
-.hp-sheet .hp-sub-empty {
-  padding: 10px 12px;
-  color: var(--text-2);
-  font-size: 12.5px;
-  line-height: 1.35;
-}
-
-/* Subtitle sync — provider VTTs sometimes run early against the video.
-   Compact −/+ half-second taps with a tap-to-reset value. */
-.hp-sub-sync {
-  margin: 2px 4px 6px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.hp-sheet .hp-sub-sync-label {
-  margin: 0 0 6px;
-  padding: 0;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
-  opacity: 0.85;
-}
-
-.hp-sub-sync-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hp-sheet .hp-sub-sync-btn {
-  flex: 0 0 auto;
-  justify-content: center;
-  min-width: 52px;
-  height: 32px;
-  padding: 0 7px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xs);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  font-size: 11.5px;
-  font-weight: 750;
-}
-
-.hp-sheet .hp-sub-sync-btn:disabled {
-  opacity: 0.38;
-}
-
-.hp-sheet .hp-sub-sync-value {
-  flex: 1 1 auto;
-  justify-content: center;
-  min-width: 54px;
-  height: 32px;
-  padding: 0 6px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--accent-bright);
-  font-size: 12.5px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.hp-sub-sync-hint {
-  margin: 6px 0 0;
-  font-size: 10.5px;
-  line-height: 1.3;
-  color: var(--text-2);
-}
-
-/* Activated CC / speed states on the chrome buttons. */
-.hp-btn--on {
-  color: var(--accent-bright);
-  text-shadow: 0 0 12px var(--accent-glow);
-}
-
-/* Keep the browser's loud blue focus ring off touch/mouse clicks, but keep a
-   visible accent ring for keyboard users (the phone taps were leaving a blue
-   halo on Fullscreen/CC). */
-.hp-controls .hp-btn:focus,
-.hp-sheet button:focus {
-  outline: none;
-}
-
-.hp-controls .hp-btn:focus-visible,
-.hp-sheet button:focus-visible {
-  outline: 2px solid var(--accent-bright);
-  outline-offset: 2px;
-}
-
-/* "No ad-free stream" note shown briefly before the embed fallback. */
-.rip-note {
-  position: absolute;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 18px);
-  transform: translateX(-50%);
-  max-width: min(92vw, 480px);
-  padding: 10px 16px;
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  border: 1px solid var(--border-strong);
-  box-shadow: var(--shadow);
-  font-size: var(--text-2xs, 11px);
-  color: var(--text-2, #aab4c4);
-  pointer-events: none;
-  z-index: 5;
-  animation: watchdog-in var(--dur-fast, 180ms) ease;
-}
-
-/* Lighthook chip — a subtle accent tint so it reads as different in
-   kind from the provider chips (active glow still comes from
-   .chip--active above). */
-.watch-top-row .server-chips .chip--lighthook {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
-  color: var(--accent-bright);
+  .watch-source {
+    display: flex;
+  }
 }

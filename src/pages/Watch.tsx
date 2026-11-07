@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Player from "../components/Player";
-import HlsPlayer from "../components/HlsPlayer";
 import ServerChips from "../components/ServerChips";
-import { availableProviders, preferredUrl, providerById, type ProviderOption } from "../lib/providers";
-import { backdropUrl, getTitle } from "../lib/tmdb";
-import { resolveRip, type RipOk } from "../lib/rip";
+import {
+  availableProviders,
+  preferredUrl,
+  type ProviderOption,
+} from "../lib/providers";
+import { getSeason, getTitle, posterUrl } from "../lib/tmdb";
 import { useSession } from "../lib/session";
 import { historyKey } from "../lib/store";
-import type { MediaRef, MediaType, TitleDetail } from "../types";
+import type {
+  MediaRef,
+  MediaType,
+  SeasonDetail,
+  SeasonSummary,
+  TitleDetail,
+} from "../types";
 import "../styles/player.css";
 
 /**
@@ -34,25 +42,20 @@ function positiveInt(raw: string | null, fallback: number): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-/* ---------------------------------------------------------------- */
-/* Lighthook playback modes (2026-10-24)                            */
-/* "preparing" = resolving the ad-free stream via the sidecar,      */
-/* "owned" = playing our own proxied stream in HlsPlayer,           */
-/* "embed" = today's cross-origin iframe providers, unchanged.      */
-/* ---------------------------------------------------------------- */
-
-const LIGHTHOOK_ID = "lighthook";
-
-type PlayMode = "preparing" | "owned" | "embed";
-
-/** True when the stored pick names a real embed provider (not Lighthook). */
-function isEmbedPref(id: string | undefined): boolean {
-  return !!id && id !== LIGHTHOOK_ID && !!providerById(id);
+/**
+ * A season that prev/next may target: a regular numbered season with at least
+ * one episode. TMDB lists specials as season 0 and, for some shows, a season
+ * with `episode_count: 0`; neither is a legal neighbour. Without the
+ * `seasonNumber > 0` guard, S1E1's "previous" lands on `?s=0&e=<specials
+ * count>` instead of simply not existing.
+ */
+function isNavigableSeason(entry: SeasonSummary): boolean {
+  return entry.seasonNumber > 0 && entry.episodeCount > 0;
 }
 
-/** Mount/param/reload entry rule: an explicit provider pick wins; else rip. */
-function initialMode(pref: string | undefined): PlayMode {
-  return isEmbedPref(pref) ? "embed" : "preparing";
+interface EpisodeRef {
+  season: number;
+  episode: number;
 }
 
 const BackIcon = (
@@ -64,6 +67,67 @@ const BackIcon = (
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const PreviousIcon = (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M6 5v14M18 6l-8 6 8 6V6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const NextIcon = (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M18 5v14M6 6l8 6-8 6V6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ReloadIcon = (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const CloseIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M6.6 6.6l10.8 10.8M17.4 6.6L6.6 17.4"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+/** Swap arrows for the watchdog's "try another source" action. */
+const SwapIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M4 8h13m0 0-3.5-3.5M17 8l-3.5 3.5M20 16H7m0 0 3.5-3.5M7 16l3.5 3.5"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+/** Broadcast mark for the deck's source readout. */
+const SourceIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="2.1" fill="currentColor" />
+    <path
+      d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 15.8a5.4 5.4 0 0 0 0-7.6M5.4 5.4a9.4 9.4 0 0 0 0 13.2M18.6 18.6a9.4 9.4 0 0 0 0-13.2"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
     />
   </svg>
 );
@@ -110,6 +174,40 @@ export default function Watch() {
   }, [type, tmdbId, validId]);
 
   /* ---------------------------------------------------------------- */
+  /* Season details — episode names + prev/next without leaving Watch. */
+  /* ---------------------------------------------------------------- */
+
+  const [seasonDetail, setSeasonDetail] = useState<SeasonDetail | null>(null);
+
+  useEffect(() => {
+    if (type !== "tv" || !validId || season === undefined) {
+      setSeasonDetail(null);
+      return;
+    }
+    let alive = true;
+    setSeasonDetail(null);
+
+    getSeason(tmdbId, season)
+      .then((data) => {
+        if (alive) setSeasonDetail(data);
+      })
+      .catch(() => {
+        if (alive) setSeasonDetail(null);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [type, tmdbId, season, validId]);
+
+  const currentEpisode = useMemo(() => {
+    if (!seasonDetail || episode === undefined) return null;
+    return (
+      seasonDetail.episodes.find((entry) => entry.episodeNumber === episode) ?? null
+    );
+  }, [seasonDetail, episode]);
+
+  /* ---------------------------------------------------------------- */
   /* Provider selection                                                */
   /* ---------------------------------------------------------------- */
 
@@ -127,111 +225,17 @@ export default function Watch() {
   const [reloadKey, setReloadKey] = useState(0);
   const [showWatchdog, setShowWatchdog] = useState(false);
 
-  /* ---------------------------------------------------------------- */
-  /* Lighthook — rip-first playback (2026-10-24)                      */
-  /* ---------------------------------------------------------------- */
-
-  const preferredProvider = session.state.prefs.preferredProvider;
-  // First render may predate session hydration (async boot) — the
-  // "prefs hydrate" effect below applies a stored provider pick as soon as
-  // it lands, so an explicit past choice still wins over ripping.
-  const [mode, setMode] = useState<PlayMode>(() => initialMode(preferredProvider));
-  const [rip, setRip] = useState<RipOk | null>(null);
-  const [ripElapsed, setRipElapsed] = useState(0);
-  const [ripNote, setRipNote] = useState<string | null>(null);
-  const ripFailedRef = useRef(false);
-  const ripNoteTimerRef = useRef(0);
-
-  /** Shows the one-line fallback note for ~4.5s, replacing any pending timer. */
-  const flashRipNote = useCallback((text: string) => {
-    window.clearTimeout(ripNoteTimerRef.current);
-    setRipNote(text);
-    ripNoteTimerRef.current = window.setTimeout(() => setRipNote(null), 4500);
-  }, []);
-
-  // Unmount: never leave the note timer firing into a dead page.
+  // A new title/episode starts with a fresh watchdog state.
   useEffect(() => {
-    return () => window.clearTimeout(ripNoteTimerRef.current);
-  }, []);
-
-  // Latest stored preference without re-triggering the param-reset effect
-  // (prefs also change on chip picks and cross-device sync merges).
-  const prefRef = useRef(preferredProvider);
-  useEffect(() => {
-    prefRef.current = preferredProvider;
-  }, [preferredProvider]);
-
-  // A new title/episode restarts the machine. A resolve that already failed
-  // for THIS media is remembered so "Continue" re-enters embed directly
-  // instead of burning another 45s sidecar timeout.
-  useEffect(() => {
-    ripFailedRef.current = false;
-    window.clearTimeout(ripNoteTimerRef.current);
-    setRipNote(null);
-    setRip(null);
-    setRipElapsed(0);
     setShowWatchdog(false);
-    setMode(initialMode(prefRef.current));
   }, [type, tmdbId, season, episode]);
-
-  // Session prefs hydrate asynchronously after mount, so an explicit past
-  // provider pick is honored the moment it lands: still "preparing" and a
-  // real stored provider → embed. Explicit chip picks during this session
-  // set embed mode themselves, so this never fights the user.
-  useEffect(() => {
-    if (mode !== "preparing") return;
-    if (isEmbedPref(preferredProvider)) setMode("embed");
-  }, [mode, preferredProvider]);
-
-  // The sidecar resolve. Gated on detail (or a definitive detail failure):
-  // imdbId unlocks VidFast/Vidsrc resolution server-side. Any mode flip,
-  // param change or unmount aborts silently (AbortController + alive flag).
-  useEffect(() => {
-    if (mode !== "preparing") return;
-    if (!detail && !detailFailed) return;
-    if (ripFailedRef.current) {
-      setMode("embed"); // already failed here — don't re-burn the timeout
-      return;
-    }
-
-    const controller = new AbortController();
-    let alive = true;
-    resolveRip(mediaRef, { signal: controller.signal }).then((result) => {
-      if (!alive) return;
-      if (result.ok) {
-        setRip(result);
-        setMode("owned");
-      } else {
-        ripFailedRef.current = true;
-        // Honest one-line reason before the embed takes over (any of: the
-        // providers genuinely have no stream, the sidecar timed out, or the
-        // extractor crashed even after its auto-retry).
-        flashRipNote("No ad-free source for this title right now — regular servers below.");
-        setMode("embed");
-      }
-    });
-    return () => {
-      alive = false;
-      controller.abort();
-    };
-  }, [mode, mediaRef, detail, detailFailed, flashRipNote]);
-
-  // Live elapsed counter while resolving; the display caps at 40s.
-  useEffect(() => {
-    if (mode !== "preparing") return;
-    const timer = window.setInterval(() => setRipElapsed((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [mode]);
 
   // Background reachability check. It never delays the first iframe — the first
   // server paints immediately and this may only swap it before the user
   // interacts. Registry order is playability order (harness-verified 2026-10-22:
   // only VidLink actually plays), so raw latency may not demote the first server.
   // A swap happens only when the first server does not answer at all.
-  // 2026-10-24: the probe is an embed-mode tiebreaker — it must not fetch
-  // provider hosts while the ad-free path is preparing/playing.
   useEffect(() => {
-    if (mode !== "embed") return;
     if (preferred || options.length < 2) return;
     let cancelled = false;
 
@@ -250,7 +254,7 @@ export default function Watch() {
     return () => {
       cancelled = true;
     };
-  }, [options, preferred, mode]);
+  }, [options, preferred]);
 
   const currentOption: ProviderOption | undefined = useMemo(() => {
     if (preferred) return options.find((option) => option.url === preferred);
@@ -259,13 +263,21 @@ export default function Watch() {
   }, [options, preferred, probeWinner]);
 
   const url = currentOption?.url;
+  const poster = detail ? posterUrl(detail.posterPath, "w185") : null;
+
+  const isEpisode = type === "tv" && season !== undefined && episode !== undefined;
+
+  /** "S1 · E1" — the badge shown in the deck and in the top chrome. */
+  const episodeBadge = isEpisode ? `S${season} · E${episode}` : null;
+
+  const episodeLabel =
+    type === "tv" && season !== undefined && episode !== undefined
+      ? `S${season} · E${episode}${currentEpisode?.name ? ` · ${currentEpisode.name}` : ""}`
+      : null;
 
   const frameTitle = detail
-    ? `${detail.title}${season !== undefined && episode !== undefined ? ` — S${season} E${episode}` : ""}`
+    ? `${detail.title}${episodeLabel ? ` — ${episodeLabel}` : ""}`
     : "Player";
-
-  /** Poster shown by the ad-free player while the stream spins up (2026-10-24). */
-  const framePoster = backdropUrl(detail?.backdropPath, "w780");
 
   /* ---------------------------------------------------------------- */
   /* Actions                                                           */
@@ -277,9 +289,7 @@ export default function Watch() {
   // stop them). When the user closes the ad tab and returns, a stale "Not
   // playing" bar over a working player is worse than no bar: hide it on return
   // to the foreground. Player's fresh 6s grace timer re-shows it only if the
-  // player is genuinely still stuck. Deliberately does NOT set interactedRef —
-  // a programmatic focus event is not a user interaction, so the background
-  // probe swap above is unaffected.
+  // player is genuinely still stuck.
   useEffect(() => {
     const handleReturnToForeground = () => {
       if (document.visibilityState === "visible") setShowWatchdog(false);
@@ -296,37 +306,16 @@ export default function Watch() {
     (id: string) => {
       interactedRef.current = true;
       setShowWatchdog(false);
-      // 2026-10-24 — the Lighthook chip (re-)enters ad-free mode and
-      // re-resolves; a warm sidecar cache answers instantly and skips
-      // straight back to "owned". Persisted like provider picks so the next
-      // visit starts ad-free too — never falls through to the embed logic.
-      if (id === LIGHTHOOK_ID) {
-        ripFailedRef.current = false; // an explicit pick always retries
-        setRip(null);
-        setRipElapsed(0);
-        setMode("preparing");
-        if (prefRef.current !== LIGHTHOOK_ID) {
-          session.setPrefs({ preferredProvider: LIGHTHOOK_ID });
-        }
-        return;
-      }
-      // A real provider chip always lands in iframe mode (2026-10-24).
-      setMode("embed");
       if (id !== currentOption?.provider.id) {
-        session.setPrefs({ preferredProvider: id }); // url changes -> Player restarts its 6s timer
+        session.setPrefs({ preferredProvider: id });
       } else {
-        setReloadKey((value) => value + 1); // same server re-picked -> force reload + fresh timer
+        setReloadKey((value) => value + 1);
       }
     },
     [currentOption, session],
   );
 
-  /**
-   * Cycles to the next available server in registry order, wrapping around.
-   * 2026-10-24: `options` only ever holds real providers — "lighthook" is a
-   * chip, not an option — so this can never advance onto it, and the prefs
-   * it persists always name a real embed provider.
-   */
+  /** Cycles to the next available server in registry order, wrapping around. */
   const advanceServer = useCallback(() => {
     interactedRef.current = true;
     setShowWatchdog(false);
@@ -334,42 +323,13 @@ export default function Watch() {
     const index = options.findIndex(
       (option) => option.provider.id === currentOption?.provider.id,
     );
-    // index -1 (no current option) resolves to the first server — modulo wraps.
     const next = options[(index + 1) % options.length];
     session.setPrefs({ preferredProvider: next.provider.id });
   }, [currentOption, options, session]);
 
-  const continueHere = useCallback(() => {
+  const reloadStream = useCallback(() => {
     setShowWatchdog(false);
     setReloadKey((value) => value + 1);
-    // 2026-10-24 — a reloadKey bump restarts the mode machine with the same
-    // entry rule as mount: an explicit stored provider goes straight to
-    // embed; otherwise re-prepare the ad-free stream. Once a resolve has
-    // failed for this media, embed stays (no repeated 45s timeouts).
-    if (!isEmbedPref(prefRef.current) && !ripFailedRef.current) {
-      setRip(null);
-      setRipElapsed(0);
-      setMode("preparing");
-    }
-  }, []);
-
-  // 2026-10-24 — the ad-free engine gave up (fatal error, no recovery):
-  // fall back to the iframe providers WITHOUT persisting a provider pick —
-  // the user never chose one. The normal watchdog cycle in embed mode takes
-  // over from here.
-  const handleRipUnrecoverable = useCallback(() => {
-    ripFailedRef.current = true; // this media's stream is dead — don't retry on Continue
-    flashRipNote("Ad-free stream ended — switched to regular servers.");
-    setMode("embed");
-  }, [flashRipNote]);
-
-  // 2026-10-24 — manual "Play with regular servers →": aborts the in-flight
-  // resolve (the resolve effect's cleanup) and switches to embed. Counts as
-  // an interaction so the background probe can't swap servers afterwards.
-  const switchToEmbed = useCallback(() => {
-    ripFailedRef.current = true; // the user explicitly chose embed — remember for Continue
-    interactedRef.current = true;
-    setMode("embed");
   }, []);
 
   const goBack = useCallback(() => {
@@ -406,19 +366,57 @@ export default function Watch() {
   }, [detail, detailFailed, validId, type, tmdbId, season, episode, recordHistory]);
 
   /* ---------------------------------------------------------------- */
-  /* Next episode                                                      */
+  /* Previous / next episode                                           */
   /* ---------------------------------------------------------------- */
 
-  const next = useMemo(() => {
+  const previous = useMemo<EpisodeRef | null>(() => {
     if (detail?.type !== "tv" || season === undefined || episode === undefined) return null;
-    const current = detail.seasons.find((s) => s.seasonNumber === season);
-    if (current && episode < current.episodeCount) return { season, episode: episode + 1 };
-    const nextSeason = detail.seasons.find(
-      (s) => s.seasonNumber === season + 1 && s.episodeCount > 0,
-    );
-    if (nextSeason) return { season: season + 1, episode: 1 };
-    return null;
+    if (season < 1) return null; // specials are not a regular-season neighbour
+    if (episode > 1) return { season, episode: episode - 1 };
+    if (season === 1) return null; // S1E1 is the true start of the show
+
+    // Episode 1 of a later season: go to the final episode of the highest
+    // earlier regular season (skipping specials and empty seasons).
+    const earlier = detail.seasons
+      .filter((entry) => isNavigableSeason(entry) && entry.seasonNumber < season)
+      .sort((a, b) => b.seasonNumber - a.seasonNumber)[0];
+    return earlier ? { season: earlier.seasonNumber, episode: earlier.episodeCount } : null;
   }, [detail, season, episode]);
+
+  /**
+   * The current season's true length. TMDB's `episode_count` is per-season,
+   * but it can lag (or be 0) for a season that is still airing, so the loaded
+   * season detail is used as a floor when it is available.
+   */
+  const seasonLength = useMemo(() => {
+    if (detail?.type !== "tv" || season === undefined || season < 1) return 0;
+    const summary = detail.seasons.find(
+      (entry) => entry.seasonNumber === season && entry.seasonNumber > 0,
+    );
+    const loaded =
+      seasonDetail?.seasonNumber === season
+        ? seasonDetail.episodes.reduce(
+            (max, entry) => Math.max(max, entry.episodeNumber),
+            0,
+          )
+        : 0;
+    return Math.max(summary?.episodeCount ?? 0, loaded);
+  }, [detail, season, seasonDetail]);
+
+  const next = useMemo<EpisodeRef | null>(() => {
+    if (detail?.type !== "tv" || season === undefined || episode === undefined) return null;
+    if (season < 1) return null; // specials are not a regular-season neighbour
+
+    if (seasonLength > 0 && episode < seasonLength) {
+      return { season, episode: episode + 1 };
+    }
+
+    // End of the season: the first episode of the next regular season, if any.
+    const later = detail.seasons
+      .filter((entry) => isNavigableSeason(entry) && entry.seasonNumber > season)
+      .sort((a, b) => a.seasonNumber - b.seasonNumber)[0];
+    return later ? { season: later.seasonNumber, episode: 1 } : null;
+  }, [detail, season, episode, seasonLength]);
 
   if (!type || !validId) return <Navigate to="/" replace />;
 
@@ -429,80 +427,77 @@ export default function Watch() {
   return (
     <div className="player-page watch">
       <div className="watch-stage">
-        {mode === "preparing" ? (
-          // 2026-10-24 — same frame geometry as the players; the elapsed
-          // counter is capped at 40s but the abort button works throughout.
-          <div className="rip-stage" role="status">
-            <span className="rip-spinner" aria-hidden="true" />
-            <p className="rip-text">Preparing ad-free stream&hellip;</p>
-            <p className="rip-elapsed tiny muted">{Math.min(ripElapsed, 90)}s</p>
-            {ripElapsed >= 25 && (
-              <p className="rip-elapsed tiny muted">
-                Waking the source on your home server&hellip;
-              </p>
-            )}
-            <button type="button" className="btn btn-secondary" onClick={switchToEmbed}>
-              Play with regular servers &rarr;
-            </button>
-          </div>
-        ) : mode === "owned" && rip ? (
-          <HlsPlayer
-            key={`${rip.playlistUrl}#${reloadKey}`}
-            kind={rip.kind}
-            src={rip.playlistUrl}
-            title={frameTitle}
-            poster={framePoster}
-            subs={rip.subs}
-            onUnrecoverable={handleRipUnrecoverable}
-          />
-        ) : url ? (
+        {url ? (
           <Player key={reloadKey} url={url} title={frameTitle} onTimeout={handleTimeout} />
         ) : (
-          <div className="empty-state">
-            <h3>No server can play this title</h3>
+          <div className="watch-empty">
+            <div className="watch-empty-card">
+              <p className="eyebrow">No signal</p>
+              <h3>No server can play this title</h3>
+              <p className="muted">
+                The provider list came back empty. Go back and try another title, or
+                reopen this one in a moment.
+              </p>
+              <button type="button" className="btn btn-secondary" onClick={goBack}>
+                Go back
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Honest fallback note flashed when the ad-free handoff to embed
-            happens for a reason the user can act on (2026-10-24). */}
-        {ripNote && mode === "embed" && (
-          <div className="rip-note" role="status">{ripNote}</div>
-        )}
-
+        {/* Luminous top chrome: a glass rail that floats over the frame. */}
         <div className="watch-top">
           <div className="watch-top-row">
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn watch-back"
               onClick={goBack}
               aria-label="Back"
             >
               {BackIcon}
             </button>
-            {detail && (
-              <p className="watch-top-title truncate" aria-hidden="true">
-                {detail.title}
-              </p>
-            )}
+
+            {/* Decorative only — the deck below carries the same copy for
+                screen readers. */}
+            <div className="watch-top-copy" aria-hidden="true">
+              <p className="watch-top-kicker">Now playing</p>
+              <p className="watch-top-title truncate">{detail?.title ?? "Loading"}</p>
+              {(episodeBadge || detail?.year) && (
+                <p className="watch-top-meta">
+                  {episodeBadge && <span className="watch-top-badge">{episodeBadge}</span>}
+                  {detail?.year && <span className="watch-top-year">{detail.year}</span>}
+                </p>
+              )}
+            </div>
+
             <ServerChips
               mediaRef={mediaRef}
-              mode={mode === "preparing" ? "ripping" : mode === "owned" ? "owned" : "embed"}
-              activeId={mode === "embed" ? currentOption?.provider.id : LIGHTHOOK_ID}
+              activeId={currentOption?.provider.id}
               onSelect={onSelectServer}
             />
           </div>
 
-          {showWatchdog && mode === "embed" && (
+          {showWatchdog && (
             <div className="watchdog-bar" role="status">
-              <span>Not playing? Try the next server</span>
+              <span className="watchdog-beacon" aria-hidden="true">
+                <span className="watchdog-beacon-core" />
+              </span>
+              <div className="watchdog-copy">
+                <span className="watchdog-kicker">Stream not starting?</span>
+                <span className="watchdog-text">
+                  {currentOption ? `${currentOption.provider.name} is taking a while. ` : ""}
+                  Try another server — you&rsquo;ll stay on this episode.
+                </span>
+              </div>
               <div className="watchdog-actions">
                 <button
                   type="button"
-                  className="btn btn-sm btn-primary"
-                  onClick={advanceServer}
-                  disabled={options.length < 2}
+                  className="btn btn-sm btn-primary watchdog-switch"
+                  onClick={options.length > 1 ? advanceServer : reloadStream}
+                  disabled={options.length === 0}
                 >
-                  Try next server
+                  {SwapIcon}
+                  {options.length > 1 ? "Switch server" : "Reload stream"}
                 </button>
                 <button
                   type="button"
@@ -510,7 +505,7 @@ export default function Watch() {
                   onClick={() => setShowWatchdog(false)}
                   aria-label="Dismiss"
                 >
-                  ✕
+                  {CloseIcon}
                 </button>
               </div>
             </div>
@@ -518,16 +513,38 @@ export default function Watch() {
         </div>
       </div>
 
-      <footer className="watch-bar">
+      {/* The deck: now-playing readout on the left, transport on the right. */}
+      <footer className={`watch-bar watch-bar--${type === "tv" ? "tv" : "movie"}`}>
         <div className="watch-now">
           {detail ? (
             <>
-              <p className="watch-now-title truncate">{detail.title}</p>
-              {type === "tv" && (
-                <p className="watch-now-sub tiny">
-                  Season {season} · Episode {episode}
-                </p>
+              {poster ? (
+                <img className="watch-poster" src={poster} alt="" decoding="async" />
+              ) : (
+                <span className="watch-poster watch-poster--fallback" aria-hidden="true">
+                  {detail.title.slice(0, 1)}
+                </span>
               )}
+              <div className="watch-now-copy">
+                <p className="watch-now-kicker">Now playing</p>
+                <p className="watch-now-title truncate">{detail.title}</p>
+                <div className="watch-now-meta">
+                  {detail.year && <span className="watch-meta-year">{detail.year}</span>}
+                  {episodeBadge && (
+                    <span className="watch-episode-badge">{episodeBadge}</span>
+                  )}
+                  {currentOption && (
+                    <span className="watch-provider">{currentOption.provider.name}</span>
+                  )}
+                </div>
+                {type === "tv" && (
+                  <p className="watch-now-sub tiny watch-now-episode">
+                    <span className="watch-episode-name truncate">
+                      {currentEpisode?.name ?? (seasonDetail ? "Episode" : "Loading episode…")}
+                    </span>
+                  </p>
+                )}
+              </div>
             </>
           ) : detailFailed ? (
             <p className="watch-now-sub tiny">
@@ -538,29 +555,58 @@ export default function Watch() {
           )}
         </div>
 
-        <div className="watch-actions">
-          <button type="button" className="btn btn-primary" onClick={continueHere}>
-            Continue
-          </button>
-          {type === "tv" && next && (
-            <Link
-              className="btn btn-secondary"
-              to={`/watch/tv/${tmdbId}?s=${next.season}&e=${next.episode}`}
+        {type === "tv" ? (
+          <div
+            className="watch-actions watch-actions--episodes"
+            role="group"
+            aria-label="Episode controls"
+          >
+            {previous && (
+              <Link
+                className="btn btn-secondary watch-episode-btn"
+                to={`/watch/tv/${tmdbId}?s=${previous.season}&e=${previous.episode}`}
+                aria-label="Previous episode"
+              >
+                {PreviousIcon}
+                <span className="watch-episode-btn__long">Previous episode</span>
+                <span className="watch-episode-btn__short">Previous</span>
+              </Link>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary watch-episode-btn"
+              onClick={reloadStream}
+              aria-label="Reload stream"
             >
-              Next episode
-            </Link>
-          )}
-        </div>
-
-        <p className="tiny muted watch-note">
-          {mode === "owned" ? (
-            "You're watching the ad-free Lighthook stream — served locally, nothing to block."
-          ) : type === "tv" ? (
-            "Opens the episode you picked. The player\u2019s position can\u2019t be read back."
-          ) : (
-            "Opens the title you picked. The player\u2019s position can\u2019t be read back."
-          )}
-        </p>
+              {ReloadIcon}
+              <span className="watch-episode-btn__long">Reload stream</span>
+              <span className="watch-episode-btn__short">Reload</span>
+            </button>
+            {next && (
+              <Link
+                className="btn btn-primary watch-episode-btn"
+                to={`/watch/tv/${tmdbId}?s=${next.season}&e=${next.episode}`}
+                aria-label="Next episode"
+              >
+                <span className="watch-episode-btn__long">Next episode</span>
+                <span className="watch-episode-btn__short">Next</span>
+                {NextIcon}
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="watch-source">
+            <span className="watch-source-icon" aria-hidden="true">
+              {SourceIcon}
+            </span>
+            <span className="watch-source-copy">
+              <span className="watch-source-label">Source</span>
+              <span className="watch-source-name">
+                {currentOption?.provider.name ?? "No server"}
+              </span>
+            </span>
+          </div>
+        )}
       </footer>
     </div>
   );

@@ -30,8 +30,12 @@ async function get<T>(path: string, params: Params = {}, signal?: AbortSignal): 
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL) return hit.data as T;
 
+  // A shared in-flight request must never inherit one caller's abort signal:
+  // if the first caller navigates away, the second caller would get a spurious
+  // AbortError. The shared request therefore runs unabortable, and each caller
+  // races it against its own signal.
   const running = inflight.get(key);
-  if (running) return running as Promise<T>;
+  if (running) return raceWithSignal(running as Promise<T>, signal);
 
   const headers: Record<string, string> = { accept: "application/json" };
   if (TOKEN) headers.Authorization = `Bearer ${TOKEN}`;
@@ -39,9 +43,8 @@ async function get<T>(path: string, params: Params = {}, signal?: AbortSignal): 
   const request = (async () => {
     let res: Response;
     try {
-      res = await fetch(key, { headers, signal });
-    } catch (err) {
-      if ((err as Error)?.name === "AbortError") throw err;
+      res = await fetch(key, { headers });
+    } catch {
       throw new TmdbError("Could not reach TMDB. Check your connection.", 0);
     }
     if (!res.ok) {
@@ -59,10 +62,41 @@ async function get<T>(path: string, params: Params = {}, signal?: AbortSignal): 
 
   inflight.set(key, request);
   try {
-    return (await request) as T;
+    return (await raceWithSignal(request as Promise<T>, signal)) as T;
   } finally {
     inflight.delete(key);
   }
+}
+
+/**
+ * Races a promise against an abort signal without cancelling the underlying
+ * work. When the signal fires first the caller gets a real `AbortError`, which
+ * is what the search page checks for before it updates state.
+ */
+function raceWithSignal<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(abortError());
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortError());
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+function abortError(): Error {
+  const error = new Error("The request was aborted.");
+  error.name = "AbortError";
+  return error;
 }
 
 /* ------------------------------------------------------------------ */

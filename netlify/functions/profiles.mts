@@ -61,13 +61,21 @@ interface ProfileState {
 }
 
 const INDEX_KEY = "profiles/index.json";
-const MAX_PROFILES = 10;
+const MAX_PROFILES = 50;
 const MAX_RECORDS_PER_PUSH = 2000;
 const MAX_NAME_LENGTH = 24;
 const MAX_RECORD_ID_LENGTH = 200;
+const MAX_RECORD_BYTES = 2048;
+const MAX_PREFS_KEYS = 64;
+const MAX_PREF_KEY_LENGTH = 64;
+const MAX_PREFS_BYTES = 16 * 1024;
+const MAX_BODY_BYTES = 512 * 1024;
 const DEFAULT_COLOR = "#8b5cf6";
 const ID_PATTERN = /^[a-z0-9-]{1,64}$/;
 const COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/;
+const CONTROL_GLOBAL = /[\u0000-\u001f\u007f-\u009f]/g;
+const textEncoder = new TextEncoder();
 
 const SEEDS = [
   { id: "sam", name: "Sam", color: "#00acc1" },
@@ -78,10 +86,18 @@ type BlobStore = ReturnType<typeof getStore>;
 
 type ParsedBody =
   | { ok: true; body: Record<string, unknown> }
-  | { ok: false; error: "invalid_json" | "invalid_body" };
+  | { ok: false; error: "invalid_json" | "invalid_body" | "body_too_large" };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function jsonByteSize(value: unknown): number {
+  try {
+    return JSON.stringify(value)?.length ?? Number.POSITIVE_INFINITY;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
 }
 
 function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
@@ -110,9 +126,12 @@ function seedIndex(): ProfileMeta[] {
 
 function normalizeName(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return null;
-  return trimmed.slice(0, MAX_NAME_LENGTH);
+  // Strip control characters (C0, DEL and C1 ranges) before trimming, so a
+  // crafted name cannot smuggle unprintable bytes into the blob key or UI.
+  const cleaned = value.replace(CONTROL_GLOBAL, "").trim();
+  if (cleaned.length === 0) return null;
+  // Code-point aware slice: a naive .slice() could cut a surrogate pair in half.
+  return Array.from(cleaned).slice(0, MAX_NAME_LENGTH).join("");
 }
 
 function isColor(value: unknown): value is string {
@@ -172,14 +191,17 @@ function sanitizeIndex(value: unknown): ProfileMeta[] | null {
 
 /**
  * Structural check for the fields the merge relies on. Remaining fields
- * (posterPath, deletedAt, season, ...) pass through untouched.
+ * (posterPath, deletedAt, season, ...) pass through untouched, but the whole
+ * record must fit inside MAX_RECORD_BYTES so one profile cannot push a
+ * giant record through the function's memory/time budget.
  */
 function isStamped<T extends Stamped>(value: unknown): value is T {
   if (!isRecord(value)) return false;
   if (
     typeof value.id !== "string" ||
     value.id.length === 0 ||
-    value.id.length > MAX_RECORD_ID_LENGTH
+    value.id.length > MAX_RECORD_ID_LENGTH ||
+    CONTROL_PATTERN.test(value.id)
   ) {
     return false;
   }
@@ -191,16 +213,17 @@ function sanitizeRecords<T extends Stamped>(value: unknown, limit?: number): T[]
 
   const out: T[] = [];
   for (const entry of value) {
-    if (isStamped<T>(entry)) out.push(entry);
+    if (!isStamped<T>(entry)) continue;
+    if (jsonByteSize(entry) > MAX_RECORD_BYTES) continue;
+    out.push(entry);
   }
 
   if (limit !== undefined && out.length > limit) {
-    // Tombstones must survive truncation first: dropping one would let the next
-    // pull resurrect a record the server never held a delete for (deletes are
-    // tombstones and are never physically deleted). Then keep the newest.
-    out.sort(
-      (a, b) => Number(!!b.deletedAt) - Number(!!a.deletedAt) || b.updatedAt - a.updatedAt,
-    );
+    // Keep the newest `limit` records: the array arrives oldest-first, and a
+    // truncated push must drop the oldest entries, not the newest. Tombstones
+    // ride along whenever they fall inside the newest window (a delete stamps
+    // `updatedAt` with the removal time, so it is naturally among the newest).
+    out.sort((a, b) => b.updatedAt - a.updatedAt);
     return out.slice(0, limit);
   }
 
@@ -210,9 +233,18 @@ function sanitizeRecords<T extends Stamped>(value: unknown, limit?: number): T[]
 function sanitizePrefs(value: unknown): ProfilePrefs | null {
   if (!isRecord(value)) return null;
 
+  const entries = Object.entries(value);
+  if (entries.length > MAX_PREFS_KEYS) return null;
+
   const prefs: ProfilePrefs = {};
-  for (const [key, entry] of Object.entries(value)) {
+  let totalBytes = 0;
+  for (const [key, entry] of entries) {
     if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    if (key.length === 0 || key.length > MAX_PREF_KEY_LENGTH || CONTROL_PATTERN.test(key)) {
+      return null;
+    }
+    totalBytes += key.length + jsonByteSize(entry);
+    if (totalBytes > MAX_PREFS_BYTES) return null;
     prefs[key] = entry;
   }
   return prefs;
@@ -221,8 +253,8 @@ function sanitizePrefs(value: unknown): ProfilePrefs | null {
 function sanitizeState(value: unknown, profileId: string): ProfileState | null {
   if (!isRecord(value)) return null;
 
-  const watchlist = sanitizeRecords<WatchItem>(value.watchlist) ?? [];
-  const history = sanitizeRecords<HistoryItem>(value.history) ?? [];
+  const watchlist = sanitizeRecords<WatchItem>(value.watchlist, MAX_RECORDS_PER_PUSH) ?? [];
+  const history = sanitizeRecords<HistoryItem>(value.history, MAX_RECORDS_PER_PUSH) ?? [];
   const prefs = sanitizePrefs(value.prefs) ?? {};
   const updatedAt =
     typeof value.updatedAt === "number" && Number.isFinite(value.updatedAt) ? value.updatedAt : 0;
@@ -243,6 +275,11 @@ function mergeById<T extends Stamped>(incoming: T[], stored: T[]): T[] {
 }
 
 async function readBody(req: Request): Promise<ParsedBody> {
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return { ok: false, error: "body_too_large" };
+  }
+
   let value: unknown;
   try {
     value = await req.json();
@@ -254,20 +291,41 @@ async function readBody(req: Request): Promise<ParsedBody> {
   return { ok: true, body: value };
 }
 
-async function loadIndex(store: BlobStore): Promise<ProfileMeta[]> {
+function bodyErrorResponse(error: "invalid_json" | "invalid_body" | "body_too_large"): Response {
+  return error === "body_too_large"
+    ? json({ error, max: MAX_BODY_BYTES }, 413)
+    : json({ error }, 400);
+}
+
+/**
+ * Reads the index. Returns null when it cannot be read or is corrupt — the
+ * caller answers 500 rather than overwriting a healthy-looking-but-unreadable
+ * index with seeds (which would silently drop every profile but Sam and Mellu).
+ * Only a genuinely missing index is (re)seeded.
+ */
+async function loadIndex(store: BlobStore): Promise<ProfileMeta[] | null> {
   let raw: unknown = null;
   try {
     raw = await store.get(INDEX_KEY, { type: "json" });
   } catch (error) {
     console.error("profiles: failed to read index", error);
+    return null;
+  }
+
+  if (raw === null || raw === undefined) {
+    // First run: no index yet — seed it.
+    const seeded = seedIndex();
+    await store.setJSON(INDEX_KEY, seeded);
+    return seeded;
   }
 
   const parsed = sanitizeIndex(raw);
-  if (parsed !== null) return parsed;
+  if (parsed === null) {
+    console.error("profiles: index.json is corrupt; refusing to overwrite it");
+    return null;
+  }
 
-  const seeded = seedIndex();
-  await store.setJSON(INDEX_KEY, seeded);
-  return seeded;
+  return parsed;
 }
 
 async function loadState(store: BlobStore, profileId: string): Promise<ProfileState | null> {
@@ -294,6 +352,9 @@ async function route(req: Request): Promise<Response> {
   const id = rawId;
   const store = getStore({ name: "lighthook", consistency: "strong" });
   const index = await loadIndex(store);
+  if (index === null) {
+    return json({ error: "index_unavailable" }, 500);
+  }
 
   if (method === "GET") {
     if (id === null) return json({ profiles: index });
@@ -305,11 +366,18 @@ async function route(req: Request): Promise<Response> {
   if (method === "POST") {
     if (id === null) {
       if (index.length >= MAX_PROFILES) {
-        return json({ error: "profile_limit", max: MAX_PROFILES }, 409);
+        return json(
+          {
+            error: "profile_limit",
+            max: MAX_PROFILES,
+            message: `Profile limit reached (${MAX_PROFILES}).`,
+          },
+          409,
+        );
       }
 
       const parsed = await readBody(req);
-      if (!parsed.ok) return json({ error: parsed.error }, 400);
+      if (!parsed.ok) return bodyErrorResponse(parsed.error);
 
       const name = normalizeName(parsed.body.name);
       if (name === null) return json({ error: "name_required" }, 400);
@@ -329,7 +397,7 @@ async function route(req: Request): Promise<Response> {
     }
 
     const parsed = await readBody(req);
-    if (!parsed.ok) return json({ error: parsed.error }, 400);
+    if (!parsed.ok) return bodyErrorResponse(parsed.error);
 
     // Rename / recolour is index-only work and must be handled before merging state.
     if (parsed.body.meta !== undefined) {
@@ -378,11 +446,15 @@ async function route(req: Request): Promise<Response> {
     if (patchPrefs === null) return json({ error: "invalid_prefs" }, 400);
 
     const current = (await loadState(store, id)) ?? emptyState(id);
+    const mergedWatchlist = mergeById(patchWatchlist, current.watchlist);
+    const mergedHistory = mergeById(patchHistory, current.history);
     const next: ProfileState = {
       ...current,
       profileId: id,
-      watchlist: mergeById(patchWatchlist, current.watchlist),
-      history: mergeById(patchHistory, current.history),
+      // The final per-profile document is bounded too, so a single profile can
+      // never accumulate unbounded growth across pushes.
+      watchlist: sanitizeRecords<WatchItem>(mergedWatchlist, MAX_RECORDS_PER_PUSH) ?? mergedWatchlist,
+      history: sanitizeRecords<HistoryItem>(mergedHistory, MAX_RECORDS_PER_PUSH) ?? mergedHistory,
       prefs: { ...current.prefs, ...patchPrefs },
       updatedAt: Date.now(),
     };
@@ -412,9 +484,25 @@ async function route(req: Request): Promise<Response> {
   });
 }
 
+/**
+ * Constant-time-ish comparison so the family key cannot be probed byte by byte.
+ * (A length leak remains, which is fine for a gate that is not authentication.)
+ */
+function familyKeyOk(provided: string | null, expected: string): boolean {
+  if (provided === null) return false;
+  const a = textEncoder.encode(provided);
+  const b = textEncoder.encode(expected);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
 export default async function handler(req: Request): Promise<Response> {
-  const expectedKey = process.env.FAMILY_KEY ?? "samandmellu";
-  if (req.headers.get("x-family-key") !== expectedKey) {
+  const expectedKey = (process.env.FAMILY_KEY ?? "").trim() || "samandmellu";
+  // The gate runs before routing, so neither unknown methods nor unknown paths
+  // can reach the blob store without the key.
+  if (!familyKeyOk(req.headers.get("x-family-key"), expectedKey)) {
     return json({ error: "forbidden" }, 403);
   }
 

@@ -447,3 +447,44 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 - **195 PASS / 0 FAIL total.** Ground truth: S5E5 cold resolve 10.9s (vidsrc HLS, 4 subs), S1E1 8.3s, 969681 1080p, 220542 1080p. Screenshots under `qa\shots\` (`s5e5-cc-final.png`, `s5e5-sync.png`, `s5e5-cc-layout.png`, `969681-quality.png`, `subs-empty-sheet.png`).
 
 **NOT done (per mandate):** no git commands, no deploy/Netlify, `.env` untouched. Dev stack is still running on **http://192.168.0.35:5173** for a real phone check; approval is required before any git or deploy step.
+
+---
+
+## 12. Revamp — 50-screen household, admin control room, auth lockout, full UI redesign (2026-11-08, in progress)
+
+**User mandate:** make every screen password-protected with a 3-strike block; only admin can add/remove/unblock; raise the cap to 50 screens; remove the ad-free rip player entirely; improve the house notice; make the UI "impress me" across every surface.
+
+**Completed architecture:**
+- `src/lib/auth.ts` — local auth: admin password `light0552`, seeded screen passwords `1234`, 3-failed-attempt block, admin set/unblock/add/remove, credential listing.
+- `src/lib/session.tsx` — admin session, auth map state, `adminAddProfile`/`adminDeleteProfile`/`adminSetProfilePassword`/`adminUnblockProfile`.
+- `src/lib/profiles.ts` + `netlify/functions/profiles.mts` — `MAX_PROFILES = 50`.
+- `src/pages/Admin.tsx` + `src/styles/admin.css` — control room: login, stats, add-screen form, filterable 50-screen list, copy password, bulk copy all, unblock/remove.
+- `src/pages/Watch.tsx` + `src/styles/player.css` — iframe-only watch; TV footer with episode name + Previous/Reload/Next; friendly watchdog; no Continue button for movies.
+- `src/App.tsx` — notice hidden on `/admin` and `/watch*`; global offline banner; `LIGHTH00K` TabBar wordmark.
+- `src/lib/providers.ts` — removed the hidden Vidsrc provider concept with the deleted sidecar.
+- `scripts/ripstream/` deleted; `scripts/dev-all.mjs` now spawns only Vite; `hls.js` uninstalled; `BUILD.md` updated to mark the rip player path as deleted.
+
+**In-flight design work (subagents, strict file ownership):**
+- `src/components/NoticeBoard.tsx` + `src/styles/notice.css` — house notice: one-time acknowledgement per device (`lighthook.notice.acknowledged = "1"`, legacy date key migrated), never shown again after "Got it"; hidden on `/admin` and `/watch*`.
+- `src/pages/Home.tsx` + `src/styles/home.css` — home header + hero + shelves.
+- `src/pages/Title.tsx` + `src/styles/title.css` — title detail page.
+- `src/pages/Browse.tsx`/`Search.tsx`/`Library.tsx` + their CSS — catalogue/search/library pages.
+- `src/styles.css` + shared components — global design-system polish.
+- `src/pages/Admin.tsx` + `src/styles/admin.css` — control room, incl. inline rename/recolour.
+- `src/pages/Watch.tsx` + `src/styles/player.css` — watch chrome, TV episode controls, watchdog.
+- `index.html`, `public/manifest.webmanifest`, `vite.config.ts` — PWA shell (LIGHTH00K, offline, icon set).
+
+**Temporary QA files:** removed. The permanent harnesses live in `scripts/qa/`:
+- `audit.mjs` — 41-check household audit (notice, lockout, admin, add/remove, watch semantics).
+- `preview.mjs` — production-build preview smoke test (25 checks + 16 screenshots).
+- `visual.mjs` — 34-shot visual QA across 360/390/768/1440 (overflow, tap targets, fold).
+
+**Final verification (2026-11-08):**
+- `npx tsc --noEmit` clean; `npm run build` green (10 precache entries).
+- `scripts/qa/audit.mjs` — **41/41 PASS**.
+- Flow e2e — **41/41 PASS** (3-strike block, admin add/set/remove/unblock, notice one-time ack, movie no-Continue, TV episode controls).
+- `scripts/qa/preview.mjs` — **25/25 PASS** against the production build (SW, manifest, deep links, admin, watch).
+- `scripts/qa/visual.mjs` — **0 blockers / 0 major / 0 minor** at 360x640, 390x844, 768x1024, 1440x950 (the only INFO is the intentional absence of Previous on S1E1).
+- Netlify config validated with `netlify dev --offline`: `/api/*` → `/.netlify/functions/:splat`, function answers 200/400/403/405/404 correctly, SPA fallback intact, security + cache headers set.
+- **No git, no Netlify deploy, no push performed.**
+- Dev server left running on **http://localhost:5173** (LAN: http://192.168.0.42:5173).

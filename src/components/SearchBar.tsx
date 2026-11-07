@@ -42,7 +42,7 @@ export default function SearchBar({
   };
 
   return (
-    <label className="field" style={{ minHeight: 48 }}>
+    <label className="field search-field">
       <svg
         width="18"
         height="18"
@@ -51,7 +51,6 @@ export default function SearchBar({
         stroke="currentColor"
         strokeWidth="1.8"
         aria-hidden="true"
-        style={{ color: "var(--muted)", flex: "0 0 auto" }}
       >
         <circle cx="11" cy="11" r="6.5" />
         <path d="m16 16 4.5 4.5" strokeLinecap="round" />
@@ -87,7 +86,6 @@ export default function SearchBar({
           type="button"
           className="icon-btn icon-btn--bare"
           aria-label="Clear search"
-          style={{ width: 44, height: 44, marginRight: -6 }}
           onClick={() => {
             setText("");
             submit("");

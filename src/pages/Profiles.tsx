@@ -1,135 +1,151 @@
 import {
   useEffect,
-  useRef,
+  useMemo,
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import Sheet from "../components/Sheet";
 import { useSession } from "../lib/session";
-import { MAX_PROFILES, PROFILE_COLORS, initials } from "../lib/profiles";
+import { initials } from "../lib/profiles";
 import type { ProfileMeta } from "../types";
 import "../styles/profiles.css";
 
-const DEFAULT_ADD_COLOR = PROFILE_COLORS[2];
+interface UnlockSheet {
+  profile: ProfileMeta;
+  password: string;
+  error: string | null;
+  pending: boolean;
+  reveal: boolean;
+}
 
-type SheetState =
-  | { mode: "menu"; profile: ProfileMeta }
-  | { mode: "rename"; profile: ProfileMeta }
-  | { mode: "colour"; profile: ProfileMeta }
-  | { mode: "delete"; profile: ProfileMeta }
-  | { mode: "add" };
-
-function SheetShell({
-  title,
-  onClose,
+function Glyph({
   children,
+  size = 16,
+  strokeWidth = 1.8,
 }: {
-  title: string;
-  onClose: () => void;
   children: ReactNode;
+  size?: number;
+  strokeWidth?: number;
 }) {
-  const sheetRef = useRef<HTMLDivElement | null>(null);
-  const restoreRef = useRef<HTMLElement | null>(null);
-
-  // Move focus into the sheet, trap Tab inside it, and restore focus on close.
-  useEffect(() => {
-    restoreRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    const sheet = sheetRef.current;
-    const focusables = () =>
-      sheet
-        ? Array.from(
-            sheet.querySelectorAll<HTMLElement>("input, button, [tabindex]"),
-          ).filter((el) => !el.hasAttribute("disabled"))
-        : [];
-
-    const firstFocusable = focusables()[0];
-    if (firstFocusable) firstFocusable.focus();
-    else sheet?.focus();
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-      const items = focusables();
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      const active = document.activeElement;
-      const inside = active instanceof HTMLElement && sheet?.contains(active);
-      if (event.shiftKey) {
-        if (active === first || !inside) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !inside) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      const restore = restoreRef.current;
-      if (restore && restore.isConnected) restore.focus();
-    };
-  }, []);
-
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div
-        ref={sheetRef}
-        className="sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
   );
 }
 
-function Swatches({ value, onPick }: { value: string; onPick: (color: string) => void }) {
-  return (
-    <div className="swatch-grid">
-      {PROFILE_COLORS.map((color) => (
-        <button
-          key={color}
-          type="button"
-          className={`swatch${color === value ? " swatch--active" : ""}`}
-          style={{ "--swatch-color": color, background: color } as CSSProperties}
-          aria-pressed={color === value}
-          aria-label={`Colour ${color}`}
-          onClick={() => onPick(color)}
-        />
-      ))}
-    </div>
-  );
-}
+const LockGlyph = ({ size = 14 }: { size?: number }) => (
+  <Glyph size={size}>
+    <rect x="5" y="10.5" width="14" height="9.5" rx="2.6" />
+    <path d="M8.2 10.5V7.6a3.8 3.8 0 0 1 7.6 0v2.9" />
+  </Glyph>
+);
+
+const CheckGlyph = ({ size = 15 }: { size?: number }) => (
+  <Glyph size={size} strokeWidth={2.6}>
+    <path d="m5.2 12.4 4.1 4.1L18.8 7" />
+  </Glyph>
+);
+
+const ShieldGlyph = ({ size = 16 }: { size?: number }) => (
+  <Glyph size={size}>
+    <path d="M12 3 5 6v5.4c0 4.3 2.9 8 7 9.6 4.1-1.6 7-5.3 7-9.6V6l-7-3Z" />
+    <path d="m9.5 12.1 1.7 1.7 3.5-3.6" />
+  </Glyph>
+);
+
+const EyeGlyph = ({ off, size = 18 }: { off: boolean; size?: number }) => (
+  <Glyph size={size}>
+    <path d="M2.7 12S6.1 5.9 12 5.9 21.3 12 21.3 12 17.9 18.1 12 18.1 2.7 12 2.7 12Z" />
+    <circle cx="12" cy="12" r="3" />
+    {off && <path d="m4 4 16 16" />}
+  </Glyph>
+);
+
+const ArrowGlyph = ({ size = 12 }: { size?: number }) => (
+  <Glyph size={size} strokeWidth={2.2}>
+    <path d="M5 12h13" />
+    <path d="m13 7 5 5-5 5" />
+  </Glyph>
+);
+
+const SignOutGlyph = ({ size = 16 }: { size?: number }) => (
+  <Glyph size={size}>
+    <path d="M14.5 4H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3.5" />
+    <path d="m9 8-4 4 4 4" />
+    <path d="M5 12h10" />
+  </Glyph>
+);
+
+const AlertGlyph = ({ size = 15 }: { size?: number }) => (
+  <Glyph size={size}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.6v5" />
+    <path d="M12 16.2h.01" />
+  </Glyph>
+);
+
+const SearchGlyph = ({ size = 17 }: { size?: number }) => (
+  <Glyph size={size}>
+    <circle cx="10.8" cy="10.8" r="6.3" />
+    <path d="m15.6 15.6 4 4" />
+  </Glyph>
+);
+
+const CloseGlyph = ({ size = 15 }: { size?: number }) => (
+  <Glyph size={size} strokeWidth={2.2}>
+    <path d="m6 6 12 12" />
+    <path d="m18 6-12 12" />
+  </Glyph>
+);
+
+const BeaconGlyph = ({ size = 30 }: { size?: number }) => (
+  <Glyph size={size} strokeWidth={1.5}>
+    <path d="M12 3v2.4" />
+    <path d="m5.6 6.1 1.6 1.6" />
+    <path d="m18.4 6.1-1.6 1.6" />
+    <path d="M9.4 9.4h5.2l1.5 4.2H7.9l1.5-4.2Z" />
+    <path d="M8.6 16.2h6.8L16.8 21H7.2l1.4-4.8Z" />
+    <path d="M10.1 18.6h3.8" />
+  </Glyph>
+);
 
 export default function Profiles() {
   const {
     ready,
     profiles,
     activeProfile,
-    chooseProfile,
-    addProfile,
-    updateProfile,
-    deleteProfile,
+    authMap,
+    unlockProfile,
     signOut,
     syncStatus,
   } = useSession();
   const navigate = useNavigate();
 
-  const [sheet, setSheet] = useState<SheetState | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [addName, setAddName] = useState("");
-  const [addColor, setAddColor] = useState(DEFAULT_ADD_COLOR);
-  const [addError, setAddError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<UnlockSheet | null>(null);
+  const [query, setQuery] = useState("");
+
+  const filteredProfiles = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return profiles;
+    return profiles.filter((profile) =>
+      profile.name.toLowerCase().includes(needle),
+    );
+  }, [profiles, query]);
+
+  const showFilter = profiles.length > 6 || query.trim().length > 0;
 
   // Lock the page behind an open sheet and let Escape dismiss it.
   useEffect(() => {
@@ -145,246 +161,57 @@ export default function Profiles() {
     };
   }, [sheet]);
 
-  const pick = async (id: string) => {
-    await chooseProfile(id);
-    navigate("/", { replace: true });
-  };
-
-  const openRename = (profile: ProfileMeta) => {
-    setRenameValue(profile.name);
-    setSheet({ mode: "rename", profile });
-  };
-
-  const saveRename = async () => {
-    if (sheet?.mode !== "rename") return;
-    const name = renameValue.trim();
-    if (!name) return;
-    await updateProfile(sheet.profile.id, { name });
-    setSheet(null);
-  };
-
-  const pickColor = async (color: string) => {
-    if (sheet?.mode !== "colour") return;
-    await updateProfile(sheet.profile.id, { color });
-    setSheet(null);
-  };
-
-  const confirmDelete = async () => {
-    if (sheet?.mode !== "delete") return;
-    const id = sheet.profile.id;
-    setSheet(null);
-    await deleteProfile(id);
-  };
-
-  const closeAdd = () => {
-    setAddName("");
-    setAddColor(DEFAULT_ADD_COLOR);
-    setAddError(null);
-    setSheet(null);
-  };
-
-  const submitAdd = async () => {
-    const result = await addProfile(addName, addColor);
-    if (!result.ok) {
-      setAddError(result.error); // keep the sheet open so the message is readable
+  const pick = (profile: ProfileMeta) => {
+    if (activeProfile?.id === profile.id) {
+      navigate("/", { replace: true });
       return;
     }
-    setAddName("");
-    setAddColor(DEFAULT_ADD_COLOR);
-    setAddError(null);
-    setSheet(null);
+    setSheet({
+      profile,
+      password: "",
+      error: null,
+      pending: false,
+      reveal: false,
+    });
   };
 
-  function renderSheet() {
-    if (!sheet) return null;
-
-    switch (sheet.mode) {
-      case "menu": {
-        const { profile } = sheet;
-        return (
-          <SheetShell key="menu" title={`Options for ${profile.name}`} onClose={() => setSheet(null)}>
-            <h2>{profile.name}</h2>
-            <div className="sheet-stack">
-              <button
-                type="button"
-                className="btn btn-block"
-                onClick={() => openRename(profile)}
-              >
-                Rename
-              </button>
-              <button
-                type="button"
-                className="btn btn-block"
-                onClick={() => setSheet({ mode: "colour", profile })}
-              >
-                Colour
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger btn-block"
-                onClick={() => setSheet({ mode: "delete", profile })}
-              >
-                Delete profile
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-block"
-                onClick={() => setSheet(null)}
-              >
-                Cancel
-              </button>
-            </div>
-          </SheetShell>
-        );
-      }
-
-      case "rename": {
-        const { profile } = sheet;
-        return (
-          <SheetShell key="rename" title="Rename profile" onClose={() => setSheet(null)}>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void saveRename();
-              }}
-            >
-              <h2>Rename profile</h2>
-              <div className="field sheet-field">
-                <input
-                  value={renameValue}
-                  onChange={(event) => setRenameValue(event.target.value)}
-                  maxLength={24}
-                  placeholder="Name"
-                  autoFocus
-                  autoCapitalize="words"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  enterKeyHint="done"
-                  aria-label="Profile name"
-                />
-              </div>
-              <div className="sheet-actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setSheet({ mode: "menu", profile })}
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={!renameValue.trim()}
-                >
-                  Save
-                </button>
-              </div>
-            </form>
-          </SheetShell>
-        );
-      }
-
-      case "colour": {
-        const { profile } = sheet;
-        return (
-          <SheetShell key="colour" title={`Colour for ${profile.name}`} onClose={() => setSheet(null)}>
-            <h2>Colour</h2>
-            <p className="tiny muted sheet-note">{profile.name}</p>
-            <Swatches value={profile.color} onPick={(color) => void pickColor(color)} />
-            <div className="sheet-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setSheet({ mode: "menu", profile })}
-              >
-                Back
-              </button>
-            </div>
-          </SheetShell>
-        );
-      }
-
-      case "delete": {
-        const { profile } = sheet;
-        return (
-          <SheetShell key="delete" title={`Delete ${profile.name}?`} onClose={() => setSheet(null)}>
-            <h2>Delete {profile.name}?</h2>
-            <p className="muted sheet-note">
-              Their watchlist and history are removed from this device and every device that
-              syncs.
-            </p>
-            <div className="sheet-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setSheet({ mode: "menu", profile })}
-              >
-                Keep profile
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => void confirmDelete()}
-              >
-                Delete
-              </button>
-            </div>
-          </SheetShell>
-        );
-      }
-
-      case "add":
-        return (
-          <SheetShell key="add" title="Add profile" onClose={closeAdd}>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submitAdd();
-              }}
-            >
-              <h2>Add profile</h2>
-              <div className="field sheet-field">
-                <input
-                  value={addName}
-                  onChange={(event) => {
-                    setAddName(event.target.value);
-                    setAddError(null);
-                  }}
-                  maxLength={24}
-                  placeholder="Name"
-                  autoCapitalize="words"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  enterKeyHint="done"
-                  aria-label="New profile name"
-                />
-              </div>
-              <p className="eyebrow sheet-swatch-label">Colour</p>
-              <Swatches
-                value={addColor}
-                onPick={(color) => {
-                  setAddColor(color);
-                  setAddError(null);
-                }}
-              />
-              {addError && (
-                <p className="sheet-error" role="alert">
-                  {addError}
-                </p>
-              )}
-              <div className="sheet-actions">
-                <button type="button" className="btn btn-ghost" onClick={closeAdd}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={!addName.trim()}>
-                  Create
-                </button>
-              </div>
-            </form>
-          </SheetShell>
-        );
+  const submitPassword = async () => {
+    if (!sheet || sheet.pending) return;
+    const password = sheet.password;
+    if (!password) {
+      setSheet((current) =>
+        current ? { ...current, error: "Enter the screen password first." } : current,
+      );
+      return;
     }
-  }
+
+    setSheet((current) => (current ? { ...current, pending: true, error: null } : current));
+    const result = await unlockProfile(sheet.profile.id, password);
+
+    if (result.ok) {
+      setSheet(null);
+      navigate("/", { replace: true });
+      return;
+    }
+
+    const message = result.blocked
+      ? "This screen is blocked. Contact admin (the person who gave you access) to unblock it."
+      : `Incorrect password. ${result.attemptsLeft} ${
+          result.attemptsLeft === 1 ? "attempt" : "attempts"
+        } left before this screen is blocked.`;
+
+    setSheet((current) =>
+      current
+        ? {
+            ...current,
+            password: "",
+            pending: false,
+            reveal: false,
+            error: message,
+          }
+        : current,
+    );
+  };
 
   if (!ready) {
     return (
@@ -396,97 +223,402 @@ export default function Profiles() {
     );
   }
 
+  const blocked = sheet ? authMap[sheet.profile.id]?.blocked === true : false;
+  const failedAttempts = sheet ? authMap[sheet.profile.id]?.failedAttempts ?? 0 : 0;
+
   return (
     <div className="page profiles-page">
-      <h1 className="display profiles-title">Who&apos;s watching?</h1>
-      <p className="muted profiles-sub">
-        Profiles keep each shelf separate. Everything syncs across your devices.
-      </p>
-      <p className="tiny muted profiles-meta">
-        {profiles.length} / {MAX_PROFILES} profiles
-      </p>
-      {syncStatus.error && (
-        <p className="tiny muted profiles-sync-error" role="status">
-          {syncStatus.error}
-        </p>
-      )}
-
-      {profiles.length === 0 && (
-        <div className="empty-state profiles-empty">
-          <h3>No profiles yet</h3>
-          <p>Add the first profile to give this device its own shelf.</p>
-        </div>
-      )}
-
-      <div className="profile-grid">
-        {profiles.map((profile) => {
-          const active = activeProfile?.id === profile.id;
-          return (
-            <div
-              key={profile.id}
-              className={`profile-tile${active ? " profile-tile--active" : ""}`}
-            >
-              <button
-                type="button"
-                className="profile-tile__select"
-                onClick={() => void pick(profile.id)}
-                aria-label={`Switch to ${profile.name}`}
-              >
-                <span className="profile-avatar-wrap">
-                  <span
-                    className="avatar profile-avatar"
-                    style={{ "--profile-color": profile.color } as CSSProperties}
-                  >
-                    {initials(profile.name)}
-                  </span>
-                  {active && (
-                    <span className="profile-check" aria-hidden="true">
-                      ✓
-                    </span>
-                  )}
-                </span>
-                <span className="profile-name truncate">{profile.name}</span>
-              </button>
-              <button
-                type="button"
-                className="icon-btn profile-menu-btn"
-                aria-label={`Options for ${profile.name}`}
-                onClick={() => setSheet({ mode: "menu", profile })}
-              >
-                <span aria-hidden="true">⋯</span>
-              </button>
-            </div>
-          );
-        })}
-
-        {profiles.length < MAX_PROFILES && (
-          <div className="profile-tile">
-            <button
-              type="button"
-              className="profile-tile__select profile-add"
-              onClick={() => setSheet({ mode: "add" })}
-              aria-label="Add profile"
-            >
-              <span className="profile-add__box" aria-hidden="true">
-                <span className="profile-add__glyph">+</span>
-              </span>
-              <span className="profile-name">Add profile</span>
-            </button>
-          </div>
-        )}
+      <div className="profiles-ambient" aria-hidden="true">
+        <span className="profiles-ambient__glow" />
+        <span className="profiles-ambient__beam" />
+        <span className="profiles-ambient__horizon" />
+        <span className="profiles-ambient__vignette" />
       </div>
 
-      {activeProfile && (
+      <header className="profiles-masthead">
+        <div className="profiles-brand">
+          <span className="profiles-brand-mark" aria-hidden="true">
+            L
+          </span>
+          <span className="profiles-brand-copy">
+            <span className="profiles-brand-name">LIGHTH00K</span>
+            <span className="profiles-brand-kicker">Private shelf</span>
+          </span>
+        </div>
         <button
           type="button"
-          className="btn btn-ghost btn-block profiles-signout"
-          onClick={signOut}
+          className="profiles-admin-btn"
+          onClick={() => navigate("/admin")}
         >
-          Sign out of {activeProfile.name}
+          <ShieldGlyph />
+          Admin
         </button>
-      )}
+      </header>
 
-      {renderSheet()}
+      <section className="profiles-hero" aria-labelledby="profiles-title">
+        <p className="profiles-eyebrow">
+          <span className="profiles-beacon" aria-hidden="true" />
+          <span>
+            {profiles.length} {profiles.length === 1 ? "screen" : "screens"}
+          </span>
+          <span className="profiles-eyebrow-sep" aria-hidden="true" />
+          <span className="profiles-eyebrow-soft">A private shelf</span>
+        </p>
+        <h1 id="profiles-title" className="display profiles-title">
+          Who&apos;s watching?
+        </h1>
+        <p className="profiles-sub">
+          Every screen is here. Choose yours and enter its password.
+        </p>
+      </section>
+
+      <section className="profiles-shelf" aria-label="Choose a screen">
+        {profiles.length === 0 ? (
+          <div className="profiles-empty">
+            <span className="profiles-empty__beacon" aria-hidden="true">
+              <BeaconGlyph />
+            </span>
+            <p className="eyebrow">The shelf is empty</p>
+            <h2>No screens yet</h2>
+            <p>
+              This shelf is waiting for its first screen. Open admin to add one and set
+              its password.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary profiles-empty__cta"
+              onClick={() => navigate("/admin")}
+            >
+              <ShieldGlyph />
+              Open admin
+            </button>
+          </div>
+        ) : (
+          <>
+            {showFilter && (
+              <div className="profiles-filter">
+                <div className="profiles-filter__field">
+                  <SearchGlyph />
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Find a screen"
+                    aria-label="Filter screens by name"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      className="profiles-filter__clear"
+                      onClick={() => setQuery("")}
+                      aria-label="Clear screen filter"
+                    >
+                      <CloseGlyph />
+                    </button>
+                  )}
+                </div>
+                {query.trim() && (
+                  <span className="profiles-filter__count">
+                    {filteredProfiles.length} of {profiles.length}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Persistent live region so filtering is announced reliably;
+                the visible count pill is purely decorative. */}
+            <p className="sr-only" aria-live="polite">
+              {query.trim()
+                ? `${filteredProfiles.length} of ${profiles.length} screens match`
+                : ""}
+            </p>
+
+            {filteredProfiles.length === 0 ? (
+              <div className="profiles-no-match" role="status">
+                <span className="profiles-no-match__icon" aria-hidden="true">
+                  <SearchGlyph size={22} />
+                </span>
+                <p>
+                  No screens match <strong>“{query.trim()}”</strong>.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setQuery("")}
+                >
+                  Clear filter
+                </button>
+              </div>
+            ) : (
+              <div className="profile-grid">
+                {filteredProfiles.map((profile, index) => {
+                  const active = activeProfile?.id === profile.id;
+                  const isBlocked = authMap[profile.id]?.blocked === true;
+                  return (
+                    <div
+                      key={profile.id}
+                      className={`profile-tile${active ? " profile-tile--active" : ""}${
+                        isBlocked ? " profile-tile--blocked" : ""
+                      }`}
+                      style={{ "--tile-index": index } as CSSProperties}
+                    >
+                      <button
+                        type="button"
+                        className="profile-tile__select"
+                        onClick={() => pick(profile)}
+                        aria-label={
+                          active
+                            ? `Continue as ${profile.name}`
+                            : isBlocked
+                              ? `${profile.name} is blocked. Open for details on contacting admin.`
+                              : `Unlock ${profile.name} with a password`
+                        }
+                      >
+                        <span
+                          className="profile-avatar-wrap"
+                          style={{ "--profile-color": profile.color } as CSSProperties}
+                        >
+                          <span className="profile-halo" aria-hidden="true" />
+                          <span className="avatar profile-avatar">
+                            {initials(profile.name)}
+                          </span>
+                          <span
+                            className={`profile-badge${
+                              active
+                                ? " profile-badge--active"
+                                : isBlocked
+                                  ? " profile-badge--blocked"
+                                  : ""
+                            }`}
+                            aria-hidden="true"
+                          >
+                            {active ? <CheckGlyph /> : <LockGlyph />}
+                          </span>
+                        </span>
+                        <span className="profile-tile__meta">
+                          <span className="profile-name truncate" title={profile.name}>
+                            {profile.name}
+                          </span>
+                          <span className="profile-status">
+                            {active ? (
+                              <>
+                                Continue
+                                <ArrowGlyph />
+                              </>
+                            ) : isBlocked ? (
+                              "Blocked"
+                            ) : null}
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <footer className="profiles-foot">
+        {syncStatus.error && (
+          <p className="tiny profiles-sync-error" role="status">
+            {syncStatus.error}
+          </p>
+        )}
+        <p className="profiles-foot-note">
+          <LockGlyph size={12} />
+          Three incorrect attempts lock a screen until admin unblocks it.
+        </p>
+        {activeProfile && (
+          <button
+            type="button"
+            className="btn btn-ghost profiles-signout"
+            onClick={signOut}
+          >
+            <SignOutGlyph />
+            Sign out of {activeProfile.name}
+          </button>
+        )}
+      </footer>
+
+      {sheet && (
+        <Sheet
+          key={sheet.profile.id}
+          title={
+            blocked
+              ? `${sheet.profile.name} is blocked`
+              : `Unlock ${sheet.profile.name}`
+          }
+          onClose={() => setSheet(null)}
+          className="profiles-unlock-sheet"
+        >
+          <div
+            className={`unlock-head${blocked ? " unlock-head--blocked" : ""}`}
+          >
+            <span
+              className="unlock-avatar-wrap"
+              style={{ "--profile-color": sheet.profile.color } as CSSProperties}
+            >
+              <span className="unlock-halo" aria-hidden="true" />
+              <span className="avatar unlock-avatar">
+                {initials(sheet.profile.name)}
+              </span>
+              {blocked && (
+                <span className="unlock-avatar-badge" aria-hidden="true">
+                  <LockGlyph size={13} />
+                </span>
+              )}
+            </span>
+            <p className="eyebrow unlock-eyebrow">
+              {blocked ? "Screen blocked" : "Password required"}
+            </p>
+            <h2 className="unlock-name">{sheet.profile.name}</h2>
+            {!blocked && (
+              <p className="unlock-sub">
+                Enter this screen&apos;s password to continue watching.
+              </p>
+            )}
+          </div>
+
+          {blocked ? (
+            <>
+              <div className="unlock-blocked" role="status">
+                <span className="unlock-blocked-icon" aria-hidden="true">
+                  <ShieldGlyph size={20} />
+                </span>
+                <h3>Contact admin</h3>
+                <p>
+                  This screen is blocked after too many incorrect password attempts.
+                  Contact admin (the person who gave you access) to unblock it.
+                </p>
+              </div>
+              <div className="unlock-attempts unlock-attempts--warn">
+                <span className="unlock-pips" aria-hidden="true">
+                  {[0, 1, 2].map((pip) => (
+                    <span
+                      key={pip}
+                      className="unlock-pip unlock-pip--used"
+                    />
+                  ))}
+                </span>
+                <span className="unlock-attempts-label">3 of 3 attempts used</span>
+              </div>
+              <div className="sheet-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setSheet(null)}
+                  autoFocus
+                >
+                  Back to screens
+                </button>
+              </div>
+            </>
+          ) : (
+            <form
+              className="unlock-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitPassword();
+              }}
+            >
+              <div
+                className={`field unlock-field${
+                  sheet.error ? " unlock-field--error" : ""
+                }`}
+              >
+                <span className="unlock-field-icon" aria-hidden="true">
+                  <LockGlyph size={16} />
+                </span>
+                <input
+                  type={sheet.reveal ? "text" : "password"}
+                  value={sheet.password}
+                  onChange={(event) =>
+                    setSheet((current) =>
+                      current
+                        ? { ...current, password: event.target.value, error: null }
+                        : current,
+                    )
+                  }
+                  autoFocus
+                  autoComplete="current-password"
+                  enterKeyHint="done"
+                  placeholder="Screen password"
+                  aria-label={`Password for ${sheet.profile.name}`}
+                  aria-invalid={sheet.error ? true : undefined}
+                  aria-describedby={
+                    sheet.error ? "unlock-attempts unlock-error" : "unlock-attempts"
+                  }
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="unlock-reveal"
+                  onClick={() =>
+                    setSheet((current) =>
+                      current ? { ...current, reveal: !current.reveal } : current,
+                    )
+                  }
+                  aria-label={sheet.reveal ? "Hide password" : "Show password"}
+                  aria-pressed={sheet.reveal}
+                >
+                  <EyeGlyph off={sheet.reveal} />
+                </button>
+              </div>
+
+              <div
+                id="unlock-attempts"
+                className={`unlock-attempts${
+                  failedAttempts > 0 ? " unlock-attempts--warn" : ""
+                }`}
+              >
+                <span className="unlock-pips" aria-hidden="true">
+                  {[0, 1, 2].map((pip) => (
+                    <span
+                      key={pip}
+                      className={`unlock-pip${
+                        pip < failedAttempts ? " unlock-pip--used" : ""
+                      }`}
+                    />
+                  ))}
+                </span>
+                <span className="unlock-attempts-label">
+                  {failedAttempts > 0
+                    ? `${failedAttempts} of 3 attempts used`
+                    : "3 attempts before this screen locks"}
+                </span>
+              </div>
+
+              {sheet.error && (
+                <p id="unlock-error" className="sheet-error unlock-error" role="alert">
+                  <AlertGlyph />
+                  <span>{sheet.error}</span>
+                </p>
+              )}
+
+              <div className="sheet-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setSheet(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={sheet.pending || !sheet.password}
+                >
+                  {sheet.pending ? "Unlocking…" : "Unlock"}
+                </button>
+              </div>
+            </form>
+          )}
+        </Sheet>
+      )}
     </div>
   );
 }

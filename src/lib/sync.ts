@@ -1,8 +1,12 @@
+import { kvGet, kvSet } from "./store";
 import type { ProfileMeta, ProfileState } from "../types";
 
 const FAMILY_KEY =
   (import.meta.env.VITE_FAMILY_KEY as string | undefined)?.trim() || "samandmellu";
 const ENDPOINT = "/api/profiles";
+const SYNC_TIMEOUT_MS = 10_000;
+/** Persisted pending-push blob key in the local kv store. */
+const PENDING_KEY = "syncPending";
 
 export interface SyncStatus {
   online: boolean;
@@ -58,9 +62,14 @@ export function subscribeStatus(listener: (next: SyncStatus) => void): () => voi
  * meaningful rejection from a server that did answer.
  */
 function isServiceUnavailable(err: unknown): boolean {
-  if (err instanceof TypeError) return true;
-  if (!(err instanceof ApiError)) return false;
-  return err.status === 0 || err.status >= 500;
+  if (err instanceof ApiError) {
+    // Status 0 = transport failure or timeout that we translated here. 5xx =
+    // the service itself failed, so degrade to local-only. A plain 4xx reached
+    // the server and was meaningfully rejected — that is a real error.
+    return err.status === 0 || err.status >= 500 || err.code === "offline" || err.code === "timeout";
+  }
+  // fetch rejects with a TypeError on network failure — also "service down".
+  return err instanceof TypeError;
 }
 
 function describe(err: unknown): string {
@@ -68,6 +77,8 @@ function describe(err: unknown): string {
     switch (err.code) {
       case "offline":
         return "Offline — changes saved on this device.";
+      case "timeout":
+        return "Sync service timed out — changes saved on this device.";
       case "forbidden":
         return "Family passphrase rejected.";
       case "profile_limit":
@@ -78,7 +89,9 @@ function describe(err: unknown): string {
         return `Sync failed (${err.status || err.code}).`;
     }
   }
-  return "Offline — changes saved on this device.";
+  // Anything else (unexpected shape, JSON parse failure, ...) is a real failure
+  // of an answered request, not an outage — do not call it offline.
+  return "Sync failed — check connection and retry.";
 }
 
 function handleError(err: unknown): void {
@@ -94,11 +107,14 @@ function handleError(err: unknown): void {
 }
 
 async function request<T>(query: string, init: RequestInit = {}): Promise<T> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
   let res: Response;
   try {
     res = await fetch(`${ENDPOINT}${query}`, {
       ...init,
       cache: "no-store",
+      signal: controller.signal,
       headers: {
         accept: "application/json",
         "x-family-key": FAMILY_KEY,
@@ -106,9 +122,15 @@ async function request<T>(query: string, init: RequestInit = {}): Promise<T> {
         ...(init.headers ?? {}),
       },
     });
-  } catch {
+  } catch (err) {
+    window.clearTimeout(timer);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new ApiError("The sync service timed out.", 0, "timeout");
+    }
+    // Transport-level failure (offline, DNS, proxy refused, ...).
     throw new ApiError("The sync service is unreachable.", 0, "offline");
   }
+  window.clearTimeout(timer);
 
   if (!res.ok) {
     let code = `http_${res.status}`;
@@ -122,7 +144,12 @@ async function request<T>(query: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  try {
+    return (await res.json()) as T;
+  } catch {
+    // An OK answer that is not JSON is a malformed response, not a hang.
+    throw new ApiError("Malformed response from the sync service.", 502, "malformed");
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -245,6 +272,52 @@ let pushTimer: number | null = null;
 // One slot PER PROFILE: switching profiles (or failing a flush) must never
 // overwrite another profile's unsent edits.
 const pendingByProfile = new Map<string, PendingPush>();
+// Set once the persisted queue has been read back from the local store, so a
+// reload does not re-read (or resurrect) stale entries mid-flush.
+let pendingLoaded = false;
+
+/**
+ * Reads the persisted pending queue back from the local kv store. Survives a
+ * reload / private-mode fallbacks because it is stored under a stable key.
+ * Malformed entries are skipped rather than trusted.
+ */
+async function loadPending(): Promise<void> {
+  if (pendingLoaded) return;
+  pendingLoaded = true;
+  try {
+    const stored = await kvGet<Record<string, PendingPush>>(PENDING_KEY);
+    if (stored && typeof stored === "object") {
+      for (const [id, entry] of Object.entries(stored)) {
+        const candidate = entry as Partial<PendingPush> | null;
+        const state = candidate?.state as ProfileState | undefined;
+        if (
+          state &&
+          typeof state === "object" &&
+          typeof state.profileId === "string" &&
+          Array.isArray(state.watchlist) &&
+          Array.isArray(state.history) &&
+          typeof state.prefs === "object" &&
+          state.prefs !== null
+        ) {
+          pendingByProfile.set(id, {
+            state,
+            includePrefs: candidate?.includePrefs ?? false,
+          });
+        }
+      }
+    }
+  } catch {
+    /* storage unavailable — keep whatever we already hold in memory */
+  }
+}
+
+function persistPending(): void {
+  const next: Record<string, PendingPush> = {};
+  for (const [id, entry] of pendingByProfile) next[id] = entry;
+  // kvSet never rejects (memory fallback in store.ts), but guard anyway so a
+  // storage hiccup can never surface as an unhandled rejection.
+  void kvSet(PENDING_KEY, next).catch(() => {});
+}
 
 export function queuePush(state: ProfileState, includePrefs = false): void {
   const existing = pendingByProfile.get(state.profileId);
@@ -252,46 +325,66 @@ export function queuePush(state: ProfileState, includePrefs = false): void {
     state,
     includePrefs: (existing?.includePrefs ?? false) || includePrefs,
   });
+  persistPending();
   if (pushTimer !== null) window.clearTimeout(pushTimer);
   pushTimer = window.setTimeout(() => {
     void flushPush();
   }, 2000);
 }
 
+let flushInFlight = false;
+
 export async function flushPush(): Promise<void> {
+  // Clear the debounce timer first so a timer callback landing mid-flush does
+  // not leave a stale timer id behind.
   if (pushTimer !== null) {
     window.clearTimeout(pushTimer);
     pushTimer = null;
   }
+  if (flushInFlight) return;
+
+  // Load the persisted queue *before* the emptiness check — otherwise a flush
+  // triggered by a lifecycle event right after a reload sees an empty in-memory
+  // map and returns without ever restoring the pending pushes.
+  await loadPending();
   if (pendingByProfile.size === 0) return;
 
   // Clear first: edits queued while this flush is in flight must not be
   // clobbered. Failed entries are re-queued below.
   const snapshot = [...pendingByProfile.entries()];
   pendingByProfile.clear();
+  persistPending();
 
+  flushInFlight = true;
   setStatus({ syncing: true });
   let firstError: unknown = null;
 
-  for (const [profileId, entry] of snapshot) {
-    try {
-      await pushState(entry.state, entry.includePrefs);
-    } catch (err) {
-      if (firstError === null) firstError = err;
-      // Keep the payload so the next flush can retry after reconnecting.
-      const queued = pendingByProfile.get(profileId);
-      if (queued) {
-        // A newer edit for this profile arrived while we were in flight — it
-        // supersedes this payload; only the prefs flag needs carrying over.
-        pendingByProfile.set(profileId, {
-          state: queued.state,
-          includePrefs: queued.includePrefs || entry.includePrefs,
-        });
-      } else {
-        pendingByProfile.set(profileId, entry);
+  try {
+    for (const [profileId, entry] of snapshot) {
+      try {
+        await pushState(entry.state, entry.includePrefs);
+      } catch (err) {
+        if (firstError === null) firstError = err;
+        if (isServiceUnavailable(err)) {
+          // Transient outage — keep the payload so the next reconnect /
+          // visibility / online flush can retry it.
+          pendingByProfile.set(profileId, entry);
+        } else {
+          // 4xx: the server answered and refused this exact payload. Retrying
+          // it would fail forever (a poison-pill loop), so drop it — the local
+          // store still holds the data and the next push sends full state.
+          console.error(`sync: dropping rejected push for profile ${profileId}`, err);
+        }
       }
     }
+  } finally {
+    flushInFlight = false;
   }
+
+  // Persist whatever remains: failures re-queued above, plus edits that were
+  // queued while this flush was in flight. Never blanket-clears the map, so a
+  // reload cannot resurrect stale entries nor lose fresh ones.
+  persistPending();
 
   if (firstError === null) {
     setStatus({ syncing: false, lastSyncedAt: Date.now() });
@@ -307,6 +400,7 @@ export function cancelPush(): void {
     pushTimer = null;
   }
   pendingByProfile.clear();
+  persistPending();
 }
 
 /**
@@ -315,6 +409,7 @@ export function cancelPush(): void {
  */
 export function dropPending(id: string): void {
   pendingByProfile.delete(id);
+  persistPending();
 }
 
 /* ------------------------------------------------------------------ */
@@ -347,6 +442,9 @@ export function startSync(
       setStatus({ syncing: false });
     } finally {
       running = false;
+      // If the effect was stopped mid-pull, neither branch above ran — clear
+      // the spinner here so the shared status cannot be stuck "syncing".
+      if (stopped) setStatus({ syncing: false });
     }
   };
 
@@ -357,6 +455,8 @@ export function startSync(
       void pull();
       void flushPush();
     } else {
+      // Leaving the page: push before the tab is frozen, and do it before the
+      // browser can discard the debounce timer.
       void flushPush();
     }
   };

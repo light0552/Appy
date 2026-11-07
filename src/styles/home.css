@@ -1,23 +1,190 @@
 /* ==================================================================
-   Home page — greeting, cinematic hero, shelves.
+   Home page — app header, cinematic hero, premium shelves.
    Tokens and shared primitives come from src/styles.css.
+   NOTE: styles.css loads AFTER this file in the cascade, so any rule
+   that overrides a shared primitive is scoped through a parent class
+   (.home …) so it wins the specificity tie regardless of order.
    ================================================================== */
 
 .home {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
 
+/* App header ---------------------------------------------------------- */
+
+/* Sticky glass bar: the wordmark, the greeting and the profile chip.
+   Mirrors .search-sticky — sticky under the top nav on desktop, under
+   the status bar on phones. */
+.home-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 10px)
+    max(var(--page-x), env(safe-area-inset-right))
+    10px
+    max(var(--page-x), env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  backdrop-filter: blur(20px) saturate(1.35);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+}
+
+/* A beam hairline instead of a border: it fades out at both edges, so
+   the sticky bar never leaves a hard step where the column ends. */
+.home-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border) 12%,
+    var(--accent-line) 30%,
+    var(--accent-line) 52%,
+    var(--border) 82%,
+    transparent 100%
+  );
+  opacity: 0.55;
+}
+
+/* Brand --------------------------------------------------------------- */
+
+.home-brand {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 7px;
+  border-radius: var(--radius-sm);
+}
+
+/* The gradient tile, matching the desktop nav mark. */
+.home-brand__mark {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: -0.04em;
+  color: var(--accent-ink);
+  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 4px 18px var(--accent-glow);
+}
+
+/* On the narrowest phones the wordmark would crowd the greeting, so
+   the tile carries the brand alone. */
+.home-brand__name {
+  display: none;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+@media (min-width: 480px) {
+  .home-brand__name {
+    display: block;
+  }
+}
+
+/* Greeting ------------------------------------------------------------ */
+
 .home-greeting {
-  padding: 16px var(--page-x) 14px;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--text-sm);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
   color: var(--muted);
 }
 
-/* Hero -------------------------------------------------------------- */
+@media (min-width: 768px) {
+  .home-greeting {
+    font-size: var(--text-md);
+    font-weight: 650;
+  }
+}
+
+/* Profile chip -------------------------------------------------------- */
+
+.home-profile {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 4px 12px 4px 5px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-2) 62%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease);
+}
+
+.home-profile:active {
+  transform: scale(0.97);
+}
+
+/* The shared .avatar primitive sets a 24% radius and a neutral ink;
+   the profile medallion is round and carries the profile's own colour. */
+.home .home-profile__avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgba(0, 0, 0, 0.74);
+  background:
+    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.42), transparent 46%),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--profile-color, var(--accent)) 74%, white) 0%,
+      var(--profile-color, var(--accent)) 54%,
+      color-mix(in srgb, var(--profile-color, var(--accent)) 82%, black) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    0 4px 14px color-mix(in srgb, var(--profile-color, var(--accent)) 34%, transparent);
+}
+
+.home-profile__name {
+  display: none;
+  max-width: 12ch;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+@media (min-width: 768px) {
+  .home-profile__name {
+    display: block;
+  }
+}
+
+/* Hero ---------------------------------------------------------------- */
 
 /* Full-bleed cinematic stage. The art sits behind a layered scrim that
    fades to --bg at the bottom so the content below flows on seamlessly. */
@@ -31,17 +198,31 @@
   background: radial-gradient(120% 80% at 50% 0%, var(--surface-3) 0%, var(--bg) 70%);
 }
 
+/* Phones: center the hero copy in the stage instead of pinning it to the
+   bottom. With the house notice above it, bottom-aligned copy lands under
+   the tab bar on a 390x844 screen. */
+@media (max-width: 639px) {
+  .hero {
+    align-items: center;
+  }
+
+  .hero-body {
+    padding-top: 20px;
+    padding-bottom: 24px;
+  }
+}
+
 .hero-art {
   position: absolute;
   inset: 0;
-  z-index: -2;
+  z-index: -3;
 }
 
 .hero-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 18%;
+  object-position: center 20%;
 }
 
 /* No backdrop: blow the poster up, blur it, let the scrim do the rest. */
@@ -50,26 +231,71 @@
   transform: scale(1.3);
 }
 
-/* Three-part scrim: a deep fade into the page at the bottom, a left-to-
-   right wash so text stays legible over any backdrop, and a soft top
-   edge so the nav/greeting never sits on raw art. */
+/* The beam: one long, soft shaft of light drifting down the frame.
+   Transform/opacity only, and never under prefers-reduced-motion. */
+.hero-beam {
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  z-index: -2;
+  width: 46vmax;
+  height: 125vmax;
+  transform: translateX(-50%) rotate(15deg);
+  transform-origin: 50% 0;
+  border-radius: 50% 50% 46% 46% / 9% 9% 92% 92%;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent-bright) 22%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 44%,
+    transparent 74%
+  );
+  filter: blur(30px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-beam {
+    animation: home-beam-drift 24s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes home-beam-drift {
+  from {
+    transform: translateX(-53%) rotate(12deg);
+    opacity: 0.34;
+  }
+  to {
+    transform: translateX(-47%) rotate(19deg);
+    opacity: 0.58;
+  }
+}
+
+/* Four-part scrim: a deep fade into the page at the bottom, a left-to-
+   right wash so text stays legible over any backdrop, a soft top edge
+   so the header never sits on raw art, and a quiet accent bloom. */
 .hero-scrim {
   position: absolute;
   inset: 0;
   z-index: -1;
   background:
+    radial-gradient(
+      74% 50% at 16% 86%,
+      color-mix(in srgb, var(--accent) 11%, transparent) 0%,
+      transparent 70%
+    ),
     linear-gradient(
       to top,
-      var(--bg) 2%,
-      color-mix(in srgb, var(--bg) 88%, transparent) 30%,
-      color-mix(in srgb, var(--bg) 30%, transparent) 62%,
-      color-mix(in srgb, var(--bg) 55%, transparent) 100%
+      var(--bg) 1%,
+      color-mix(in srgb, var(--bg) 92%, transparent) 26%,
+      color-mix(in srgb, var(--bg) 34%, transparent) 58%,
+      color-mix(in srgb, var(--bg) 58%, transparent) 100%
     ),
     linear-gradient(
       to right,
-      color-mix(in srgb, var(--bg) 70%, transparent) 0%,
-      color-mix(in srgb, var(--bg) 20%, transparent) 45%,
-      transparent 80%
+      color-mix(in srgb, var(--bg) 68%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 20%, transparent) 46%,
+      transparent 82%
     );
 }
 
@@ -82,35 +308,66 @@
   gap: 10px;
   width: 100%;
   max-width: 640px;
-  padding: 26px var(--page-x) calc(30px + env(safe-area-inset-bottom));
+  padding: 26px var(--page-x) 30px;
 }
 
-.hero-eyebrow {
+/* Eyebrow: a glowing pip before the caps label. */
+.home .hero .hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--accent);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.6);
+}
+
+.hero-eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 /* Big, confident title treatment — tight tracking, strong weight. */
 .hero-title {
+  max-width: 100%;
   font-size: clamp(30px, 8vw, 56px);
   line-height: 1.02;
   letter-spacing: -0.04em;
   font-weight: 800;
   text-wrap: balance;
+  text-shadow: 0 18px 46px rgba(0, 0, 0, 0.45);
 }
 
 /* Compact metadata line: year · rating, small caps-ish and quiet. */
 .hero-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   font-size: var(--text-sm);
   font-weight: 650;
   letter-spacing: 0.01em;
   color: var(--muted);
 }
 
+.hero-meta__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--muted-2);
+}
+
 .hero-meta .hero-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--accent-bright);
+}
+
+.hero-rating__star {
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
 .hero-overview {
@@ -119,51 +376,91 @@
   font-size: 14px;
   line-height: 1.5;
   color: var(--muted);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
 }
 
-.hero-actions {
-  margin-top: 12px;
+/* Hero actions -------------------------------------------------------- */
+
+/* On phones: a confident full-width Play over a tidy pair. From tablet
+   up they sit inline, the primary leading. */
+.home .hero .cluster.hero-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  max-width: 460px;
+  margin-top: 14px;
 }
 
-/* Netflix/Prime-style button pair: a bold Play plus quieter companions. */
-.hero-actions .btn {
-  min-width: 140px;
+.home .hero .cluster.hero-actions .btn {
+  width: 100%;
   min-height: 48px;
-  padding: 0 24px;
-  font-size: 16px;
+  padding: 0 18px;
+  font-size: 15px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    color var(--dur-fast) ease;
 }
 
-.hero-actions .btn-primary {
+.home .hero .cluster.hero-actions .btn-primary {
+  grid-column: 1 / -1;
   box-shadow: 0 14px 40px var(--accent-glow);
 }
 
 /* Secondary actions over art read best as translucent glass chips. */
-.hero-actions .btn-secondary {
+.home .hero .cluster.hero-actions .btn-secondary {
   background: color-mix(in srgb, var(--surface) 60%, transparent);
   border-color: var(--border-strong);
   color: var(--text);
 }
 
-.hero-actions .btn-secondary[aria-pressed="true"] {
+.home .hero .cluster.hero-actions .btn-secondary[aria-pressed="true"] {
   color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    0 0 20px var(--accent-glow);
 }
 
-@media (hover: hover) {
-  .hero-actions .btn-secondary:hover {
-    background: color-mix(in srgb, var(--surface) 80%, transparent);
-    border-color: var(--border-strong);
+@media (min-width: 640px) {
+  .home .hero .cluster.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: none;
   }
 
-  .hero-actions .btn-secondary[aria-pressed="true"]:hover {
-    background: var(--accent-soft);
+  .home .hero .cluster.hero-actions .btn {
+    width: auto;
+    min-width: 136px;
+    padding: 0 22px;
+    font-size: 16px;
+  }
+
+  .home .hero .cluster.hero-actions .btn-primary {
+    flex: 0 0 auto;
   }
 }
 
-/* Hero skeleton ----------------------------------------------------- */
+/* Short screens (360x640 phones, landscape): the first-open notice plus
+   the fixed tab bar would otherwise cover the Play button, so the hero
+   sheds its synopsis and tightens its stage. */
+@media (max-height: 720px) {
+  .hero {
+    min-height: 300px;
+  }
+
+  .hero-overview {
+    display: none;
+  }
+}
+
+/* Hero skeleton ------------------------------------------------------- */
 
 .hero-skeleton-fill {
   position: absolute;
@@ -171,28 +468,354 @@
   border-radius: 0;
 }
 
-.hero--skeleton .hero-body {
+.home .hero--skeleton .hero-body {
   gap: 12px;
   padding-bottom: 34px;
 }
 
-.hero-skeleton-line {
-  width: 42%;
-  height: 12px;
+.hero-skeleton-eyebrow {
+  width: 30%;
+  height: 10px;
 }
 
 .hero-skeleton-title {
-  width: 72%;
-  height: 40px;
+  width: 74%;
+  height: 42px;
   border-radius: 10px;
 }
 
-/* Section-level error block ----------------------------------------- */
+.hero-skeleton-meta {
+  width: 38%;
+  height: 12px;
+}
 
-.row-error {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.hero-skeleton-line {
+  width: 92%;
+  height: 11px;
+}
+
+.hero-skeleton-line--short {
+  width: 68%;
+}
+
+.hero-skeleton-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  padding: 6px var(--page-x) 10px;
+  width: 100%;
+  max-width: 460px;
+  margin-top: 6px;
+}
+
+.hero-skeleton-btn {
+  height: 48px;
+  border-radius: var(--radius-pill);
+}
+
+.hero-skeleton-btn:first-child {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 640px) {
+  .hero-skeleton-actions {
+    display: flex;
+  }
+
+  .hero-skeleton-btn {
+    width: 136px;
+  }
+}
+
+/* Shelves ------------------------------------------------------------- */
+
+.home .row {
+  margin-top: clamp(26px, 4vw, 40px);
+}
+
+/* Tidy section header with a beam-lit title and a "See all" affordance
+   that carries a small chevron. */
+.home .section-head {
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.home .section-head h2 {
+  font-size: clamp(17px, 2.3vw, 21px);
+  letter-spacing: -0.025em;
+}
+
+.home .section-head a,
+.home .section-head button {
+  gap: 6px;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.home .section-head a::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-right: 1.8px solid currentColor;
+  border-top: 1.8px solid currentColor;
+  border-radius: 1px;
+  transform: rotate(45deg) translate(-1px, 1px);
+  opacity: 0.8;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+/* A little more breathing room under the shelf, and enough top padding
+   for the poster hover-lift. */
+.home .row-scroller {
+  gap: 13px;
+  padding-top: 10px;
+  padding-bottom: 14px;
+}
+
+/* Row skeleton lines -------------------------------------------------- */
+
+.home-sk-title {
+  width: 82%;
+  height: 11px;
+  margin-top: 10px;
+}
+
+.home-sk-sub {
+  width: 46%;
+  height: 9px;
+  margin-top: 7px;
+}
+
+/* Error + empty states ------------------------------------------------ */
+
+/* A designed failure card instead of a bare line of grey text. */
+.home .row-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 var(--page-x);
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--surface-2) 72%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 52%, transparent) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--shadow-soft);
+}
+
+.row-error__icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 26%, transparent);
+}
+
+.row-error__copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.row-error__title {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+.row-error__text {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.row-error__retry {
+  flex: 1 1 100%;
+  margin-left: 0;
+  border-color: var(--border-strong);
+}
+
+@media (min-width: 480px) {
+  .row-error__retry {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+
+/* The page-level failure sits under the header where the hero would be,
+   so it reads as the headline problem: a bigger seal and a stronger
+   title than the per-shelf cards below it. */
+.home .row-error--page {
+  margin-top: 22px;
+  padding: 22px;
+}
+
+.home .row-error--page .row-error__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+}
+
+.home .row-error--page .row-error__title {
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.home .row-error--page .row-error__text {
+  font-size: 13.5px;
+}
+
+@media (min-width: 480px) {
+  .home .row-error--page .row-error__retry {
+    flex: 0 0 auto;
+  }
+}
+
+/* Empty state --------------------------------------------------------- */
+
+.home .empty-state {
+  margin: 0 var(--page-x);
+  padding: 56px 24px 64px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--surface-2) 62%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 38%, transparent) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--shadow-soft);
+}
+
+.home-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  margin-bottom: 4px;
+  border-radius: 22px;
+  color: var(--accent-bright);
+  background:
+    radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 62%),
+    var(--surface-2);
+  border: 1px solid var(--accent-line);
+  box-shadow: 0 0 34px var(--accent-glow);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-empty__icon {
+    animation: home-icon-bob 3.8s var(--ease) infinite;
+  }
+}
+
+@keyframes home-icon-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+
+/* Motion -------------------------------------------------------------- */
+
+/* The hero copy settles in — transform/opacity only, and never under
+   prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .home .hero .hero-title {
+    animation: home-rise 0.55s var(--ease) 0.05s both;
+  }
+
+  .home .hero .cluster.hero-actions {
+    animation: home-rise 0.55s var(--ease) 0.16s both;
+  }
+}
+
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* Tablet and up ------------------------------------------------------- */
+
+@media (min-width: 640px) {
+  .home-header {
+    padding-top: calc(env(safe-area-inset-top) + 12px);
+    padding-bottom: 12px;
+  }
+
+  .hero-body {
+    padding-bottom: 40px;
+  }
+}
+
+/* Desktop (>= 1024px) ------------------------------------------------- */
+
+@media (min-width: 1024px) {
+  /* The primary nav is a sticky top bar here and already carries the
+     wordmark, so the page header drops its own brand, unsticks and
+     scrolls away with the hero. */
+  .home-header {
+    position: static;
+    top: auto;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .home-brand {
+    display: none;
+  }
+
+  .hero {
+    min-height: clamp(440px, 66dvh, 600px);
+  }
+
+  .hero-body {
+    padding-bottom: 46px;
+  }
+}
+
+/* Pointer hover — desktop mice only, never touch --------------------- */
+
+@media (hover: hover) {
+  .home-brand:hover .home-brand__mark {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 6px 24px var(--accent-glow);
+  }
+
+  .home-profile:hover {
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+  }
+
+  .home .hero .cluster.hero-actions .btn-secondary:hover {
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    border-color: var(--border-strong);
+  }
+
+  .home .hero .cluster.hero-actions .btn-secondary[aria-pressed="true"]:hover {
+    background: var(--accent-soft);
+  }
+
+  .home .section-head a:hover::after {
+    transform: rotate(45deg) translate(1px, -1px);
+  }
 }

@@ -82,117 +82,143 @@ export default function Search() {
 
   return (
     <div className="search-page">
+      <header className="search-head">
+        <p className="eyebrow search-eyebrow">
+          <span className="search-eyebrow-dot" aria-hidden="true" />
+          Search
+        </p>
+        <h1 className="search-title">Search the whole shelf</h1>
+        <p className="search-lede">
+          Movies and series from the house catalogue — results arrive as you type.
+        </p>
+      </header>
+
       <div className="search-sticky">
         <SearchBar key={barKey} value={input} onChange={commit} />
       </div>
 
-      {trimmed ? (
-        <>
-          <p className="search-meta tiny muted" role="status">
-            {loading
-              ? `Searching “${trimmed}”…`
-              : error
-                ? "Something went wrong while searching."
-                : results
-                  ? `${count} ${count === 1 ? "result" : "results"} for “${trimmed}”.`
-                  : ""}
-          </p>
-
-          {error && (
-            <div className="empty-state">
-              <h3>Search hit a snag.</h3>
-              <p>{error}</p>
-              <button type="button" className="btn btn-sm" onClick={() => setAttempt((a) => a + 1)}>
-                Try again
-              </button>
-            </div>
-          )}
-
-          {!error && loading && results === null && (
-            <div className="poster-grid" aria-hidden="true">
-              {Array.from({ length: 8 }, (_, index) => (
-                <div className="skeleton skeleton--poster" key={index} />
-              ))}
-            </div>
-          )}
-
-          {!error && !loading && results && results.length === 0 && (
-            <div className="empty-state">
-              <h3>No matches for “{trimmed}”.</h3>
-              <p>Check the spelling, or try the title&rsquo;s original name.</p>
-            </div>
-          )}
-
-          {!error && results && results.length > 0 && (
-            <div className="poster-grid search-results">
-              {results.map((media) => (
-                <PosterCard
-                  key={`${media.type}-${media.tmdbId}`}
-                  type={media.type}
-                  tmdbId={media.tmdbId}
-                  title={media.title}
-                  posterPath={media.posterPath}
-                  year={media.year}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="search-idle">
-            <span className="search-idle__icon" aria-hidden="true">
-              <svg
-                width="30"
-                height="30"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <circle cx="11" cy="11" r="6.5" />
-                <path d="m16 16 4.5 4.5" strokeLinecap="round" />
-              </svg>
-            </span>
-            <h1 className="search-idle__title">Start typing to find something fun&hellip;</h1>
-            <p className="search-idle__sub muted">
-              Movies, TV, hidden gems — the search runs as you type.
+      <div className="search-body">
+        {trimmed ? (
+          <>
+            <p className="search-meta" role="status">
+              {loading ? (
+                <>
+                  <span className="search-meta__pulse" aria-hidden="true" />
+                  Searching for “{trimmed}”…
+                </>
+              ) : error ? (
+                "Search didn’t finish."
+              ) : results ? (
+                <>
+                  <span className={count > 0 ? "search-meta__count" : undefined}>{count}</span>{" "}
+                  {count === 1 ? "result" : "results"} for “{trimmed}”.
+                </>
+              ) : null}
             </p>
-          </div>
 
-          <section className="section">
-            <div className="section-head">
-              <h2>Popular right now</h2>
-            </div>
+            {error && (
+              <div className="empty-state search-empty">
+                <h3>Search hit a snag.</h3>
+                <p>{error}</p>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setAttempt((a) => a + 1)}
+                >
+                  Try again
+                </button>
+              </div>
+            )}
 
-            {ideas === null ? (
-              <div className="cluster search-chips" aria-hidden="true">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <span className="skeleton search-chip-skeleton" key={index} />
-                ))}
-              </div>
-            ) : ideas.length === 0 ? (
-              <div className="empty-state">
-                <h3>Nothing came back from the catalogue.</h3>
-                <p>Suggestions are unavailable right now — try searching directly.</p>
-              </div>
-            ) : (
-              <div className="cluster search-chips">
-                {ideas.map((item) => (
-                  <button
-                    key={`${item.type}-${item.tmdbId}`}
-                    type="button"
-                    className="chip"
-                    onClick={() => pickIdea(item)}
-                  >
-                    {item.title}
-                  </button>
+            {!error && loading && results === null && (
+              <div className="poster-grid search-results" aria-hidden="true">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <div className="skeleton skeleton--poster" key={index} />
                 ))}
               </div>
             )}
-          </section>
-        </>
-      )}
+
+            {!error && !loading && results && results.length === 0 && (
+              <div className="empty-state search-empty">
+                <h3>No matches for “{trimmed}”.</h3>
+                <p>Check the spelling, or try the title’s original name.</p>
+              </div>
+            )}
+
+            {!error && results && results.length > 0 && (
+              <div
+                className={`poster-grid search-results${loading ? " search-results--busy" : ""}`}
+              >
+                {results.map((media) => (
+                  <PosterCard
+                    key={`${media.type}-${media.tmdbId}`}
+                    type={media.type}
+                    tmdbId={media.tmdbId}
+                    title={media.title}
+                    posterPath={media.posterPath}
+                    year={media.year}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="search-idle">
+              <span className="search-idle__icon" aria-hidden="true">
+                <svg
+                  width="30"
+                  height="30"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="m16 16 4.5 4.5" strokeLinecap="round" />
+                </svg>
+              </span>
+              <p className="search-idle__title">Start typing to find something fun</p>
+              <p className="search-idle__sub muted">
+                Movies, TV, hidden gems — the search runs as you type.
+              </p>
+            </div>
+
+            <section className="section search-section">
+              <div className="section-head search-section-head">
+                <h2>Popular right now</h2>
+                <p className="search-section-sub">Tap a title to search it</p>
+              </div>
+
+              {ideas === null ? (
+                <div className="cluster search-chips" aria-hidden="true">
+                  {Array.from({ length: 6 }, (_, index) => (
+                    <span className="skeleton search-chip-skeleton" key={index} />
+                  ))}
+                </div>
+              ) : ideas.length === 0 ? (
+                <div className="empty-state search-empty">
+                  <h3>Nothing came back from the catalogue.</h3>
+                  <p>Suggestions are unavailable right now — try searching directly.</p>
+                </div>
+              ) : (
+                <div className="cluster search-chips">
+                  {ideas.map((item) => (
+                    <button
+                      key={`${item.type}-${item.tmdbId}`}
+                      type="button"
+                      className="chip"
+                      onClick={() => pickIdea(item)}
+                    >
+                      {item.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
     </div>
   );
 }

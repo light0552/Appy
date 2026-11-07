@@ -55,7 +55,9 @@ export default function TabBar() {
         <span className="tab-brand-mark" aria-hidden="true">
           L
         </span>
-        <span className="tab-brand-name">Lighthook</span>
+        <span className="tab-brand-name">
+          LIGHTH<span className="tab-brand-zeros">00</span>K
+        </span>
       </span>
       {tabs.map((tab) => (
         <NavLink

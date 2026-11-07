@@ -4,24 +4,28 @@
    THE SYSTEM (for agents restyling pages against it):
 
    Surfaces   --bg (deepest base) → --surface (panels) →
-              --surface-2 (cards/inputs) → --surface-3 (active cards).
-              --surface-glass is the translucent fill for bars/overlays.
+               --surface-2 (cards/inputs) → --surface-3 (active cards).
+               --surface-glass is the translucent fill for bars/overlays.
    Accent     "The beam" — electric azure --accent. Used sparingly:
-              primary buttons, active nav, links, focus rings, glows.
-              --accent-bright = hover/highlight, --accent-ink = text on
-              accent fills, --accent-soft = tinted active surfaces,
-              --accent-line = accent-tinted borders, --accent-glow =
-              shadow/glow colour. The AMOLED theme overrides --bg,
-              --surface*, --border* and brightens --accent.
+               primary buttons, active nav, links, focus rings, glows.
+               --accent-bright = hover/highlight, --accent-ink = text on
+               accent fills, --accent-soft = tinted active surfaces,
+               --accent-line = accent-tinted borders, --accent-glow =
+               shadow/glow colour, --glow-secondary = the faint violet
+               counter-hue in the ambient light field. The AMOLED theme
+               overrides --bg, --surface*, --border* and brightens
+               --accent.
    Type       System stack only. Scale: --text-2xs/…/--text-display,
-              weights via literals (400/600/750/800), --tracking-tight
-              for headings, --tracking-caps for uppercase labels.
+               weights via literals (400/600/650/750/800), --tracking-tight
+               for headings, --tracking-caps for uppercase labels.
    Radius     --radius-xs/sm/(base)/lg, --radius-pill.
-   Elevation  --shadow / --shadow-lg, glows via --accent-glow.
-   Motion     --ease + --dur-fast/med. transform/opacity only for
-              anything that moves; prefers-reduced-motion kills all.
+   Elevation  --shadow / --shadow-lg / --shadow-soft (layered ambient +
+               key shadows), glows via --accent-glow, --focus-ring.
+   Motion     --ease (ui) + --ease-out (entrances) + --dur-fast/med/slow.
+               transform/opacity only for anything that moves;
+               prefers-reduced-motion kills all.
    Layout     --page-x (gutter), --tab-height (bottom bar),
-              --nav-height (desktop top bar), --z-nav / --z-sheet.
+               --nav-height (desktop top bar), --z-nav / --z-sheet.
 
    Breakpoints: 480 large phones, 768 tablets, 1024 desktop (nav flips
    from bottom bar to sticky top bar there). Hover styles live only
@@ -31,28 +35,30 @@
 
 :root {
   /* Surfaces — layered near-black, deep base → lighter cards ---------- */
-  --bg: #070a11; /* app base, the deepest layer */
-  --surface: #0d1219; /* raised panels: sheets, bars, player chrome */
-  --surface-2: #131a24; /* cards, inputs, chips */
-  --surface-3: #1a2330; /* hovered/active cards, pressed states */
-  --surface-glass: rgba(9, 13, 20, 0.78); /* translucent overlay fills */
+  --bg: #050810; /* app base, the deepest layer */
+  --surface: #0c1119; /* raised panels: sheets, bars, player chrome */
+  --surface-2: #121926; /* cards, inputs, chips */
+  --surface-3: #1b2534; /* hovered/active cards, pressed states */
+  --surface-glass: rgba(8, 12, 20, 0.74); /* translucent overlay fills */
 
-  /* Lines ------------------------------------------------------------- */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* Lines — faintly blue so hairlines read as glass, not grey --------- */
+  --border: rgba(151, 183, 228, 0.1);
+  --border-strong: rgba(168, 196, 238, 0.2);
 
   /* Text -------------------------------------------------------------- */
-  --text: #f4f7fb; /* primary text */
-  --muted: #98a3b4; /* secondary text */
-  --muted-2: #6b7686; /* tertiary / inactive */
+  --text: #f2f6fc; /* primary text */
+  --muted: #9aa7ba; /* secondary text */
+  --muted-2: #677287; /* tertiary / inactive */
 
   /* Accent — "the beam", electric azure ------------------------------- */
   --accent: #4cc3ff;
-  --accent-bright: #7ad6ff; /* hover highlight, gradient tops */
-  --accent-ink: #04121b; /* text/icons on accent fills */
-  --accent-soft: rgba(76, 195, 255, 0.14); /* tinted active surfaces */
-  --accent-line: rgba(76, 195, 255, 0.4); /* accent-tinted borders */
-  --accent-glow: rgba(76, 195, 255, 0.3); /* glows and shadows */
+  --accent-bright: #8ad9ff; /* hover highlight, gradient tops */
+  --accent-ink: #05111c; /* text/icons on accent fills */
+  --accent-soft: rgba(76, 195, 255, 0.16); /* tinted active surfaces */
+  --accent-line: rgba(76, 195, 255, 0.42); /* accent-tinted borders */
+  --accent-glow: rgba(76, 195, 255, 0.34); /* glows and shadows */
+  --glow-secondary: rgba(124, 104, 255, 0.055); /* ambient violet counter-hue */
+  --beam-gradient: linear-gradient(135deg, var(--accent-bright), var(--accent));
 
   /* Semantic ---------------------------------------------------------- */
   --danger: #ff5c5c;
@@ -78,14 +84,25 @@
   --radius-lg: 22px; /* sheets, modals */
   --radius-pill: 999px;
 
-  /* Elevation ---------------------------------------------------------- */
-  --shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.6);
+  /* Elevation — two-layer shadows: a tight contact pass + a wide
+     ambient pass, so cards sit on the page instead of floating past it */
+  --shadow:
+    0 2px 8px rgba(2, 5, 11, 0.4),
+    0 18px 48px rgba(2, 5, 11, 0.5);
+  --shadow-lg:
+    0 3px 12px rgba(2, 5, 11, 0.45),
+    0 32px 88px rgba(2, 5, 11, 0.62);
+  --shadow-soft:
+    0 2px 6px rgba(2, 5, 11, 0.35),
+    0 12px 30px rgba(2, 5, 11, 0.36);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent);
 
   /* Motion ------------------------------------------------------------- */
   --ease: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 150ms;
   --dur-med: 250ms;
+  --dur-slow: 420ms;
 
   /* Layout ------------------------------------------------------------- */
   --tab-height: 62px; /* bottom tab bar (phones/tablets) */
@@ -111,6 +128,7 @@
   --border-strong: rgba(255, 255, 255, 0.18);
   --accent: #5ccbff;
   --accent-bright: #8adcff;
+  --glow-secondary: rgba(124, 104, 255, 0.04);
 }
 
 *,
@@ -130,9 +148,24 @@ body,
   height: 100%;
 }
 
+/* The ambient light field: a beam spilling from the top of the page,
+   a violet counter-hue off the far corner, and a cool wash on the left.
+   Kept on body so page components stay transparent over it. */
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(
+      110% 72% at 50% -14%,
+      color-mix(in srgb, var(--accent) 9%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(46% 34% at 88% 6%, var(--glow-secondary) 0%, transparent 62%),
+    radial-gradient(
+      40% 30% at 2% 24%,
+      color-mix(in srgb, var(--accent) 5%, transparent) 0%,
+      transparent 64%
+    ),
+    var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: 16px;
@@ -211,7 +244,7 @@ ol {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: transparent;
 }
 
 .app-main {
@@ -228,7 +261,9 @@ ol {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0 var(--page-x);
+  /* Inline-only so a page may own its vertical rhythm without fighting
+     this file in the cascade (styles.css loads last). */
+  padding-inline: var(--page-x);
 }
 
 .page--wide {
@@ -236,31 +271,48 @@ ol {
   padding: 0;
 }
 
-/* Boot splash ------------------------------------------------------ */
+/* Boot splash ------------------------------------------------------
+   A cold-open: the mark breathes over a converging light field, the
+   LIGHTH00K wordmark fades up beneath it, and a single tag line. */
 
 .boot {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  background: radial-gradient(
-    120% 80% at 50% 0%,
-    color-mix(in srgb, var(--accent) 12%, var(--bg)) 0%,
-    var(--bg) 60%
-  );
+  background:
+    radial-gradient(
+      120% 70% at 50% 0%,
+      color-mix(in srgb, var(--accent) 14%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(52% 38% at 50% 108%, var(--glow-secondary) 0%, transparent 62%),
+    var(--bg);
+}
+
+.boot-core {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding: 24px;
+  animation: boot-in 0.6s var(--ease-out) both;
 }
 
 .boot-mark {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 28px;
+  font-size: 30px;
   letter-spacing: -0.04em;
   color: var(--accent-ink);
-  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
-  box-shadow: 0 0 60px var(--accent-glow);
+  background: linear-gradient(160deg, var(--accent-bright) 4%, var(--accent) 62%, #1d9ae0 120%);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.4),
+    inset 0 -6px 18px rgba(1, 22, 38, 0.35),
+    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 90px var(--accent-glow);
   animation: boot-pulse 1.6s ease-in-out infinite;
 }
 
@@ -276,6 +328,42 @@ ol {
   }
 }
 
+@keyframes boot-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.boot-wordmark {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em; /* recenters spaced caps */
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Lit wordmark where supported; the plain muted colour above is the
+   safe fallback (it paints under the clipped gradient). */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .boot-wordmark {
+    background: linear-gradient(120deg, var(--text) 34%, var(--accent) 86%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+  }
+}
+
+.boot-tag {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
 /* Status banner ---------------------------------------------------- */
 
 /* Flows at the top of the page; must not pin over sticky content
@@ -285,31 +373,109 @@ ol {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+  gap: 9px;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
   font-size: 13px;
   font-weight: 600;
-  color: #ffd9a8;
-  background: rgba(52, 36, 12, 0.92);
-  border-bottom: 1px solid rgba(245, 185, 66, 0.28);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  letter-spacing: 0.01em;
+  color: #ffe4bb;
+  background:
+    linear-gradient(180deg, rgba(74, 52, 16, 0.92), rgba(49, 35, 12, 0.92)) padding-box,
+    color-mix(in srgb, var(--surface) 82%, transparent);
+  border-bottom: 1px solid rgba(245, 185, 66, 0.32);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: 0 10px 30px rgba(2, 5, 11, 0.35);
+  text-align: center;
+}
+
+/* A lit underline that brightens the banner's bottom edge, just above
+   its border. */
+.offline-banner::after {
+  content: "";
+  position: absolute;
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 4%,
+    rgba(245, 185, 66, 0.75) 26%,
+    #ffd98a 50%,
+    rgba(245, 185, 66, 0.75) 74%,
+    transparent 96%
+  );
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.offline-banner > span[aria-hidden="true"] {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 185, 66, 0.42);
+  background: rgba(245, 185, 66, 0.18);
+  color: #f5b942;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 14px rgba(245, 185, 66, 0.28);
 }
 
 .offline-banner--error {
-  color: #ffd2d2;
-  background: rgba(52, 16, 16, 0.92);
-  border-bottom-color: rgba(255, 92, 92, 0.28);
+  color: #ffd8d8;
+  background:
+    linear-gradient(180deg, rgba(74, 22, 22, 0.92), rgba(48, 15, 15, 0.92)) padding-box,
+    color-mix(in srgb, var(--surface) 82%, transparent);
+  border-bottom-color: rgba(255, 92, 92, 0.32);
+}
+
+.offline-banner--error::after {
+  background: linear-gradient(
+    90deg,
+    transparent 4%,
+    rgba(255, 92, 92, 0.75) 26%,
+    #ffb0b0 50%,
+    rgba(255, 92, 92, 0.75) 74%,
+    transparent 96%
+  );
+}
+
+.offline-banner--error > span[aria-hidden="true"] {
+  border-color: rgba(255, 92, 92, 0.45);
+  background: rgba(255, 92, 92, 0.18);
+  color: #ff8d8d;
+  box-shadow: 0 0 14px rgba(255, 92, 92, 0.3);
 }
 
 /* Typography helpers ----------------------------------------------- */
 
 .display {
   font-size: var(--text-display);
-  line-height: 1.05;
+  line-height: 1.04;
   letter-spacing: -0.04em;
   font-weight: 800;
   text-wrap: balance;
+}
+
+/* Top-lit type: the display fades from full ink into the page's own
+   ambience, pulling light the way the surfaces do. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .display {
+    background: linear-gradient(
+      180deg,
+      var(--text) 42%,
+      color-mix(in srgb, var(--text) 72%, var(--bg)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 .eyebrow {
@@ -351,19 +517,29 @@ ol {
 /* Buttons ---------------------------------------------------------- */
 
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 20px;
+  padding: 0 21px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 74%, transparent) 0%,
+      var(--surface-2) 100%
+    ),
+    var(--surface-2);
   color: var(--text);
   font-size: 15px;
   font-weight: 650;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 3px rgba(2, 5, 11, 0.3);
   transition:
     transform var(--dur-fast) var(--ease),
     background-color var(--dur-fast) ease,
@@ -374,6 +550,7 @@ ol {
 
 .btn:active {
   transform: scale(0.97);
+  box-shadow: inset 0 2px 6px rgba(2, 5, 11, 0.35);
 }
 
 .btn:disabled {
@@ -382,35 +559,81 @@ ol {
 }
 
 .btn-primary {
-  background: var(--accent);
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--accent-bright) 0%, #24aef2 74%, var(--accent) 100%);
   border-color: transparent;
   color: var(--accent-ink);
   font-weight: 750;
-  box-shadow: 0 10px 30px var(--accent-glow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -8px 18px rgba(4, 66, 104, 0.28),
+    0 12px 30px var(--accent-glow);
+}
+
+/* A single sheen sweep across the beam on hover — light passing over
+   glass. Runs only on hover-capable pointers. */
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.34) 50%,
+    transparent 64%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.65s var(--ease);
+  pointer-events: none;
 }
 
 .btn-ghost {
   background: transparent;
+  box-shadow: none;
 }
 
 /* Distinct from ghost: a solid neutral fill with visible border — the
    default "secondary" action (hero "My List"/"More info", pickers). */
 .btn-secondary {
-  background: var(--surface-3);
-  border-color: var(--border);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 88%, transparent) 0%,
+      var(--surface-2) 100%
+    ),
+    var(--surface-2);
+  border-color: var(--border-strong);
   color: var(--text);
 }
 
 .btn-secondary[aria-pressed="true"] {
   color: var(--accent-bright);
   border-color: var(--accent-line);
-  background: var(--accent-soft);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 72%, transparent) 0%,
+      color-mix(in srgb, var(--accent-soft) 34%, transparent) 100%
+    ),
+    var(--accent-soft);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 24%, transparent),
+    inset 0 0 0 1px var(--accent-line),
+    0 0 18px color-mix(in srgb, var(--accent-glow) 70%, transparent);
 }
 
 .btn-danger {
-  background: var(--danger-soft);
-  border-color: rgba(255, 92, 92, 0.35);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--danger) 22%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--danger-soft) 78%, transparent) 100%
+  );
+  border-color: rgba(255, 92, 92, 0.38);
   color: #ffb3b3;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 18px rgba(255, 92, 92, 0.14);
 }
 
 .btn-block {
@@ -432,12 +655,17 @@ ol {
   place-items: center;
   border: 1px solid var(--border);
   background: var(--surface-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
   color: var(--text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 8px rgba(2, 5, 11, 0.3);
   transition:
     transform var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) ease;
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
 }
 
 .icon-btn:active {
@@ -449,6 +677,7 @@ ol {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 
 /* Chips ------------------------------------------------------------ */
@@ -461,22 +690,40 @@ ol {
   padding: 0 15px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 66%, transparent) 0%,
+      var(--surface-2) 100%
+    ),
+    var(--surface-2);
   color: var(--muted);
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition:
     background-color var(--dur-fast) ease,
     color var(--dur-fast) ease,
-    border-color var(--dur-fast) ease;
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
 .chip[aria-pressed="true"],
 .chip--active {
-  background: var(--accent-soft);
   border-color: var(--accent-line);
-  color: var(--accent-bright);
+  color: #a9e2ff;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 82%, transparent) 0%,
+      color-mix(in srgb, var(--accent-soft) 40%, transparent) 100%
+    ),
+    var(--accent-soft);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 22%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 55%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent-glow) 62%, transparent);
 }
 
 .chip-row {
@@ -492,7 +739,7 @@ ol {
   display: none;
 }
 
-/* Segmented control ------------------------------------------------ */
+/* Segmented control — a recessed track with a raised, lit thumb ------ */
 
 .segmented {
   display: inline-flex;
@@ -500,7 +747,10 @@ ol {
   gap: 2px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--bg) 42%, transparent);
+  box-shadow:
+    inset 0 2px 6px rgba(2, 5, 11, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .segmented button {
@@ -512,14 +762,23 @@ ol {
   border-radius: var(--radius-pill);
   font-size: var(--text-sm);
   font-weight: 650;
+  letter-spacing: -0.01em;
   transition:
     background-color var(--dur-fast) ease,
-    color var(--dur-fast) ease;
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
 .segmented button[aria-pressed="true"] {
-  background: var(--surface-3);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-3) 82%, #ffffff 3%) 0%,
+    var(--surface-3) 100%
+  );
   color: var(--text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 8px rgba(2, 5, 11, 0.35);
 }
 
 /* Inputs ----------------------------------------------------------- */
@@ -532,15 +791,23 @@ ol {
   padding: 0 14px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 2px 8px rgba(2, 5, 11, 0.25);
   transition:
     border-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
+    box-shadow var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
 }
 
 .field:focus-within {
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--surface-2);
+  box-shadow:
+    var(--focus-ring),
+    0 0 26px color-mix(in srgb, var(--accent-glow) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .field input {
@@ -567,6 +834,8 @@ ol {
 }
 
 .search-field .icon-btn--bare {
+  width: 44px;
+  height: 44px;
   margin-right: -6px;
 }
 
@@ -580,7 +849,7 @@ ol {
 /* Sections + headers ----------------------------------------------- */
 
 .section {
-  margin-top: 34px;
+  margin-top: 36px;
 }
 
 .section-head {
@@ -593,9 +862,25 @@ ol {
 }
 
 .section-head h2 {
-  font-size: clamp(17px, 2.2vw, 20px);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(18px, 2.2vw, 21px);
   font-weight: 800;
   letter-spacing: var(--tracking-tight);
+}
+
+/* A short lit bar before every shelf title — the recurring "beam" cue. */
+.section-head h2::before {
+  content: "";
+  width: 3px;
+  height: 1.05em;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent) 58%, transparent 150%);
+  box-shadow:
+    0 0 12px var(--accent-glow),
+    0 2px 6px rgba(2, 5, 11, 0.4);
 }
 
 .section-head a,
@@ -622,7 +907,7 @@ ol {
 .poster-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 14px;
+  gap: 20px 14px;
   padding: 0 var(--page-x);
 }
 
@@ -635,6 +920,7 @@ ol {
 @media (min-width: 820px) {
   .poster-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px 16px;
   }
 }
 
@@ -647,7 +933,12 @@ ol {
 /* Horizontal rows -------------------------------------------------- */
 
 .row {
-  margin-top: 32px;
+  margin-top: 34px;
+}
+
+/* The shell hosts the desktop hover chevrons around the scroller. */
+.row-shell {
+  position: relative;
 }
 
 /* Padding-top gives the hover-lift headroom inside the scroller so a
@@ -684,6 +975,67 @@ ol {
   }
 }
 
+/* Desktop shelf chevrons — glass coins floating over the row edges,
+   hover-revealed on pointer devices only. Touch keeps native swipe. */
+.row-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(calc(-50% - 12px)); /* minus the scroller headroom */
+  width: 40px;
+  height: 40px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  background: var(--surface-glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 22px rgba(2, 5, 11, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-med) ease,
+    visibility var(--dur-med) ease,
+    transform var(--dur-med) var(--ease),
+    border-color var(--dur-fast) ease;
+  z-index: 2;
+}
+
+.row-nav--prev {
+  left: 6px;
+}
+
+.row-nav--next {
+  right: 6px;
+}
+
+@media (hover: hover) and (min-width: 1024px) {
+  .row-shell:hover .row-nav,
+  .row-shell:focus-within .row-nav {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .row-shell:hover .row-nav--prev {
+    transform: translateY(calc(-50% - 12px)) scale(1);
+  }
+
+  .row-nav:hover {
+    border-color: var(--accent-line);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 8px 22px rgba(2, 5, 11, 0.5),
+      0 0 18px var(--accent-glow);
+  }
+
+  .row-nav:active {
+    transform: translateY(calc(-50% - 12px)) scale(0.92);
+  }
+}
+
 /* Cards ------------------------------------------------------------ */
 
 .poster-card {
@@ -708,9 +1060,40 @@ ol {
   aspect-ratio: 2 / 3;
   border-radius: var(--radius);
   overflow: hidden;
-  background: var(--surface-2);
+  background:
+    radial-gradient(120% 80% at 24% 0%, color-mix(in srgb, var(--accent) 7%, transparent) 0%, transparent 56%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 85%, transparent) 0%,
+      var(--surface-2) 100%
+    );
   border: 1px solid var(--border);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(2, 5, 11, 0.3),
+    0 14px 30px rgba(2, 5, 11, 0.38);
+  transition:
+    border-color var(--dur-med) ease,
+    box-shadow var(--dur-med) ease;
+}
+
+/* A cinematic floor: art recedes into shadow the way prints do on a
+   lit shelf. Sits under the badge, never intercepts taps. */
+.poster-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg) 18%, transparent) 0%,
+    transparent 22%,
+    transparent 64%,
+    color-mix(in srgb, var(--bg) 34%, transparent) 100%
+  );
+  z-index: 0;
+  opacity: 0.9;
+  pointer-events: none;
 }
 
 .poster-media img {
@@ -727,6 +1110,7 @@ ol {
 .poster-fallback {
   position: absolute;
   inset: 0;
+  z-index: 1; /* the fallback word stays above the media's floor shadow */
   display: grid;
   place-items: center;
   padding: 12px;
@@ -744,28 +1128,33 @@ ol {
   top: 8px;
   left: 8px;
   padding: 3px 8px;
+  z-index: 1;
   border-radius: var(--radius-xs);
+  border: 1px solid var(--border-strong);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   background: var(--surface-glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px) saturate(1.3);
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow: 0 4px 12px rgba(2, 5, 11, 0.35);
   color: var(--text);
 }
 
 .poster-title {
   margin-top: 10px;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.3;
+  letter-spacing: -0.012em;
   color: var(--text);
 }
 
 .poster-sub {
   margin-top: 2px;
   font-size: var(--text-xs);
+  font-weight: 500;
   color: var(--muted);
 }
 
@@ -786,7 +1175,7 @@ ol {
   background: linear-gradient(
     100deg,
     transparent 20%,
-    rgba(255, 255, 255, 0.07) 50%,
+    rgba(255, 255, 255, 0.08) 50%,
     transparent 80%
   );
   animation: shimmer 1.6s infinite;
@@ -817,6 +1206,12 @@ ol {
   text-align: center;
   padding: 56px 24px;
   color: var(--muted);
+  background: radial-gradient(
+    60% 90% at 50% 0%,
+    color-mix(in srgb, var(--accent) 5%, transparent) 0%,
+    transparent 70%
+  );
+  border-radius: var(--radius-lg);
 }
 
 .empty-state h3 {
@@ -831,7 +1226,37 @@ ol {
   font-size: 14px;
 }
 
-/* Sheets / dialogs ------------------------------------------------- */
+/* Scrollbars (desktop) --------------------------------------------- */
+
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--text) 22%, transparent);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--text) 38%, transparent);
+    background-clip: content-box;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
+  }
+}
+
+/* Sheets / glass modals -------------------------------------------- */
 
 .sheet-backdrop {
   position: fixed;
@@ -840,10 +1265,16 @@ ol {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.62);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  animation: fade-in 0.16s ease;
+  background:
+    radial-gradient(
+      70% 50% at 50% 100%,
+      color-mix(in srgb, var(--accent) 10%, transparent) 0%,
+      transparent 70%
+    ),
+    rgba(2, 5, 10, 0.68);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  animation: fade-in 0.18s ease;
 }
 
 @media (min-width: 640px) {
@@ -852,21 +1283,56 @@ ol {
   }
 }
 
+/* The modal itself is deliberately translucent: page light shows
+   through, blurred, with a gradient that keeps the panel's top — where
+   the title sits — denser and opaque enough to read on. */
 .sheet {
+  position: relative;
   width: 100%;
-  max-width: 440px;
-  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  max-width: 460px;
+  padding: 22px 22px calc(22px + env(safe-area-inset-bottom));
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  animation: sheet-up 0.22s var(--ease);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 58%, transparent) 0%,
+      color-mix(in srgb, var(--surface) 90%, transparent) 44%,
+      color-mix(in srgb, var(--surface) 84%, transparent) 100%
+    ),
+    color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(26px) saturate(1.35);
+  -webkit-backdrop-filter: blur(26px) saturate(1.35);
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    var(--shadow-lg);
+  animation: sheet-up 0.26s var(--ease);
+}
+
+/* A lit hairline along the sheet's top edge. */
+.sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 6%,
+    var(--accent-line) 30%,
+    var(--accent-bright) 50%,
+    var(--accent-line) 70%,
+    transparent 94%
+  );
+  opacity: 0.8;
 }
 
 @media (min-width: 640px) {
   .sheet {
     border-radius: var(--radius-lg);
-    padding-bottom: 20px;
+    padding-bottom: 22px;
+    animation-name: sheet-pop;
   }
 }
 
@@ -884,7 +1350,15 @@ ol {
 
 @keyframes sheet-up {
   from {
-    transform: translateY(24px);
+    transform: translateY(26px);
+    opacity: 0;
+  }
+}
+
+/* Desktop glass: settles downward with a whisper of scale. */
+@keyframes sheet-pop {
+  from {
+    transform: translateY(14px) scale(0.985);
     opacity: 0;
   }
 }
@@ -916,20 +1390,42 @@ ol {
   right: 0;
   bottom: 0;
   z-index: var(--z-nav);
+  isolation: isolate;
   display: flex;
   align-items: stretch;
   gap: 2px;
   height: calc(var(--tab-height) + env(safe-area-inset-bottom));
-  padding: 6px 10px env(safe-area-inset-bottom);
+  padding: 7px 10px env(safe-area-inset-bottom);
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--bg) 92%, transparent) 24%,
-    color-mix(in srgb, var(--bg) 60%, transparent) 72%,
+    color-mix(in srgb, var(--bg) 96%, transparent) 22%,
+    color-mix(in srgb, var(--bg) 70%, transparent) 74%,
     color-mix(in srgb, var(--bg) 0%, transparent) 100%
   );
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
   border-top: 1px solid var(--border);
+  box-shadow: 0 -16px 38px rgba(2, 5, 11, 0.46);
+}
+
+/* A single beam hairline runs the bar's lit edge — bottom edge while
+   docked at the bottom, bottom edge under the sticky top nav on desktop. */
+.tab-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 4%,
+    var(--accent-line) 26%,
+    var(--accent-bright) 50%,
+    var(--accent-line) 74%,
+    transparent 96%
+  );
+  opacity: 0.4;
 }
 
 /* Brand tile — desktop top nav only; hidden while the bar sits at the
@@ -939,6 +1435,7 @@ ol {
 }
 
 .tab-item {
+  position: relative;
   flex: 1 1 0;
   display: flex;
   flex-direction: column;
@@ -947,27 +1444,59 @@ ol {
   gap: 3px;
   border: 0;
   background: none;
-  color: var(--muted-2);
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.015em;
   border-radius: var(--radius-sm);
   transition:
     color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease;
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease);
 }
 
 .tab-item svg {
   width: 22px;
   height: 22px;
+  transition: filter var(--dur-med) ease;
+}
+
+/* A tiny lit point under the active glyph — the shelf indicator. */
+.tab-item::after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--beam-gradient);
+  box-shadow: 0 0 8px var(--accent-glow);
+  opacity: 0;
+  transform: translate(-50%, 3px) scale(0.4);
+  transition:
+    opacity var(--dur-med) ease,
+    transform var(--dur-med) var(--ease);
 }
 
 .tab-item[aria-current="page"] {
+  color: var(--accent-bright);
+  background: linear-gradient(180deg, var(--accent-soft) 0%, transparent 84%);
+}
+
+.tab-item[aria-current="page"] svg {
   color: var(--accent);
+  filter: drop-shadow(0 0 9px var(--accent-glow));
+}
+
+.tab-item[aria-current="page"]::after {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
 }
 
 .tab-item:active {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.045);
+  transform: scale(0.96);
 }
 
 /* Player surface --------------------------------------------------- */
@@ -979,6 +1508,30 @@ ol {
 }
 
 /* Motion ----------------------------------------------------------- */
+
+/* Page entrance — opacity only on purpose: a transform on a page
+   ancestor would turn fixed children (the title back button) and sticky
+   headers into positioned-relative boxes for the length of the fade. */
+@media (prefers-reduced-motion: no-preference) {
+  .home,
+  .search-page,
+  .browse-page,
+  .library-page,
+  .title-page,
+  .admin-page,
+  .profiles-page {
+    animation: page-in 0.44s var(--ease-out) both;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1088,20 +1641,28 @@ ol {
     order: -1;
     align-items: center;
     justify-content: flex-start;
-    gap: 4px;
+    gap: 6px;
     height: calc(var(--nav-height) + env(safe-area-inset-top));
     padding: env(safe-area-inset-top)
       max(var(--page-x), calc((100% - 1280px) / 2 + var(--page-x)))
       0;
     background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
     border-top: 0;
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 12px 32px rgba(2, 5, 11, 0.35);
+  }
+
+  /* The beam hairline moves to the nav's bottom edge. */
+  .tab-bar::before {
+    inset: auto 0 0;
   }
 
   .tab-brand {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 11px;
     margin-right: 18px;
     padding-right: 18px;
     border-right: 1px solid var(--border);
@@ -1109,8 +1670,8 @@ ol {
   }
 
   .tab-brand-mark {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-sm);
     display: grid;
     place-items: center;
@@ -1118,8 +1679,11 @@ ol {
     font-size: 15px;
     letter-spacing: -0.04em;
     color: var(--accent-ink);
-    background: linear-gradient(160deg, var(--accent-bright), var(--accent));
-    box-shadow: 0 4px 18px var(--accent-glow);
+    background: linear-gradient(160deg, var(--accent-bright) 4%, var(--accent) 66%, #1d9ae0 120%);
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.45),
+      inset 0 -5px 12px rgba(1, 22, 38, 0.3),
+      0 4px 18px var(--accent-glow);
   }
 
   .tab-brand-name {
@@ -1128,23 +1692,35 @@ ol {
     letter-spacing: -0.035em;
   }
 
+  /* The "00" catches the beam — a quiet signature inside the mark. */
+  .tab-brand-zeros {
+    color: var(--accent);
+    text-shadow: 0 0 16px var(--accent-glow);
+  }
+
   .tab-item {
     flex: 0 0 auto;
     flex-direction: row;
     gap: 8px;
     height: 44px;
-    padding: 0 14px;
+    padding: 0 15px;
     font-size: 14px;
     border-radius: var(--radius-pill);
   }
 
-  .tab-item svg {
-    width: 20px;
-    height: 20px;
+  /* The dot indicator is a bottom-dock cue; the pill carries desktop. */
+  .tab-item::after {
+    display: none;
   }
 
   .tab-item[aria-current="page"] {
-    background: var(--accent-soft);
+    color: var(--accent-bright);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 88%, transparent) 0%,
+      color-mix(in srgb, var(--accent-soft) 46%, transparent) 100%
+    );
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 48%, transparent);
   }
 
   /* Profiles is the profile affordance — pin it to the right edge. */
@@ -1167,15 +1743,26 @@ ol {
     background: rgba(255, 255, 255, 0.05);
   }
 
+  .tab-item[aria-current="page"]:hover {
+    color: var(--accent-bright);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 88%, transparent) 0%,
+      color-mix(in srgb, var(--accent-soft) 46%, transparent) 100%
+    );
+  }
+
   .poster-card:hover {
-    transform: translateY(-6px) scale(1.02);
+    transform: translateY(-6px) scale(1.015);
   }
 
   .poster-card:hover .poster-media {
     border-color: var(--border-strong);
     box-shadow:
-      0 20px 44px rgba(0, 0, 0, 0.55),
-      0 0 32px var(--accent-glow);
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 4px 10px rgba(2, 5, 11, 0.35),
+      0 22px 48px rgba(2, 5, 11, 0.55),
+      0 0 34px color-mix(in srgb, var(--accent-glow) 62%, transparent);
   }
 
   .poster-card:hover .poster-media img {
@@ -1183,27 +1770,53 @@ ol {
   }
 
   .btn:hover {
-    background: var(--surface-3);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface-3) 96%, transparent) 0%,
+        var(--surface-3) 100%
+      ),
+      var(--surface-2);
     border-color: var(--border-strong);
   }
 
   .btn-primary:hover {
-    background: var(--accent-bright);
+    background: linear-gradient(180deg, #a8e4ff 0%, var(--accent-bright) 70%, #3fbcfa 100%);
     border-color: transparent;
-    box-shadow: 0 12px 36px var(--accent-glow);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -8px 18px rgba(4, 66, 104, 0.24),
+      0 14px 38px var(--accent-glow);
+  }
+
+  .btn-primary:hover::after {
+    transform: translateX(130%);
   }
 
   .btn-secondary:not([aria-pressed="true"]):hover {
-    background: var(--surface-3);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface-3) 96%, transparent) 0%,
+        var(--surface-3) 100%
+      ),
+      var(--surface-2);
     border-color: var(--border-strong);
   }
 
   .btn-secondary[aria-pressed="true"]:hover {
-    background: var(--accent-soft);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent-soft) 88%, transparent) 0%,
+        color-mix(in srgb, var(--accent-soft) 46%, transparent) 100%
+      ),
+      var(--accent-soft);
   }
 
   .icon-btn:hover {
     background: var(--surface-3);
+    border-color: var(--border-strong);
   }
 
   .chip:not([aria-pressed="true"]):hover {

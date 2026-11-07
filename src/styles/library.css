@@ -1,14 +1,92 @@
 /* ==================================================================
    Library — active profile's Watchlist / History shelf.
    Tokens and shared primitives come from src/styles.css.
+   NOTE: styles.css loads AFTER this file in the cascade, so any rule
+   that overrides a shared primitive (.display, .segmented, .page …) is
+   scoped through a parent class so it wins the specificity tie
+   regardless of load order.
    ================================================================== */
 
+/* Page frame --------------------------------------------------------- */
+
+/* Positioned so the profile-tinted wash below can anchor to it. */
 .library-page {
-  padding-top: calc(env(safe-area-inset-top) + 20px);
+  position: relative;
 }
 
-/* Beam-dot eyebrow: a glowing pip before the caps label. Scoped past
-   the shared .eyebrow rule, which wins ties (styles.css loads last). */
+/* The shared .page padding is a shorthand, so the top/bottom breathing
+   room has to out-specify it to survive. */
+.page.library-page {
+  padding-top: calc(env(safe-area-inset-top) + 20px);
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}
+
+/* A profile-tinted wash across the top of the page: the shelf carries
+   the household member's own colour. */
+.library-page::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 300px;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      90% 100% at 10% -12%,
+      color-mix(in srgb, var(--library-color, var(--accent)) 22%, transparent) 0%,
+      transparent 64%
+    ),
+    radial-gradient(
+      70% 80% at 96% -20%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      transparent 62%
+    );
+}
+
+.library-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header ------------------------------------------------------------- */
+
+.library-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* The profile medallion — the shared .avatar primitive tinted with the
+   profile's own colour (set inline as --library-color on the root). */
+.library-page .library-avatar {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 30%;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgba(0, 0, 0, 0.74);
+  background:
+    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.42), transparent 46%),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--library-color, var(--accent)) 74%, white) 0%,
+      var(--library-color, var(--accent)) 54%,
+      color-mix(in srgb, var(--library-color, var(--accent)) 82%, black) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    0 6px 20px color-mix(in srgb, var(--library-color, var(--accent)) 30%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--library-color, var(--accent)) 26%, transparent);
+}
+
+.library-head-text {
+  min-width: 0;
+}
+
+/* Beam-dot eyebrow: a glowing pip before the caps label, tinted with the
+   profile colour. Scoped past the shared .eyebrow rule, which wins ties
+   (styles.css loads last). */
 .library-page .library-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -19,19 +97,23 @@
 .library-eyebrow-dot {
   width: 7px;
   height: 7px;
+  flex: 0 0 auto;
   border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
+  background: var(--library-color, var(--accent));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--library-color, var(--accent)) 55%, transparent);
 }
 
 /* The profile name tints toward the profile's own colour via the
-   --library-color custom property set inline from activeProfile.color. */
-.library-title {
+   --library-color custom property set inline from activeProfile.color.
+   Out-specifies the shared .display rule for the size. */
+.page.library-page .library-title {
   margin-top: 2px;
+  font-size: clamp(25px, 6vw, 38px);
   background-image: linear-gradient(
     100deg,
     var(--library-color, var(--accent-bright)) 0%,
-    var(--text) 62%
+    color-mix(in srgb, var(--library-color, var(--accent)) 38%, var(--text)) 58%,
+    var(--text) 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -40,25 +122,37 @@
 }
 
 .library-count {
-  margin-top: 8px;
+  margin-top: 6px;
   font-weight: 650;
   letter-spacing: 0.01em;
 }
 
 /* Segmented control ------------------------------------------------- */
 
-.library-tabs {
+.page.library-page .library-tabs {
   margin-top: 18px;
+  padding: 5px;
+  gap: 4px;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 22px rgba(0, 0, 0, 0.28);
 }
 
 /* Bump the shared segmented control to a comfortable iOS touch target
-   and give the active segment a springy, beam-lit feel. */
-.library-page .library-tabs button {
+   and give the active segment a springy, profile-lit feel. */
+.page.library-page .library-tabs button {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   min-height: 44px;
-  padding: 0 20px;
+  padding: 0 18px;
   font-size: 14px;
   font-weight: 650;
+  letter-spacing: -0.01em;
+  border-radius: var(--radius-pill);
   transition:
     background-color var(--dur-fast) ease,
     color var(--dur-fast) ease,
@@ -66,35 +160,119 @@
     box-shadow var(--dur-med) ease;
 }
 
-.library-page .library-tabs button:active {
+.page.library-page .library-tabs button:active {
   transform: scale(0.96);
 }
 
 /* Higher specificity than the shared .segmented button[aria-pressed="true"]
-   rule so the accent treatment wins regardless of stylesheet order. */
-.library-page .library-tabs button[aria-pressed="true"] {
-  background: var(--accent-soft);
+   rule so the profile-tinted treatment wins regardless of stylesheet order. */
+.page.library-page .library-tabs button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--library-color, var(--accent)) 16%, transparent);
   border-radius: var(--radius-pill);
-  color: var(--accent-bright);
+  color: var(--text);
   box-shadow:
-    inset 0 0 0 1px var(--accent-line),
-    0 6px 18px var(--accent-glow);
+    inset 0 0 0 1px color-mix(in srgb, var(--library-color, var(--accent)) 42%, transparent),
+    0 6px 18px color-mix(in srgb, var(--library-color, var(--accent)) 20%, transparent);
+}
+
+/* The per-tab counter. */
+.library-tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.07);
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
+}
+
+.page.library-page .library-tabs button[aria-pressed="true"] .library-tab-count {
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--library-color, var(--accent)) 82%, white);
+}
+
+/* Shelf -------------------------------------------------------------- */
+
+.library-shelf {
+  margin-top: 22px;
+}
+
+/* The shelf title carries the same lit beam bar as every other shelf
+   heading in the app. */
+.library-shelf-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.library-shelf-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(17px, 2.2vw, 20px);
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight);
+}
+
+.library-shelf-head h2::before {
+  content: "";
+  width: 3px;
+  height: 1.05em;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--beam-gradient);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 /* Grid -------------------------------------------------------------- */
 
-/* .poster-grid already carries --page-x padding; .page supplies it here. */
-.library-grid {
+/* .poster-grid already carries --page-x padding; .page supplies it here
+   — this has to out-specify the shared rule to clear that padding. */
+.page.library-page .library-grid {
   padding: 0;
-  margin-top: 18px;
+  margin-top: 2px;
 }
 
+.library-page .poster-title {
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.library-page .poster-sub {
+  color: var(--muted-2);
+}
+
+/* A footnote under the history shelf. */
 .library-note {
-  margin: 20px var(--page-x) 0;
+  margin: 20px 0 0;
   text-align: center;
 }
 
 /* Empty states ------------------------------------------------------ */
+
+/* A designed panel instead of the bare shared empty state. */
+.page.library-page .empty-state {
+  padding: 48px 24px 52px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--surface-2) 62%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 38%, transparent) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--shadow-soft);
+}
 
 .library-empty__icon {
   display: grid;
@@ -111,8 +289,17 @@
   box-shadow: 0 0 34px var(--accent-glow);
 }
 
-.library-page .empty-state .btn {
+.page.library-page .empty-state .btn {
   margin-top: 10px;
+}
+
+/* On a wide screen the panel is capped and centred rather than stretching
+   the full content width. */
+@media (min-width: 768px) {
+  .page.library-page .empty-state {
+    max-width: 560px;
+    margin-inline: auto;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -131,18 +318,37 @@
   }
 }
 
+/* Tablet and up ----------------------------------------------------- */
+
+@media (min-width: 640px) {
+  .page.library-page .library-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 21px;
+  }
+}
+
+/* Desktop (>= 1024px) ------------------------------------------------- */
+
+@media (min-width: 1024px) {
+  /* The nav already reserves the notch; the page starts clean. */
+  .page.library-page {
+    padding-top: 26px;
+  }
+}
+
 /* Pointer hover — desktop mice only, never touch --------------------- */
 
 @media (hover: hover) {
-  .library-page .library-tabs button:not([aria-pressed="true"]):hover {
+  .page.library-page .library-tabs button:not([aria-pressed="true"]):hover {
     color: var(--text);
     background: rgba(255, 255, 255, 0.05);
   }
 
-  .library-page .library-tabs button[aria-pressed="true"]:hover {
-    background: var(--accent-soft);
+  .page.library-page .library-tabs button[aria-pressed="true"]:hover {
+    background: color-mix(in srgb, var(--library-color, var(--accent)) 22%, transparent);
     box-shadow:
-      inset 0 0 0 1px var(--accent-line),
-      0 8px 24px var(--accent-glow);
+      inset 0 0 0 1px color-mix(in srgb, var(--library-color, var(--accent)) 50%, transparent),
+      0 8px 24px color-mix(in srgb, var(--library-color, var(--accent)) 24%, transparent);
   }
 }

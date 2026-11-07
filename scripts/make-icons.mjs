@@ -31,9 +31,9 @@ const ICON_DIR = path.resolve(HERE, '..', 'public', 'icons');
 /* palette + tiny maths                                               */
 /* ------------------------------------------------------------------ */
 
-const BG = [0x0b, 0x0f, 0x14]; // --bg      #0b0f14
-const SURFACE = [0x15, 0x1d, 0x2a]; // --surface-2 #151d2a
-const ACCENT = [0x00, 0xac, 0xc1]; // --accent  #00acc1
+const BG = [0x07, 0x0a, 0x11]; // --bg      #070a11
+const SURFACE = [0x0c, 0x12, 0x20]; // --surface-2 #0c1220
+const ACCENT = [0x4c, 0xc3, 0xff]; // --accent  #4cc3ff
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smoothstep = (e0, e1, x) => {
@@ -648,8 +648,11 @@ for (const job of jobs) {
   );
 }
 
-const svg = buildSVG();
 const svgFile = path.join(ICON_DIR, 'favicon.svg');
+// Rasterizer note: no SVG rasterizer is shipped with this repo, so the PNGs
+// above are produced by the existing SDF renderer. The favicon.svg is authored
+// by hand (brand mark) and is simply (re)pointed at here rather than rebuilt.
+const svg = fs.readFileSync(svgFile, 'utf8');
 fs.writeFileSync(svgFile, svg, 'utf8');
 console.log(`  favicon.svg           64x64  vector   ${String(Buffer.byteLength(svg)).padStart(7)} B`);
 

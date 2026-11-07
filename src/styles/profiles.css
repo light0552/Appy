@@ -1,57 +1,323 @@
 /* ==================================================================
-   Profiles — "Who's watching?" picker, tiles, menu + add sheets.
+   Profiles — cinematic "choose your screen" picker.
    Tokens and shared primitives come from src/styles.css.
-   The first screen users land on: warm, playful, beam-lit.
+
+   Concept: a midnight coastal lighthouse. A soft beam washes down the
+   page, a faint horizon sits under the shelf, and every screen floats
+   as a glass medallion lit by its own colour. The grid is deliberately
+   dense enough for up to 50 screens, with a name filter to keep the
+   shelf navigable.
+
+   Page CSS loads before styles.css in the bundle, so anything that
+   must beat a shared primitive is scoped through `.profiles-page`.
    ================================================================== */
 
 .profiles-page {
+  --profiles-hairline: color-mix(in srgb, var(--text) 8%, transparent);
   position: relative;
   isolation: isolate;
-  padding-top: calc(env(safe-area-inset-top) + 30px);
-  padding-bottom: calc(env(safe-area-inset-bottom) + 36px);
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
 }
 
-/* Lighthouse beam washes down from the top of the page. Sits behind
-   every child via a negative z-index inside this isolated context. */
-.profiles-page::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: min(58dvh, 540px);
+/* .page sets a padding shorthand; this pairing wins the tie regardless
+   of bundle order. */
+.page.profiles-page {
+  padding-top: calc(env(safe-area-inset-top) + 18px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
+}
+
+@media (min-width: 1024px) {
+  .page.profiles-page {
+    min-height: calc(100dvh - var(--nav-height) - env(safe-area-inset-top));
+    padding-top: 30px;
+  }
+}
+
+/* Ambient backdrop -------------------------------------------------- */
+
+.profiles-ambient {
+  position: fixed;
+  inset: 0;
   z-index: -1;
+  overflow: hidden;
   pointer-events: none;
+}
+
+/* Broad cyan wash from the top of the frame, with the faintest warm
+   ember at the opposite corner so the palette never goes fully cold. */
+.profiles-ambient__glow {
+  position: absolute;
+  inset: -18% -12% auto;
+  height: min(96dvh, 900px);
   background:
     radial-gradient(
-      85% 100% at 50% -12%,
-      color-mix(in srgb, var(--accent) 15%, transparent) 0%,
-      transparent 62%
+      58% 68% at 50% -12%,
+      color-mix(in srgb, var(--accent) 17%, transparent) 0%,
+      transparent 70%
     ),
     radial-gradient(
-      55% 70% at 10% -4%,
+      42% 58% at 88% -6%,
       color-mix(in srgb, var(--accent) 10%, transparent) 0%,
-      transparent 70%
+      transparent 72%
+    ),
+    radial-gradient(
+      38% 52% at 8% 4%,
+      color-mix(in srgb, var(--warn) 7%, transparent) 0%,
+      transparent 74%
     );
 }
 
-/* Headline ---------------------------------------------------------- */
+/* The beam: one long, soft shaft of light drifting from the masthead. */
+.profiles-ambient__beam {
+  position: absolute;
+  top: -24vmax;
+  left: 50%;
+  width: 44vmax;
+  height: 155vmax;
+  transform: translateX(-50%) rotate(18deg);
+  transform-origin: 50% 0;
+  border-radius: 50% 50% 46% 46% / 9% 9% 92% 92%;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent-bright) 22%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 9%, transparent) 44%,
+    transparent 76%
+  );
+  filter: blur(30px);
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 38%, transparent 84%);
+  mask-image: linear-gradient(to bottom, black 0%, black 38%, transparent 84%);
+}
 
-/* Gradient display type: a static beam wash across the words, plus a
-   one-time springy entrance (transform/opacity only).
-   Scoped past the shared .display rule, which wins single-class ties
-   (styles.css loads after page CSS in the bundle). */
+/* Faint water line under the shelf. */
+.profiles-ambient__horizon {
+  position: absolute;
+  top: 72%;
+  left: -8%;
+  right: -8%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 24%, transparent) 44%,
+    color-mix(in srgb, var(--warn) 16%, transparent) 62%,
+    transparent 100%
+  );
+  box-shadow: 0 0 38px 7px color-mix(in srgb, var(--accent) 7%, transparent);
+  opacity: 0.45;
+}
+
+.profiles-ambient__horizon::after {
+  content: "";
+  position: absolute;
+  inset: 1px 0 auto;
+  height: 28dvh;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 6%, transparent) 0%,
+    transparent 72%
+  );
+}
+
+/* Edge vignette keeps the eye on the shelf. */
+.profiles-ambient__vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      118% 88% at 50% 38%,
+      transparent 42%,
+      color-mix(in srgb, var(--bg) 74%, transparent) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--bg) 34%, transparent) 0%,
+      transparent 18%,
+      transparent 78%,
+      color-mix(in srgb, var(--bg) 52%, transparent) 100%
+    );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .profiles-ambient__beam {
+    animation: profiles-beam-drift 28s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes profiles-beam-drift {
+  from {
+    transform: translateX(-53%) rotate(14deg);
+    opacity: 0.34;
+  }
+  to {
+    transform: translateX(-47%) rotate(22deg);
+    opacity: 0.58;
+  }
+}
+
+/* Masthead ---------------------------------------------------------- */
+
+.profiles-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profiles-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.profiles-brand-mark {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  color: var(--accent-ink);
+  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 6px 22px var(--accent-glow);
+}
+
+.profiles-brand-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.profiles-brand-name {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+.profiles-brand-kicker {
+  display: none;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .profiles-brand-kicker {
+    display: inline-block;
+  }
+}
+
+/* Admin pill — glass, calm, always top-right. */
+.profiles-admin-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.profiles-admin-btn svg {
+  color: var(--accent-bright);
+}
+
+.profiles-admin-btn:active {
+  transform: scale(0.97);
+}
+
+/* Hero -------------------------------------------------------------- */
+
+.profiles-hero {
+  margin-top: clamp(40px, 7.5vh, 92px);
+  text-align: center;
+}
+
+.profiles-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.profiles-beacon {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent),
+    0 0 16px var(--accent-glow);
+}
+
+.profiles-eyebrow-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--muted-2);
+  opacity: 0.8;
+}
+
+.profiles-eyebrow-soft {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Scoped past the shared .display rule, which wins single-class ties. */
 .profiles-page .profiles-title {
-  font-size: clamp(30px, 8.5vw, 52px);
-  line-height: 1.04;
-  letter-spacing: -0.045em;
+  margin-top: 18px;
+  font-size: clamp(42px, 10.5vw, 88px);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+  font-weight: 800;
+  text-wrap: balance;
   background-image: linear-gradient(
     100deg,
-    var(--text) 32%,
+    var(--text) 18%,
+    #ffffff 33%,
     var(--accent-bright) 47%,
     var(--accent) 60%,
-    var(--text) 82%
+    var(--text) 87%
   );
-  background-size: 240% 100%;
-  background-position: 62% 0;
+  background-size: 220% 100%;
+  background-position: 58% 0;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -59,115 +325,244 @@
 }
 
 .profiles-sub {
-  margin-top: 12px;
-  max-width: 430px;
-  font-size: 15px;
-  line-height: 1.5;
-}
-
-.profiles-meta {
-  margin-top: 18px;
-  font-weight: 700;
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
-.profiles-sync-error {
-  margin-top: 8px;
-  color: var(--danger);
-  font-weight: 600;
+  margin: 18px auto 0;
+  max-width: 46ch;
+  font-size: clamp(14px, 1.6vw, 16px);
+  line-height: 1.55;
+  color: var(--muted);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .profiles-page .profiles-title {
-    animation: profiles-title-in 0.55s var(--ease) 0.1s both;
+    animation: profiles-title-in 0.6s var(--ease) 0.08s both;
+  }
+
+  .profiles-eyebrow {
+    animation: profiles-fade-in 0.5s var(--ease) both;
+  }
+
+  .profiles-sub {
+    animation: profiles-fade-in 0.55s var(--ease) 0.18s both;
   }
 }
 
 @keyframes profiles-title-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.98);
+    transform: translateY(16px) scale(0.985);
   }
 }
 
-/* Tile grid -------------------------------------------------------- */
+@keyframes profiles-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
 
-.profile-grid {
+/* Shelf ------------------------------------------------------------- */
+
+.profiles-shelf {
+  width: 100%;
+  margin-top: clamp(30px, 5.5vh, 58px);
+}
+
+/* Name filter — appears once the shelf grows past a comfortable scan. */
+.profiles-filter {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 8px);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto 20px;
+}
+
+@media (min-width: 1024px) {
+  .profiles-filter {
+    top: calc(env(safe-area-inset-top) + var(--nav-height) + 8px);
+  }
+}
+
+.profiles-filter__field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 6px 0 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-2) 52%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.profiles-filter__field:focus-within {
+  border-color: var(--accent-line);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 3px var(--accent-soft);
+}
+
+.profiles-filter__field > svg {
+  flex: 0 0 auto;
+  color: var(--muted-2);
+}
+
+.profiles-filter__field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 16px; /* keeps iOS from zooming */
+  color: var(--text);
+}
+
+.profiles-filter__field input::placeholder {
+  color: var(--muted-2);
+}
+
+.profiles-filter__field input::-webkit-search-cancel-button,
+.profiles-filter__field input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.profiles-filter__clear {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 22px 14px;
-  margin-top: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
 }
 
-@media (min-width: 560px) {
-  .profile-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+.profiles-filter__clear:active {
+  background: var(--surface-3);
 }
 
-@media (min-width: 900px) {
-  .profile-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    max-width: 780px;
-  }
+/* Sticky filter sits over tiles while scrolling, so the count gets its
+   own glass pill instead of floating as bare text. */
+.profiles-filter__count {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border: 1px solid var(--profiles-hairline);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-2) 66%, transparent);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
-.profiles-page .profiles-empty {
-  margin-top: 14px;
-  padding: 40px 24px 14px;
+/* Dense, centred shelf. Flex (not grid) so a handful of screens still
+   sit centred instead of hugging the left edge, and 50 screens wrap
+   into tidy rows without stretching. */
+.profile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
 }
-
-.profiles-page .profiles-empty::before {
-  content: "";
-  position: absolute;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 220px;
-  height: 220px;
-  border-radius: 999px;
-  pointer-events: none;
-  background: radial-gradient(circle, var(--accent-soft), transparent 70%);
-  z-index: -1;
-}
-
-.profiles-page .empty-state {
-  position: relative;
-  isolation: isolate;
-}
-
-/* Avatar ------------------------------------------------------------ */
 
 .profile-tile {
   position: relative;
+  flex: 1 1 88px;
+  min-width: 88px;
+  max-width: 128px;
+}
+
+/* Once there is room, give medallions a little more presence: ten per
+   row on a wide desktop instead of eleven cramped ones. */
+@media (min-width: 560px) {
+  .profile-tile {
+    flex-basis: 104px;
+  }
 }
 
 .profile-tile__select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
-  padding: 8px 4px 6px;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: none;
+  height: 100%;
+  padding: 14px 8px 11px;
+  border: 1px solid var(--profiles-hairline);
+  border-radius: 20px;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--surface-3) 46%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 34%, transparent) 62%,
+    transparent 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 28px rgba(0, 0, 0, 0.16);
   color: inherit;
+  transition:
+    transform var(--dur-med) var(--ease),
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-med) ease;
 }
+
+.profile-tile__select:active {
+  transform: scale(0.975);
+}
+
+/* Avatar medallion -------------------------------------------------- */
 
 .profile-avatar-wrap {
   position: relative;
-  display: block;
-  width: 100%;
+  display: grid;
+  place-items: center;
+  width: min(100%, 76px);
+  aspect-ratio: 1;
 }
 
-/* Each avatar is a glossy gradient built from the profile's colour
-   (--profile-color, set inline) with a soft glow shadow beneath. */
+.profile-halo {
+  position: absolute;
+  inset: -24%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 48%,
+    color-mix(in srgb, var(--profile-color, var(--accent)) 48%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: 0.5;
+  transition:
+    transform var(--dur-med) var(--ease),
+    opacity var(--dur-med) ease;
+}
+
 .profile-tile .profile-avatar {
   width: 100%;
-  aspect-ratio: 1;
-  font-size: clamp(24px, 8vw, 40px);
+  height: 100%;
+  border-radius: 50%;
+  font-size: clamp(18px, 5vw, 28px);
   background:
     radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.4), transparent 46%),
     linear-gradient(
@@ -177,151 +572,364 @@
       color-mix(in srgb, var(--profile-color, var(--accent)) 84%, black) 100%
     );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    inset 0 -12px 22px rgba(0, 0, 0, 0.2),
-    0 10px 26px color-mix(in srgb, var(--profile-color, var(--accent)) 36%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.22),
+    0 10px 24px color-mix(in srgb, var(--profile-color, var(--accent)) 32%, transparent);
   transition:
-    transform var(--dur-fast) var(--ease),
+    transform var(--dur-med) var(--ease),
     box-shadow var(--dur-med) ease;
 }
 
-/* Springy press + a satisfying scale-down. */
-.profile-tile__select:active .profile-avatar {
-  transform: scale(0.94);
+.profile-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--bg) 88%, var(--surface));
+  background: var(--surface-3);
+  color: var(--muted);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
-/* Active profile: accent ring + glow + check badge. */
-.profile-tile.profile-tile--active .profile-avatar {
+.profile-badge--active {
+  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+  color: var(--accent-ink);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.profile-badge--blocked {
+  background: color-mix(in srgb, var(--warn) 18%, var(--surface-3));
+  color: var(--warn);
+}
+
+/* Active screen ----------------------------------------------------- */
+
+.profile-tile--active .profile-tile__select {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--accent) 10%, var(--surface-3)) 0%,
+    color-mix(in srgb, var(--surface) 40%, transparent) 64%,
+    transparent 100%
+  );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    0 0 0 3px var(--bg),
-    0 0 0 5px var(--accent),
-    0 0 32px var(--accent-glow);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 16px 36px rgba(0, 0, 0, 0.24),
+    0 0 30px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.profile-tile--active .profile-avatar {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent),
+    0 0 34px var(--accent-glow);
+}
+
+.profile-tile--active .profile-halo {
+  opacity: 0.8;
+}
+
+/* Blocked screen — muted, warm, never alarming. */
+
+.profile-tile--blocked .profile-tile__select {
+  border-color: color-mix(in srgb, var(--warn) 16%, transparent);
+}
+
+.profile-tile--blocked .profile-avatar {
+  filter: grayscale(0.85) brightness(0.82);
+  opacity: 0.62;
+}
+
+.profile-tile--blocked .profile-halo {
+  background: radial-gradient(
+    circle at 50% 48%,
+    color-mix(in srgb, var(--warn) 18%, transparent) 0%,
+    transparent 68%
+  );
+  opacity: 0.35;
+}
+
+.profile-tile--blocked .profile-name {
+  color: var(--muted);
+}
+
+/* Tile text --------------------------------------------------------- */
+
+.profile-tile__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+}
+
+.profile-name {
+  max-width: 100%;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.profile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.profile-status svg {
+  width: 10px;
+  height: 10px;
 }
 
 .profile-tile--active .profile-name {
   color: var(--accent-bright);
 }
 
-.profile-check {
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  font-weight: 800;
-  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
-  color: var(--accent-ink);
-  border: 3px solid var(--bg);
-  box-shadow: 0 4px 14px var(--accent-glow);
+.profile-tile--active .profile-status {
+  color: var(--accent);
 }
 
-.profile-name {
-  max-width: 100%;
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  transition: color var(--dur-fast) ease;
+.profile-tile--blocked .profile-status {
+  color: var(--warn);
 }
 
-/* Per-tile "..." menu — 44px hit area from .icon-btn, pinned to the
-   avatar's top-right corner (matching the select's 8px top / 4px side pad). */
-.profile-menu-btn {
-  position: absolute;
-  top: 6px;
-  right: 2px;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1;
-}
-
-/* Entrance: tiles pop in one by one. Transform/opacity only, and never
-   under prefers-reduced-motion. */
+/* Entrance: a soft cascade, capped so the last tile still lands fast.
+   Transform/opacity only, and only without reduced-motion. */
 @media (prefers-reduced-motion: no-preference) {
   .profile-tile {
-    animation: tile-pop 0.5s var(--ease) both;
+    animation: tile-rise 0.5s var(--ease) both;
+    animation-delay: calc(var(--tile-index, 0) * 16ms);
   }
-
-  .profile-tile:nth-child(1) { animation-delay: 0.03s; }
-  .profile-tile:nth-child(2) { animation-delay: 0.07s; }
-  .profile-tile:nth-child(3) { animation-delay: 0.11s; }
-  .profile-tile:nth-child(4) { animation-delay: 0.15s; }
-  .profile-tile:nth-child(5) { animation-delay: 0.19s; }
-  .profile-tile:nth-child(6) { animation-delay: 0.23s; }
-  .profile-tile:nth-child(7) { animation-delay: 0.27s; }
-  .profile-tile:nth-child(8) { animation-delay: 0.31s; }
-  .profile-tile:nth-child(9) { animation-delay: 0.35s; }
-  .profile-tile:nth-child(10) { animation-delay: 0.39s; }
 }
 
-@keyframes tile-pop {
+@keyframes tile-rise {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.92);
+    transform: translateY(14px) scale(0.96);
   }
 }
 
-/* Add-profile tile ------------------------------------------------- */
+/* Empty / no-match states ------------------------------------------- */
 
-.profile-add__box {
+.profiles-empty,
+.profiles-no-match {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 42px 26px 34px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--surface-2) 52%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 34%, transparent) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    var(--shadow);
+}
+
+.profiles-empty__beacon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 2px;
   display: grid;
   place-items: center;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 2px dashed var(--border-strong);
-  border-radius: 24%;
-  color: var(--muted);
+  border: 1px solid var(--accent-line);
+  border-radius: 20px;
   background: radial-gradient(
-    100% 100% at 50% 0%,
-    var(--accent-soft) 0%,
+    circle at 50% 30%,
+    color-mix(in srgb, var(--accent) 20%, transparent) 0%,
     transparent 72%
   );
-  transition:
-    border-color var(--dur-fast) ease,
-    color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease,
-    transform var(--dur-fast) var(--ease),
-    box-shadow var(--dur-med) ease;
+  color: var(--accent-bright);
+  box-shadow: 0 0 44px var(--accent-glow);
 }
 
-.profile-add__glyph {
-  font-size: clamp(28px, 9vw, 42px);
-  font-weight: 300;
-  line-height: 1;
-  transition: transform var(--dur-med) var(--ease);
+.profiles-empty h2 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
-.profile-add:active .profile-add__box {
-  border-color: var(--accent);
-  color: var(--accent);
-  transform: scale(0.95);
-}
-
-/* Sign out ---------------------------------------------------------- */
-
-.profiles-page .profiles-signout {
-  margin-top: 34px;
-  max-width: 420px;
+.profiles-empty p:not(.eyebrow),
+.profiles-no-match p {
+  max-width: 34ch;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--muted);
 }
 
-/* Sheets (rendered inside .profiles-page) --------------------------- */
+.profiles-empty__cta {
+  margin-top: 8px;
+}
+
+.profiles-no-match {
+  gap: 10px;
+  padding: 32px 24px;
+}
+
+.profiles-no-match__icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+
+.profiles-no-match strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Footer ------------------------------------------------------------ */
+
+.profiles-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: clamp(38px, 6.5vh, 68px);
+}
+
+.profiles-foot-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--muted-2);
+}
+
+.profiles-foot-note svg {
+  flex: 0 0 auto;
+}
+
+.profiles-sync-error {
+  color: var(--danger);
+  font-weight: 600;
+  text-align: center;
+}
+
+.profiles-page .profiles-signout {
+  min-height: 44px;
+  color: var(--muted);
+}
+
+/* Hover — pointer devices only -------------------------------------- */
+
+@media (hover: hover) {
+  .profiles-admin-btn:hover {
+    border-color: var(--accent-line);
+    background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 24px var(--accent-glow);
+  }
+
+  .profiles-filter__clear:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+
+  .profile-tile__select:hover {
+    transform: translateY(-5px);
+    border-color: var(--border-strong);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 22px 44px rgba(0, 0, 0, 0.38);
+  }
+
+  .profile-tile__select:hover .profile-halo {
+    transform: scale(1.16);
+    opacity: 0.85;
+  }
+
+  .profile-tile__select:hover .profile-avatar {
+    transform: scale(1.035);
+  }
+
+  .profile-tile--active .profile-tile__select:hover {
+    border-color: var(--accent-line);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 22px 48px rgba(0, 0, 0, 0.4),
+      0 0 38px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+
+  .profiles-page .profiles-signout:hover {
+    color: var(--danger);
+    background: var(--danger-soft);
+  }
+}
+
+/* Unlock sheet ------------------------------------------------------ */
 
 /* Glassy, rounded, beam-lit. Scoped so the shared .sheet primitives
    from styles.css stay authoritative everywhere else. */
 .profiles-page .sheet {
   position: relative;
-  padding-top: 30px;
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
-  backdrop-filter: blur(22px) saturate(1.5);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  width: 100%;
+  max-width: 430px;
+  max-height: min(92dvh, 780px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 30px 22px calc(22px + env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0;
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-lg);
+  background:
+    radial-gradient(
+      120% 80% at 50% -12%,
+      color-mix(in srgb, var(--accent) 13%, transparent) 0%,
+      transparent 62%
+    ),
+    color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(26px) saturate(1.5);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 60px color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+@media (min-width: 640px) {
+  .profiles-page .sheet {
+    padding-top: 26px;
+    padding-bottom: 24px;
+    border-radius: 28px;
+  }
+
+  /* The grabber is a touch affordance; the desktop sheet reads as a dialog. */
+  .profiles-page .sheet::after {
+    display: none;
+  }
 }
 
 /* Beam-lit top edge. */
@@ -329,8 +937,8 @@
   content: "";
   position: absolute;
   top: 0;
-  left: 28px;
-  right: 28px;
+  left: 26px;
+  right: 26px;
   height: 1px;
   pointer-events: none;
   background: linear-gradient(
@@ -355,42 +963,293 @@
   pointer-events: none;
 }
 
-.profiles-page .sheet h2 {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
+.profiles-unlock-sheet {
+  max-width: 430px;
 }
 
-.sheet-stack {
+.unlock-head {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 16px;
+  align-items: center;
+  text-align: center;
 }
 
-/* Sheet actions read best as softly elevated glass buttons. Ghost and
-   danger variants keep their own semantics. */
-.profiles-page .sheet-stack .btn:not(.btn-ghost):not(.btn-danger) {
-  justify-content: flex-start;
-  min-height: 48px;
-  border-color: var(--border);
-  background: linear-gradient(
-    160deg,
-    var(--surface-3) 0%,
-    var(--surface-2) 100%
+.unlock-avatar-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin-top: 4px;
+}
+
+.unlock-halo {
+  position: absolute;
+  inset: -30%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 48%,
+    color-mix(in srgb, var(--profile-color, var(--accent)) 50%, transparent) 0%,
+    transparent 68%
   );
+  filter: blur(14px);
+  opacity: 0.7;
 }
 
-.sheet-field {
+.unlock-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  font-size: 30px;
+  background:
+    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.4), transparent 46%),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--profile-color, var(--accent)) 74%, white) 0%,
+      var(--profile-color, var(--accent)) 52%,
+      color-mix(in srgb, var(--profile-color, var(--accent)) 84%, black) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.22),
+    0 14px 34px color-mix(in srgb, var(--profile-color, var(--accent)) 36%, transparent);
+}
+
+/* The shared .avatar primitive sets a 24% radius and its own ring; the
+   sheet medallion is round and carries a coloured shadow instead. */
+.profiles-page .unlock-avatar {
+  border-radius: 50%;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.22),
+    0 14px 34px color-mix(in srgb, var(--profile-color, var(--accent)) 36%, transparent);
+}
+
+.unlock-head--blocked .unlock-avatar {
+  filter: grayscale(0.85) brightness(0.84);
+  opacity: 0.68;
+}
+
+.unlock-head--blocked .unlock-halo {
+  background: radial-gradient(
+    circle at 50% 48%,
+    color-mix(in srgb, var(--warn) 24%, transparent) 0%,
+    transparent 68%
+  );
+  opacity: 0.45;
+}
+
+.unlock-avatar-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--surface) 88%, transparent);
+  background: color-mix(in srgb, var(--warn) 20%, var(--surface-3));
+  color: var(--warn);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.profiles-page .unlock-eyebrow {
+  margin-top: 18px;
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.profiles-page .unlock-head--blocked .unlock-eyebrow {
+  color: var(--warn);
+}
+
+.profiles-page .unlock-name {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.unlock-sub {
+  margin-top: 8px;
+  max-width: 30ch;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.unlock-form {
+  margin-top: 22px;
+}
+
+.profiles-page .unlock-field {
+  margin-top: 0;
+  min-height: 54px;
+  padding: 0 5px 0 14px;
+  gap: 10px;
+  border-radius: 16px;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface-2));
+}
+
+.profiles-page .unlock-field:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.profiles-page .unlock-field--error,
+.profiles-page .unlock-field--error:focus-within {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.unlock-field-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--muted-2);
+}
+
+.unlock-field input {
+  letter-spacing: 0.04em;
+}
+
+.unlock-reveal {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.unlock-reveal:active {
+  background: var(--surface-3);
+}
+
+.unlock-reveal[aria-pressed="true"] {
+  color: var(--accent-bright);
+}
+
+.unlock-attempts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 14px;
 }
 
-.sheet-note {
-  margin-top: 8px;
-  font-size: 14px;
-  line-height: 1.5;
+.unlock-pips {
+  display: inline-flex;
+  gap: 5px;
+  flex: 0 0 auto;
 }
 
+.unlock-pip {
+  width: 18px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  transition:
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.unlock-pip--used {
+  background: var(--warn);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--warn) 32%, transparent);
+}
+
+.unlock-attempts-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted-2);
+}
+
+.unlock-attempts--warn .unlock-attempts-label {
+  color: var(--warn);
+}
+
+.profiles-page .unlock-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger-soft) 55%, transparent);
+  color: color-mix(in srgb, var(--danger) 82%, var(--text));
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.unlock-error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.unlock-blocked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 20px 18px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--warn) 22%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--warn) 8%, transparent) 0%,
+    color-mix(in srgb, var(--surface-2) 55%, transparent) 100%
+  );
+}
+
+.unlock-blocked-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+}
+
+.unlock-blocked h3 {
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.unlock-blocked p {
+  max-width: 34ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.profiles-page .sheet-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.profiles-page .sheet-actions .btn {
+  flex: 1 1 0;
+  min-height: 48px;
+}
+
+/* Shared sheet error — also used by the admin page. Keep global. */
 .sheet-error {
   margin-top: 12px;
   color: var(--danger);
@@ -398,22 +1257,7 @@
   font-weight: 600;
 }
 
-.sheet-swatch-label {
-  margin-top: 18px;
-}
-
-.sheet-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.sheet-actions .btn {
-  flex: 1 1 120px;
-  min-height: 48px;
-}
-
-/* Colour swatches --------------------------------------------------- */
+/* Colour swatches — shared with the admin page. --------------------- */
 
 .swatch-grid {
   display: grid;
@@ -457,61 +1301,8 @@
   transform: scale(0.9);
 }
 
-/* Pointer hover — desktop mice only, never touch --------------------- */
-
 @media (hover: hover) {
-  .profile-tile__select:hover .profile-avatar {
-    transform: translateY(-5px) scale(1.05);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.34),
-      inset 0 -12px 22px rgba(0, 0, 0, 0.2),
-      0 18px 36px rgba(0, 0, 0, 0.45),
-      0 0 34px color-mix(in srgb, var(--profile-color, var(--accent)) 55%, transparent);
-  }
-
-  .profile-tile.profile-tile--active .profile-tile__select:hover .profile-avatar {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.34),
-      0 0 0 3px var(--bg),
-      0 0 0 5px var(--accent-bright),
-      0 0 40px var(--accent-glow);
-  }
-
-  .profile-tile__select:hover .profile-name {
-    color: var(--text);
-  }
-
-  .profile-tile--active .profile-tile__select:hover .profile-name {
-    color: var(--accent-bright);
-  }
-
-  .profiles-page .profile-menu-btn:hover {
-    background: var(--surface-3);
-    border-color: var(--border-strong);
-  }
-
-  .profile-add:hover .profile-add__box {
-    border-color: var(--accent-line);
-    color: var(--accent-bright);
-    transform: scale(1.04);
-    box-shadow: 0 0 30px var(--accent-glow);
-  }
-
-  .profile-add:hover .profile-add__glyph {
-    transform: scale(1.18);
-  }
-
-  .profiles-page .sheet-stack .btn:not(.btn-ghost):not(.btn-danger):hover {
-    border-color: var(--border-strong);
-    transform: translateY(-1px);
-  }
-
   .swatch:hover {
     transform: scale(1.09);
-  }
-
-  .profiles-page .profiles-signout:hover {
-    color: var(--danger);
-    background: var(--danger-soft);
   }
 }

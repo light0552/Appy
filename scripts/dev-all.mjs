@@ -1,7 +1,6 @@
 /**
- * Dev-all — one command for the live rig: Vite on :5173 plus the ripstream
- * sidecar on 127.0.0.1:5174. Vite proxies /rip to the sidecar, so a phone on
- * the LAN hits http://<lan-ip>:5173 and never talks to the sidecar directly.
+ * Dev-all — one command for the live rig: Vite on :5173, bound to the LAN so a
+ * phone on the same network can open http://<lan-ip>:5173.
  *
  * Run: node scripts/dev-all.mjs   (or npm run dev:live)
  */
@@ -71,6 +70,5 @@ process.on("exit", () => {
 });
 
 start("vite", path.join(root, "node_modules", "vite", "bin", "vite.js"), ["--host"]);
-start("sidecar", path.join(root, "scripts", "ripstream", "server.mjs"), []);
 
-console.log("[dev-all] vite on :5173 + sidecar on 127.0.0.1:5174");
+console.log("[dev-all] vite on :5173 (LAN exposed)");

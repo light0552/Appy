@@ -37,6 +37,8 @@ import {
   saveProfiles,
   updateLocalProfile,
 } from "./profiles";
+import * as auth from "./auth";
+import type { ProfileAuthMap, ProfileAuthResult } from "./auth";
 import * as sync from "./sync";
 import type { SyncStatus } from "./sync";
 
@@ -57,11 +59,26 @@ export interface SessionValue {
   activeProfile: ProfileMeta | null;
   state: ProfileState;
   syncStatus: SyncStatus;
+  authMap: ProfileAuthMap;
+  adminAuthed: boolean;
   chooseProfile: (id: string) => Promise<void>;
+  unlockProfile: (id: string, password: string) => Promise<ProfileAuthResult>;
   signOut: () => void;
-  addProfile: (name: string, color?: string) => Promise<AddProfileResult>;
-  updateProfile: (id: string, patch: { name?: string; color?: string }) => Promise<void>;
-  deleteProfile: (id: string) => Promise<void>;
+  loginAdmin: (password: string) => boolean;
+  logoutAdmin: () => void;
+  /** Admin-only screen management. Nothing else may add/remove/rename a screen. */
+  adminSetProfilePassword: (id: string, password: string) => Promise<void>;
+  adminUnblockProfile: (id: string) => Promise<void>;
+  adminRenameProfile: (
+    id: string,
+    patch: { name?: string; color?: string },
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  adminAddProfile: (
+    name: string,
+    color: string | undefined,
+    password: string,
+  ) => Promise<AddProfileResult>;
+  adminDeleteProfile: (id: string) => Promise<void>;
   addToWatchlist: (media: Media) => void;
   removeFromWatchlist: (id: string) => void;
   isInWatchlist: (id: string) => boolean;
@@ -100,6 +117,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [state, setState] = useState<ProfileState>(() => emptyState(""));
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => sync.getStatus());
+  const [authMap, setAuthMap] = useState<ProfileAuthMap>({});
+  const [adminAuthed, setAdminAuthed] = useState(() => auth.hasAdminSession());
 
   const profilesRef = useRef<ProfileMeta[]>([]);
   const stateRef = useRef<ProfileState>(state);
@@ -190,6 +209,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           if (remoteIds.has(profile.id) || !pendingCreates.current.has(profile.id)) continue;
           try {
             const created = await sync.createProfileRemote(profile.name, profile.color);
+            await auth.migrateAuthRecord(profile.id, created.id);
             // The profile's id changed — carry its active slot over, or the user
             // is silently bounced to the picker on every launch (Finding 13).
             const currentActive = await kvGet<string>(KEY_ACTIVE);
@@ -228,10 +248,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await kvSet(KEY_PENDING_CREATES, [...pendingCreates.current]);
       await kvSet(KEY_PENDING_DELETES, [...pendingDeletes.current]);
 
+      const nextAuth = await auth.ensureAuthSeeds(withMeta.map((profile) => profile.id));
+      if (!alive) return;
+      setAuthMap(nextAuth);
+
       const storedActive = await kvGet<string>(KEY_ACTIVE);
-      const active = storedActive
-        ? withMeta.find((profile) => profile.id === storedActive)
-        : undefined;
+      const active =
+        storedActive && auth.isProfileUnlocked(storedActive)
+          ? withMeta.find(
+              (profile) => profile.id === storedActive && !nextAuth[profile.id]?.blocked,
+            )
+          : undefined;
 
       if (active) {
         const stored = await loadState(active.id);
@@ -296,6 +323,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!pendingCreates.current.has(profile.id)) continue;
         try {
           const created = await sync.createProfileRemote(profile.name, profile.color);
+          await auth.migrateAuthRecord(profile.id, created.id);
           // Carry the active slot across the id migration, or the user bounces
           // to the picker on every launch (Finding 13).
           const currentActive = await kvGet<string>(KEY_ACTIVE);
@@ -321,6 +349,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Apply queued offline renames/recolours before this list is persisted.
       const withMeta = await applyPendingMeta(working);
       await applyProfiles(withMeta);
+      setAuthMap(await auth.ensureAuthSeeds(withMeta.map((profile) => profile.id)));
     };
 
     const onVisible = () => void refresh();
@@ -361,13 +390,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await kvSet(KEY_ACTIVE, id);
   }, []);
 
+  const unlockProfile = useCallback(
+    async (id: string, password: string): Promise<ProfileAuthResult> => {
+      const { result, map } = await auth.verifyProfilePassword(id, password);
+      setAuthMap({ ...map });
+      if (result.ok) await chooseProfile(id);
+      return result;
+    },
+    [chooseProfile],
+  );
+
   const signOut = useCallback(() => {
     void sync.flushPush();
+    if (activeId) auth.setProfileUnlocked(activeId, false);
     setActiveId(null);
     stateRef.current = emptyState("");
     setState(emptyState(""));
     void kvDel(KEY_ACTIVE);
-  }, []);
+  }, [activeId]);
 
   const addProfile = useCallback(
     async (name: string, color?: string): Promise<AddProfileResult> => {
@@ -460,6 +500,92 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     },
     [activeId, applyProfiles],
+  );
+
+  /* ---------------------------------------------------------------- */
+  /* Admin / screen access                                             */
+  /* ---------------------------------------------------------------- */
+
+  const loginAdmin = useCallback((password: string) => {
+    const ok = auth.verifyAdminPassword(password);
+    if (ok) {
+      auth.setAdminSession(true);
+      setAdminAuthed(true);
+    }
+    return ok;
+  }, []);
+
+  const logoutAdmin = useCallback(() => {
+    auth.setAdminSession(false);
+    setAdminAuthed(false);
+  }, []);
+
+  const adminSetProfilePassword = useCallback(async (id: string, password: string) => {
+    const trimmed = password.trim();
+    if (!trimmed) return;
+    setAuthMap(await auth.adminSetPassword(id, trimmed));
+  }, []);
+
+  const adminUnblockProfile = useCallback(async (id: string) => {
+    setAuthMap(await auth.adminUnblock(id));
+  }, []);
+
+  /**
+   * Admin-only rename/recolour. Falls back to the local write path when the
+   * server is unreachable so the change is never silently lost.
+   */
+  const adminRenameProfile = useCallback(
+    async (
+      id: string,
+      patch: { name?: string; color?: string },
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const trimmedName = patch.name?.trim();
+      if (trimmedName !== undefined && trimmedName.length === 0) {
+        return { ok: false, error: "A screen needs a name." };
+      }
+      if (trimmedName !== undefined && trimmedName.length > 24) {
+        return { ok: false, error: "Names are capped at 24 characters." };
+      }
+
+      try {
+        await updateProfile(id, {
+          ...(trimmedName !== undefined ? { name: trimmedName } : {}),
+          ...(patch.color !== undefined ? { color: patch.color } : {}),
+        });
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Couldn't rename that screen." };
+      }
+    },
+    [updateProfile],
+  );
+
+  const adminAddProfile = useCallback(
+    async (
+      name: string,
+      color: string | undefined,
+      password: string,
+    ): Promise<AddProfileResult> => {
+      const result = await addProfile(name, color);
+      if (result.ok) {
+        setAuthMap(
+          await auth.adminAddRecord(
+            result.profile.id,
+            password.trim() || auth.DEFAULT_SCREEN_PASSWORD,
+          ),
+        );
+      }
+      return result;
+    },
+    [addProfile],
+  );
+
+  const adminDeleteProfile = useCallback(
+    async (id: string) => {
+      await deleteProfile(id);
+      setAuthMap(await auth.adminRemoveRecord(id));
+    },
+    [deleteProfile],
   );
 
   /* ---------------------------------------------------------------- */
@@ -568,11 +694,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activeProfile,
       state,
       syncStatus,
+      authMap,
+      adminAuthed,
       chooseProfile,
+      unlockProfile,
       signOut,
-      addProfile,
-      updateProfile,
-      deleteProfile,
+      loginAdmin,
+      logoutAdmin,
+      adminSetProfilePassword,
+      adminUnblockProfile,
+      adminRenameProfile,
+      adminAddProfile,
+      adminDeleteProfile,
       addToWatchlist,
       removeFromWatchlist,
       isInWatchlist,
@@ -585,11 +718,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       activeProfile,
       state,
       syncStatus,
+      authMap,
+      adminAuthed,
       chooseProfile,
+      unlockProfile,
       signOut,
-      addProfile,
-      updateProfile,
-      deleteProfile,
+      loginAdmin,
+      logoutAdmin,
+      adminSetProfilePassword,
+      adminUnblockProfile,
+      adminRenameProfile,
+      adminAddProfile,
+      adminDeleteProfile,
       addToWatchlist,
       removeFromWatchlist,
       isInWatchlist,

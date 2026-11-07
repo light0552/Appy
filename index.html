@@ -3,20 +3,186 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- Brand ---------------------------------------------------------- -->
+    <title>LIGHTH00K</title>
+    <meta
+      name="description"
+      content="LIGHTH00K — the household's private streaming shelf. Installable, offline-ready, and built for the living room."
+    />
+    <meta name="application-name" content="LIGHTH00K" />
+
+    <!-- Install identity: the app is dark-only, so the chrome bar and the
+         splash background are both the base surface colour. -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#050810" />
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- iOS standalone launch ------------------------------------------ -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LIGHTH00K" />
-    <meta name="theme-color" content="#070a11" />
-    <meta name="description" content="LIGHTH00K — the family's own streaming shelf." />
+
+    <!-- Manifest + icons (binaries live in public/icons) --------------- -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="mask-icon" href="/icons/favicon.svg" color="#4cc3ff" />
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+
     <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
     <link rel="preconnect" href="https://api.themoviedb.org" crossorigin />
-    <title>LIGHTH00K</title>
+    <link rel="dns-prefetch" href="https://image.tmdb.org" />
+    <link rel="dns-prefetch" href="https://api.themoviedb.org" />
+
+    <style>
+      /* Paint the shell before the bundle and stylesheet arrive so a cold start
+         (and the standalone launch) never flashes white. The app's own CSS
+         takes over as soon as it loads. */
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        background-color: #050810;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+      body {
+        /* No grey tap flash on iOS; the app's own pressed states are the
+           only feedback. */
+        -webkit-tap-highlight-color: transparent;
+      }
+      body,
+      #root {
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+
+      /* Cold-start veil: one accent dot while React mounts. It disappears the
+         moment #root has children, and the noscript panel covers it. */
+      #root:empty::after {
+        content: "";
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 10px;
+        height: 10px;
+        margin: -5px 0 0 -5px;
+        border-radius: 50%;
+        background: #4cc3ff;
+        animation: shell-pulse 1.6s ease-out infinite;
+      }
+      @keyframes shell-pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(76, 195, 255, 0.45);
+          opacity: 1;
+        }
+        70% {
+          box-shadow: 0 0 0 22px rgba(76, 195, 255, 0);
+          opacity: 0.55;
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(76, 195, 255, 0);
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #root:empty::after {
+          animation: none;
+        }
+      }
+
+      /* Client-rendered app: this panel is the whole UI when JS is off. */
+      .noscript-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        padding: max(24px, env(safe-area-inset-top)) 24px
+          max(24px, env(safe-area-inset-bottom));
+        background: radial-gradient(120% 90% at 50% 0%, #0b1526 0%, #050810 62%);
+        color: #e8f4ff;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          sans-serif;
+        text-align: center;
+      }
+      .noscript-card {
+        max-width: 36ch;
+      }
+      .noscript-beam {
+        width: 46px;
+        height: 2px;
+        margin: 0 auto 20px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, transparent, #4cc3ff, transparent);
+        box-shadow: 0 0 18px rgba(76, 195, 255, 0.55);
+      }
+      .noscript-mark {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: #4cc3ff;
+      }
+      .noscript-card h1 {
+        margin: 14px 0 10px;
+        font-size: 22px;
+        line-height: 1.25;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .noscript-card p {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.55;
+        color: #9fb1c7;
+      }
+      .noscript-card p + p {
+        margin-top: 12px;
+        font-size: 13.5px;
+        color: #677287;
+      }
+      .noscript-card a {
+        color: #4cc3ff;
+        text-decoration: none;
+        border-bottom: 1px solid rgba(76, 195, 255, 0.42);
+      }
+      .noscript-card a:hover {
+        color: #8ad9ff;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div class="noscript-shell" role="alert">
+        <div class="noscript-card">
+          <div class="noscript-beam" aria-hidden="true"></div>
+          <p class="noscript-mark">LIGHTH00K</p>
+          <h1>JavaScript is switched off</h1>
+          <p>
+            This shelf renders in your browser, so it can't start without
+            JavaScript. Enable it for this site, then
+            <a href="/">reload LIGHTH00K</a>.
+          </p>
+          <p>
+            If you already installed LIGHTH00K to your home screen, launch it
+            from there instead.
+          </p>
+        </div>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -38,7 +38,7 @@ export default function PosterCard({
     <>
       <div className="poster-media">
         {src ? (
-          <img src={src} alt="" loading="lazy" decoding="async" />
+          <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />
         ) : (
           <div className="poster-fallback">{title}</div>
         )}

@@ -2,6 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+const PROVIDER_HOSTS = String.raw`vidlink\.pro|vidsrc\.to|vidfast\.vc|player\.videasy\.to`;
+
 export default defineConfig({
   plugins: [
     react(),
@@ -10,19 +12,25 @@ export default defineConfig({
       injectRegister: "auto",
       // The manifest is a static file in public/ so it can be edited without a rebuild.
       manifest: false,
-      includeAssets: [
-        "icons/apple-touch-icon.png",
-        "icons/icon-192.png",
-        "icons/icon-512.png",
-        "icons/maskable-512.png",
-        "icons/favicon.svg",
-      ],
       workbox: {
-        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest}"],
+        // Covers the app bundle plus everything copied from public/ (manifest,
+        // favicon, the full icon set), so the installed shell boots offline.
+        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest,ico,woff2}"],
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/rip\//],
+        // Never answer an API call or a Netlify function with the SPA shell.
+        // (Also covers the bare "/api" and "/.netlify" paths, no trailing slash.)
+        navigateFallbackDenylist: [/^\/api(?:[/?]|$)/, /^\/\.netlify(?:[/?]|$)/],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
+          // Hard guard: /api/** (and Netlify functions) are never cached, never
+          // replayed from cache, and always go straight to the network. Workbox
+          // RegExpRoutes test the absolute href, hence the origin prefix. The
+          // routes below only match absolute third-party URLs, so this is a
+          // belt-and-braces rule, not the only line of defence.
+          {
+            urlPattern: /^https?:\/\/[^/]+\/(?:api|\.netlify)(?:[/?]|$)/i,
+            handler: "NetworkOnly",
+          },
           {
             urlPattern: /^https:\/\/image\.tmdb\.org\/.*/i,
             handler: "CacheFirst",
@@ -42,6 +50,48 @@ export default defineConfig({
               cacheableResponse: { statuses: [200] },
             },
           },
+          // Provider player chrome: styles and images only. Deliberately
+          // extension-anchored so a frame DOCUMENT (no file extension) can never
+          // match, and stream manifests/segments (.m3u8, .ts, .m4s, .mp4, ...)
+          // are never requested from cache.
+          {
+            urlPattern: new RegExp(
+              String.raw`^https:\/\/(?:${PROVIDER_HOSTS})\/.*\.(?:css|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf)(?:[?#].*)?$`,
+              "i",
+            ),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "provider-assets",
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Provider player bundles: revalidate, so a rotated build is picked up
+          // on the next load instead of pinning a stale player.
+          {
+            urlPattern: new RegExp(
+              String.raw`^https:\/\/(?:${PROVIDER_HOSTS})\/.*\.(?:js|mjs)(?:[?#].*)?$`,
+              "i",
+            ),
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "provider-scripts",
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 24, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Everything else on a provider origin — the embed document, its XHR,
+          // the stream manifest and the segments themselves — stays network-only.
+          // Ordered last so the two rules above win the assets they own, and no
+          // playable/page request is ever stored or replayed from cache.
+          {
+            urlPattern: new RegExp(
+              String.raw`^https:\/\/(?:${PROVIDER_HOSTS})\/`,
+              "i",
+            ),
+            handler: "NetworkOnly",
+          },
         ],
       },
       devOptions: { enabled: false },
@@ -50,9 +100,18 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    strictPort: false,
     proxy: {
-      "/api": { target: "http://localhost:8888", changeOrigin: true },
-      "/rip": { target: "http://127.0.0.1:5174", changeOrigin: false },
+      "/api": {
+        target: "http://localhost:8888",
+        changeOrigin: true,
+        // `npm run dev` has no Netlify Functions process, so every sync poll
+        // fails with ECONNREFUSED. The app already degrades to local-only; the
+        // proxy noise is pure log spam, so it is swallowed here.
+        configure: (proxy) => {
+          proxy.on("error", () => {});
+        },
+      },
     },
   },
   build: {

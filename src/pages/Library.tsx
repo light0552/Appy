@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import PosterCard from "../components/PosterCard";
+import { initials } from "../lib/profiles";
 import { useSession } from "../lib/session";
 import { liveHistory, liveWatchlist } from "../lib/store";
 import type { HistoryItem } from "../types";
@@ -76,78 +77,54 @@ export default function Library() {
     writeTab(next);
   };
 
+  const isWatchlist = tab === "watchlist";
+  const count = isWatchlist ? watchlist.length : history.length;
+
   return (
-    <div className="page library-page">
-      <p className="eyebrow library-eyebrow">
-        <span className="library-eyebrow-dot" aria-hidden="true" />
-        Library
-      </p>
-      <h1
-        className="display library-title"
-        style={{ "--library-color": activeProfile.color } as CSSProperties}
-      >
-        {activeProfile.name}
-      </h1>
-      <p className="tiny muted library-count">
-        {tab === "watchlist"
-          ? `${watchlist.length} saved ${watchlist.length === 1 ? "title" : "titles"}`
-          : `${history.length} ${history.length === 1 ? "entry" : "entries"}`}
-      </p>
+    <div
+      className="page library-page"
+      style={{ "--library-color": activeProfile.color } as CSSProperties}
+    >
+      <header className="library-head">
+        <span className="avatar library-avatar" aria-hidden="true">
+          {initials(activeProfile.name)}
+        </span>
+        <div className="library-head-text">
+          <p className="eyebrow library-eyebrow">
+            <span className="library-eyebrow-dot" aria-hidden="true" />
+            Library
+          </p>
+          <h1 className="display library-title">{activeProfile.name}</h1>
+          <p className="tiny muted library-count">
+            {isWatchlist
+              ? `${count} saved ${count === 1 ? "title" : "titles"}`
+              : `${count} ${count === 1 ? "entry" : "entries"}`}
+          </p>
+        </div>
+      </header>
 
       <div className="segmented library-tabs">
         <button
           type="button"
-          aria-pressed={tab === "watchlist"}
+          aria-pressed={isWatchlist}
           onClick={() => select("watchlist")}
         >
           Watchlist
+          <span className="library-tab-count">{watchlist.length}</span>
         </button>
-        <button type="button" aria-pressed={tab === "history"} onClick={() => select("history")}>
+        <button type="button" aria-pressed={!isWatchlist} onClick={() => select("history")}>
           History
+          <span className="library-tab-count">{history.length}</span>
         </button>
       </div>
 
-      {tab === "watchlist" ? (
-        watchlist.length === 0 ? (
-          <div className="empty-state library-empty">
-            <span className="library-empty__icon" aria-hidden="true">
-              <svg
-                width="30"
-                height="30"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z" />
-              </svg>
-            </span>
-            <h3>Nothing saved yet</h3>
-            <p>Titles you save from a title page land here, on this profile only.</p>
-            <Link className="btn btn-primary" to="/search">
-              Find something
-            </Link>
-          </div>
-        ) : (
-          <div className="poster-grid library-grid">
-            {watchlist.map((item) => (
-              <PosterCard
-                key={item.id}
-                type={item.mediaType}
-                tmdbId={item.tmdbId}
-                title={item.title}
-                posterPath={item.posterPath}
-                subtitle={relativeTime(item.addedAt)}
-                to={`/title/${item.mediaType}/${item.tmdbId}`}
-              />
-            ))}
-          </div>
-        )
-      ) : (
-        <>
-          {history.length === 0 ? (
+      <section className="library-shelf">
+        <div className="library-shelf-head">
+          <h2>{isWatchlist ? "Your saved titles" : "Recently watched"}</h2>
+        </div>
+
+        {isWatchlist ? (
+          watchlist.length === 0 ? (
             <div className="empty-state library-empty">
               <span className="library-empty__icon" aria-hidden="true">
                 <svg
@@ -160,39 +137,81 @@ export default function Library() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <circle cx="12" cy="12" r="8.5" />
-                  <path d="M12 7.5V12l3 2" />
+                  <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z" />
                 </svg>
               </span>
-              <h3>No history yet</h3>
-              <p>
-                Open an episode or a movie and it is saved here automatically — this is where
-                you pick it back up.
-              </p>
+              <h3>Nothing saved yet</h3>
+              <p>Titles you save from a title page land here, on this profile only.</p>
               <Link className="btn btn-primary" to="/search">
                 Find something
               </Link>
             </div>
           ) : (
             <div className="poster-grid library-grid">
-              {history.map((item) => (
+              {watchlist.map((item) => (
                 <PosterCard
                   key={item.id}
                   type={item.mediaType}
                   tmdbId={item.tmdbId}
                   title={item.title}
                   posterPath={item.posterPath}
-                  subtitle={historySubtitle(item)}
-                  to={historyHref(item)}
+                  subtitle={relativeTime(item.addedAt)}
+                  to={`/title/${item.mediaType}/${item.tmdbId}`}
                 />
               ))}
             </div>
-          )}
-          <p className="tiny muted library-note">
-            Picks up at the episode you opened, not at a timestamp.
-          </p>
-        </>
-      )}
+          )
+        ) : (
+          <>
+            {history.length === 0 ? (
+              <div className="empty-state library-empty">
+                <span className="library-empty__icon" aria-hidden="true">
+                  <svg
+                    width="30"
+                    height="30"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="8.5" />
+                    <path d="M12 7.5V12l3 2" />
+                  </svg>
+                </span>
+                <h3>No history yet</h3>
+                <p>
+                  Open an episode or a movie and it is saved here automatically — this is where
+                  you pick it back up.
+                </p>
+                <Link className="btn btn-primary" to="/search">
+                  Find something
+                </Link>
+              </div>
+            ) : (
+              <div className="poster-grid library-grid">
+                {history.map((item) => (
+                  <PosterCard
+                    key={item.id}
+                    type={item.mediaType}
+                    tmdbId={item.tmdbId}
+                    title={item.title}
+                    posterPath={item.posterPath}
+                    subtitle={historySubtitle(item)}
+                    to={historyHref(item)}
+                  />
+                ))}
+              </div>
+            )}
+            {history.length > 0 && (
+              <p className="tiny muted library-note">
+                Picks up at the episode you opened, not at a timestamp.
+              </p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

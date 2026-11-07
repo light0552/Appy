@@ -23,19 +23,16 @@ import type { MediaRef } from "../types";
  * so "next server" reaches a working one in a single tap. VidLink's own gaps
  * surface as "content or episode is not available" rendered inside the frame
  * (a catalogue gap on their side, not an id/format bug on ours).
+ *
+ * 2026-11-08: the ripstream sidecar (and the whole ad-free "own player"
+ * path) is deleted, so Vidsrc is no longer raced anywhere. It stays hidden
+ * from the client chips — the household watches the provider frames.
  */
 export interface ProviderDefinition {
   id: string;
   name: string;
   hint: string;
-  /**
-   * Excluded from all CLIENT-side lists (chips, manual fallbacks, advance
-   * order) per user mandate 2026-10-24 ("remove Vidsrc"). The sidecar's
-   * extractor still races it server-side — there its ad infra is irrelevant:
-   * the phone never loads the provider page, only the ripped stream passes
-   * through the home box. Removing it from the race entirely would strand
-   * most titles (measured: Vidsrc won the strongest catalogue share).
-   */
+  /** Excluded from all CLIENT-side lists (chips, manual fallbacks, advance order). */
   hidden?: boolean;
   /** Returns null when the provider cannot address this title. */
   movie: (ref: MediaRef) => string | null;

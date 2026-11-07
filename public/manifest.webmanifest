@@ -1,16 +1,29 @@
 {
+  "id": "/",
   "name": "LIGHTH00K",
   "short_name": "LIGHTH00K",
-  "description": "Personal streaming front-end for the family.",
+  "description": "LIGHTH00K — the household's private streaming shelf. Installable, offline-ready, and built for the living room.",
   "lang": "en",
+  "dir": "ltr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#070a11",
-  "theme_color": "#070a11",
-  "categories": ["entertainment"],
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#050810",
+  "theme_color": "#050810",
+  "categories": ["entertainment", "video"],
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
+    {
+      "src": "/icons/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
@@ -28,6 +41,36 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "My library",
+      "short_name": "Library",
+      "description": "Saved films and series",
+      "url": "/library",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "short_name": "Search",
+      "description": "Find something to watch",
+      "url": "/search",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
     }
   ]
 }
