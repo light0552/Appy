@@ -178,3 +178,40 @@ never committed.
 A SKIP is an environment limitation, never a pass. A FAIL names the selector,
 status, or copy that did not appear so the app source can be fixed; the script
 should pass again unchanged.
+
+---
+
+## Server-backed auth regression (`auth.mjs`)
+
+`auth.mjs` proves the security fix the household reported: **clearing cache and
+cookies must not reset screen passcodes or unlock a blocked screen.**
+
+```bash
+node scripts/qa/auth.mjs
+# or: $env:QA_BASE="http://localhost:8888"; node scripts/qa/auth.mjs
+```
+
+It expects the Netlify Dev server (functions + Blobs sandbox), default
+`http://localhost:8888`, because auth lives in `/api/auth`. Plain
+`npm run dev` has no functions and is not a valid target for this test.
+
+Covered, in order:
+
+1. seeded `1234` unlocks Sam;
+2. the admin sets Mellu to a new passcode through the UI;
+3. **a full CDP storage wipe** (cookies, localStorage, IndexedDB, sessionStorage)
+   then the new passcode still unlocks;
+4. the old `1234` is rejected after the wipe (attempts-left copy appears);
+5. three wrong attempts block the screen, and the block **survives another wipe**
+   (the correct passcode is still refused);
+6. the admin unblocks and restores `1234`;
+7. the restored passcode unlocks after another wipe;
+8. the admin can sign in again after a wipe.
+
+At the end the script restores Mellu to `1234` and clears any block via the
+admin API. It prints `N/N auth checks passed.` and exits non-zero on failure.
+
+The admin passcode and every screen passcode are stored server-side as scrypt
+hashes; the admin console reads them from an AES-GCM copy encrypted with a key
+derived from the admin password. Plain passcodes never appear in the client
+bundle or in the public status endpoint.

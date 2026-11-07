@@ -300,11 +300,16 @@
   color: var(--muted);
 }
 
-/* Scoped past the shared .display rule, which wins single-class ties. */
+/* Scoped past the shared .display rule, which wins single-class ties.
+   line-height 0.95 put the descender of the "g" below the padding box;
+   with background-clip: text the gradient is only painted inside that box,
+   so the tail of the glyph rendered transparent (looked cut). A normal
+   line box plus bottom padding keeps the paint area under the baseline. */
 .profiles-page .profiles-title {
   margin-top: 18px;
   font-size: clamp(42px, 10.5vw, 88px);
-  line-height: 0.95;
+  line-height: 1.05;
+  padding-bottom: 0.18em;
   letter-spacing: -0.055em;
   font-weight: 800;
   text-wrap: balance;

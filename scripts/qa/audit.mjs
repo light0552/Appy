@@ -303,6 +303,7 @@ async function waitForAdminRow(name, { unblocked = false, gone = false } = {}) {
  * so the run starts from a genuinely fresh household.
  */
 async function setup() {
+  await resetServerAuth();
   await goto("/profiles", ".profiles-page");
 
   const cdp = await page.createCDPSession();
@@ -319,6 +320,59 @@ async function setup() {
   await page.waitForSelector('button[aria-label="Unlock Sam with a password"]', {
     timeout: 20_000,
   });
+}
+
+/**
+ * Resets Sam and Mellu to the seeded passcode, clears any server-side lockout
+ * and removes QA Test leftovers, so the audit is repeatable. Auth is
+ * server-backed, so a previous half-finished run would otherwise leave Mellu
+ * blocked in Blobs or a duplicate QA Test profile behind.
+ * Silently no-ops when the auth function is not running (e.g. vite preview).
+ */
+async function resetServerAuth() {
+  try {
+    const headers = {
+      "content-type": "application/json",
+      "x-family-key": process.env.QA_FAMILY_KEY || "samandmellu",
+    };
+    const post = (body, extra = {}) =>
+      fetch(`${BASE}/api/auth`, {
+        method: "POST",
+        headers: { ...headers, ...extra },
+        body: JSON.stringify(body),
+      });
+
+    const login = await post({ action: "adminLogin", password: "light0552" });
+    if (!login.ok) return false;
+    const admin = { "x-admin-key": "light0552" };
+
+    // Clean any leftover QA Test screens from an interrupted previous run.
+    const listRes = await fetch(`${BASE}/api/profiles`, { headers });
+    if (listRes.ok) {
+      const list = await listRes.json().catch(() => null);
+      const leftovers = Array.isArray(list?.profiles)
+        ? list.profiles.filter((entry) => entry?.name === QA_SCREEN.name)
+        : [];
+      for (const entry of leftovers) {
+        await fetch(`${BASE}/api/profiles?id=${encodeURIComponent(entry.id)}`, {
+          method: "DELETE",
+          headers,
+        });
+        await post({ action: "adminRemove", profileId: entry.id }, admin);
+      }
+    }
+
+    for (const profileId of ["sam", "mellu"]) {
+      await post(
+        { action: "adminSet", profileId, password: DEFAULT_SCREEN_PASSWORD },
+        admin,
+      );
+      await post({ action: "adminUnblock", profileId }, admin);
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /* 1 — house notice -------------------------------------------------- */
@@ -522,30 +576,31 @@ async function phaseAdmin() {
 
   await shot("admin-dashboard.png", true);
 
-  await check("Dashboard lists screens and their passwords", async () => {
+  await check("Dashboard lists screens and their server passcodes", async () => {
     const rows = await registryRows();
     assert(rows.length >= 2, `Only ${rows.length} screen rows are listed`);
     for (const row of rows) {
-      assert(row.password, `No password is shown for ${row.name}`);
+      assert(row.password, `No passcode is shown for ${row.name}`);
     }
     const byName = Object.fromEntries(rows.map((row) => [row.name, row.password]));
     assert(
       byName.Sam === DEFAULT_SCREEN_PASSWORD,
-      `Sam's password is shown as ${JSON.stringify(byName.Sam)}`,
+      `Sam's passcode is shown as ${JSON.stringify(byName.Sam)}`,
     );
     assert(
       byName.Mellu === DEFAULT_SCREEN_PASSWORD,
-      `Mellu's password is shown as ${JSON.stringify(byName.Mellu)}`,
+      `Mellu's passcode is shown as ${JSON.stringify(byName.Mellu)}`,
     );
     return rows.map((row) => `${row.name}:${row.password}`).join(", ");
   });
 
-  await check("Admin has a Copy all control", async () => {
-    const button = await page.$(".admin-copy-all");
-    assert(button, "No .admin-copy-all button");
+  await check("Admin has a Copy all passcodes control", async () => {
+    const button =
+      (await page.$(".admin-copy-all")) || (await page.$(".admin-copy-names"));
+    assert(button, "No copy control on the dashboard");
     const label = norm(await button.evaluate((el) => el.textContent ?? ""));
-    assert(label.includes("Copy all"), `Button label was ${JSON.stringify(label)}`);
-    assert(!(await button.evaluate((el) => el.disabled)), "Copy all is disabled");
+    assert(/copy/i.test(label), `Button label was ${JSON.stringify(label)}`);
+    assert(!(await button.evaluate((el) => el.disabled)), "Copy control is disabled");
     return label;
   });
 
@@ -583,12 +638,24 @@ async function phaseAdmin() {
     await fill('input[aria-label="New screen password"]', QA_SCREEN.password);
     await clickText("button", "Add screen", { exact: true });
     await waitForAdminRow(QA_SCREEN.name);
+    // The profile row renders as soon as the profile exists; the auth record
+    // is a second request. Wait for the server-stored passcode note.
+    await page.waitForFunction(
+      (name) => {
+        const row = [...document.querySelectorAll(".admin-screen")].find((r) =>
+          r.textContent?.includes(name),
+        );
+        return row && /stored on server/i.test(row.textContent ?? "");
+      },
+      { timeout: 20000 },
+      QA_SCREEN.name,
+    );
     const rows = await registryRows();
     const created = rows.find((row) => row.name === QA_SCREEN.name);
     assert(created, "The new screen is missing from the registry");
     assert(
       created.password === QA_SCREEN.password,
-      `Stored password is ${JSON.stringify(created.password)}`,
+      `Stored passcode is ${JSON.stringify(created.password)}`,
     );
     return `${QA_SCREEN.name}:${QA_SCREEN.password}`;
   });

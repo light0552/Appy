@@ -8,6 +8,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import Sheet from "../components/Sheet";
 import { useSession } from "../lib/session";
+import type { ProfileAuthError } from "../lib/auth";
 import { initials } from "../lib/profiles";
 import type { ProfileMeta } from "../types";
 import "../styles/profiles.css";
@@ -18,6 +19,42 @@ interface UnlockSheet {
   error: string | null;
   pending: boolean;
   reveal: boolean;
+}
+
+/** Server-side lockout threshold; only used to word the copy. */
+const MAX_ATTEMPTS = 3;
+
+const UNREACHABLE_MESSAGE =
+  "Couldn’t reach the house server. Check the connection and try again.";
+const MISSING_MESSAGE =
+  "This screen has no passcode yet. Ask the admin to set one.";
+const BLOCKED_MESSAGE =
+  "This screen is blocked. Contact admin (the person who gave you access) to unblock it.";
+
+/**
+ * Maps an unlock failure to user-facing copy. The attempts-left sentence is
+ * exact on purpose: tests assert the "2 attempts left" / "1 attempt left"
+ * wording, so it must not be reworded.
+ */
+function unlockErrorMessage(
+  error: ProfileAuthError | undefined,
+  attemptsLeft: number,
+): string {
+  switch (error) {
+    case "unreachable":
+      return UNREACHABLE_MESSAGE;
+    case "missing":
+      return MISSING_MESSAGE;
+    case "blocked":
+      return BLOCKED_MESSAGE;
+    case "wrong_password":
+    default: {
+      const left = Math.max(0, Math.min(MAX_ATTEMPTS, Math.floor(attemptsLeft)));
+      return `Incorrect password. ${left} ${
+        left === 1 ? "attempt" : "attempts"
+      } left before this screen is blocked.`;
+    }
+  }
 }
 
 function Glyph({
@@ -177,6 +214,7 @@ export default function Profiles() {
 
   const submitPassword = async () => {
     if (!sheet || sheet.pending) return;
+    const { profile } = sheet;
     const password = sheet.password;
     if (!password) {
       setSheet((current) =>
@@ -186,31 +224,38 @@ export default function Profiles() {
     }
 
     setSheet((current) => (current ? { ...current, pending: true, error: null } : current));
-    const result = await unlockProfile(sheet.profile.id, password);
 
-    if (result.ok) {
-      setSheet(null);
-      navigate("/", { replace: true });
-      return;
+    try {
+      const result = await unlockProfile(profile.id, password);
+
+      if (result.ok) {
+        setSheet(null);
+        navigate("/", { replace: true });
+        return;
+      }
+
+      // Never clear what the user typed when the failure is reachability.
+      const keepPassword = result.error === "unreachable";
+      const message = unlockErrorMessage(result.error, result.attemptsLeft);
+
+      setSheet((current) =>
+        current
+          ? {
+              ...current,
+              password: keepPassword ? current.password : "",
+              pending: false,
+              reveal: keepPassword ? current.reveal : false,
+              error: message,
+            }
+          : current,
+      );
+    } catch {
+      // A thrown request (offline, DNS failure, timeout) is a reachability
+      // problem, not a bad password: never clear what the user typed.
+      setSheet((current) =>
+        current ? { ...current, pending: false, error: UNREACHABLE_MESSAGE } : current,
+      );
     }
-
-    const message = result.blocked
-      ? "This screen is blocked. Contact admin (the person who gave you access) to unblock it."
-      : `Incorrect password. ${result.attemptsLeft} ${
-          result.attemptsLeft === 1 ? "attempt" : "attempts"
-        } left before this screen is blocked.`;
-
-    setSheet((current) =>
-      current
-        ? {
-            ...current,
-            password: "",
-            pending: false,
-            reveal: false,
-            error: message,
-          }
-        : current,
-    );
   };
 
   if (!ready) {
@@ -611,8 +656,9 @@ export default function Profiles() {
                   type="submit"
                   className="btn btn-primary"
                   disabled={sheet.pending || !sheet.password}
+                  aria-busy={sheet.pending}
                 >
-                  {sheet.pending ? "Unlocking…" : "Unlock"}
+                  {sheet.pending ? "Checking…" : "Unlock"}
                 </button>
               </div>
             </form>

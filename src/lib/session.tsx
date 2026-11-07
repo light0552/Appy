@@ -53,6 +53,13 @@ type AddProfileResult =
   | { ok: true; profile: ProfileMeta }
   | { ok: false; error: string };
 
+/** Error surfaced when an admin-only action is attempted without a valid key. */
+function adminRequiredError(): Error {
+  const error = new Error("Admin sign-in required.") as Error & { code: string };
+  error.code = "admin_required";
+  return error;
+}
+
 export interface SessionValue {
   ready: boolean;
   profiles: ProfileMeta[];
@@ -64,7 +71,7 @@ export interface SessionValue {
   chooseProfile: (id: string) => Promise<void>;
   unlockProfile: (id: string, password: string) => Promise<ProfileAuthResult>;
   signOut: () => void;
-  loginAdmin: (password: string) => boolean;
+  loginAdmin: (password: string) => Promise<boolean>;
   logoutAdmin: () => void;
   /** Admin-only screen management. Nothing else may add/remove/rename a screen. */
   adminSetProfilePassword: (id: string, password: string) => Promise<void>;
@@ -248,7 +255,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await kvSet(KEY_PENDING_CREATES, [...pendingCreates.current]);
       await kvSet(KEY_PENDING_DELETES, [...pendingDeletes.current]);
 
-      const nextAuth = await auth.ensureAuthSeeds(withMeta.map((profile) => profile.id));
+      const nextAuth = auth.hasAdminSession()
+        ? await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)).catch(() => auth.ensureAuthSeeds(withMeta.map((profile) => profile.id)))
+        : await auth.ensureAuthSeeds(withMeta.map((profile) => profile.id));
       if (!alive) return;
       setAuthMap(nextAuth);
 
@@ -349,7 +358,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Apply queued offline renames/recolours before this list is persisted.
       const withMeta = await applyPendingMeta(working);
       await applyProfiles(withMeta);
-      setAuthMap(await auth.ensureAuthSeeds(withMeta.map((profile) => profile.id)));
+      setAuthMap(
+        auth.hasAdminSession()
+          ? await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)).catch(() => auth.ensureAuthSeeds(withMeta.map((profile) => profile.id)))
+          : await auth.ensureAuthSeeds(withMeta.map((profile) => profile.id)),
+      );
     };
 
     const onVisible = () => void refresh();
@@ -506,28 +519,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /* Admin / screen access                                             */
   /* ---------------------------------------------------------------- */
 
-  const loginAdmin = useCallback((password: string) => {
-    const ok = auth.verifyAdminPassword(password);
-    if (ok) {
-      auth.setAdminSession(true);
-      setAdminAuthed(true);
+  const loginAdmin = useCallback(async (password: string): Promise<boolean> => {
+    const ok = await auth.verifyAdminPassword(password);
+    if (!ok) return false;
+
+    // The password doubles as the x-admin-key for this tab only.
+    auth.setAdminKey(password);
+
+    // One-time push of passwords that only ever lived in this device's old
+    // records. Best-effort: a failure must not block a valid sign-in.
+    try {
+      await auth.migrateLegacyAuth();
+    } catch {
+      /* migration retries after a later sign-in */
     }
-    return ok;
+
+    // Load the readable passcodes BEFORE flipping to the dashboard, so the
+    // registry never renders a frame of "Unavailable".
+    try {
+      setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
+    } catch {
+      /* keep the status-only map; the registry will fill in on the next refresh */
+    }
+    setAdminAuthed(true);
+    return true;
   }, []);
 
   const logoutAdmin = useCallback(() => {
-    auth.setAdminSession(false);
+    auth.setAdminKey(null);
     setAdminAuthed(false);
   }, []);
 
   const adminSetProfilePassword = useCallback(async (id: string, password: string) => {
     const trimmed = password.trim();
     if (!trimmed) return;
-    setAuthMap(await auth.adminSetPassword(id, trimmed));
+    await auth.adminSetPassword(id, trimmed);
+    setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
   }, []);
 
   const adminUnblockProfile = useCallback(async (id: string) => {
-    setAuthMap(await auth.adminUnblock(id));
+    await auth.adminUnblock(id);
+    setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
   }, []);
 
   /**
@@ -566,14 +598,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       color: string | undefined,
       password: string,
     ): Promise<AddProfileResult> => {
+      // Check before creating anything: the screen would otherwise be left on
+      // the server with no password the admin asked for.
+      if (!auth.hasAdminSession()) throw adminRequiredError();
+
       const result = await addProfile(name, color);
       if (result.ok) {
-        setAuthMap(
-          await auth.adminAddRecord(
-            result.profile.id,
-            password.trim() || auth.DEFAULT_SCREEN_PASSWORD,
-          ),
+        await auth.adminAddRecord(
+          result.profile.id,
+          password.trim() || auth.DEFAULT_SCREEN_PASSWORD,
         );
+        setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
       }
       return result;
     },
@@ -582,8 +617,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const adminDeleteProfile = useCallback(
     async (id: string) => {
+      // Same ordering concern: removing the screen first and only then failing
+      // the auth cleanup would leave a screen whose password nobody can manage.
+      if (!auth.hasAdminSession()) throw adminRequiredError();
+
       await deleteProfile(id);
-      setAuthMap(await auth.adminRemoveRecord(id));
+      await auth.adminRemoveRecord(id);
+      setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
     },
     [deleteProfile],
   );

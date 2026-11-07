@@ -924,14 +924,14 @@
   flex-wrap: wrap;
 }
 
-.admin-copy-all {
+.admin-copy-names {
   min-height: 44px;
   gap: 7px;
   font-size: 12.5px;
   font-weight: 700;
 }
 
-.admin-copy-all.is-copied {
+.admin-copy-names.is-copied {
   color: var(--accent-bright);
   border-color: var(--accent-line);
 }
@@ -1248,11 +1248,11 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 9px;
+  gap: 8px;
   padding: 12px 14px;
-  border: 1px dashed var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--bg) 40%, transparent);
+  background: color-mix(in srgb, var(--surface-3) 30%, transparent);
 }
 
 .admin-password-line {
@@ -1277,14 +1277,78 @@
   text-shadow: 0 0 14px color-mix(in srgb, var(--accent-glow) 70%, transparent);
 }
 
+/* The passcode cannot be read back — the mask is the point, so it is
+   rendered as a deliberate sealed value rather than a blank. */
+.admin-password-value--masked {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 96px;
+  padding: 6px 10px 6px 14px;
+  letter-spacing: 0.32em;
+  background:
+    linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--accent) 18%, transparent) 0%,
+      var(--accent-soft) 100%
+    ),
+    var(--surface-2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 18px color-mix(in srgb, var(--accent-glow) 32%, transparent);
+}
+
+.admin-password-value--masked.is-unset {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--muted-2);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.admin-password-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-family: var(--admin-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-password-note.is-unset {
+  color: var(--muted);
+}
+
+.admin-password-note-dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.admin-password-note.is-unset .admin-password-note-dot {
+  background: var(--muted-2);
+  box-shadow: none;
+}
+
+/* Copy affordance for a readable server-stored passcode. */
 .admin-copy-btn {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   flex: 0 0 auto;
   border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
+  border-radius: 10px;
   background: color-mix(in srgb, var(--surface-2) 76%, transparent);
   color: var(--muted);
   transition:
@@ -1294,14 +1358,30 @@
     transform var(--dur-fast) var(--ease);
 }
 
+.admin-copy-btn:hover {
+  color: var(--accent-bright);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
 .admin-copy-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.94);
 }
 
 .admin-copy-btn.is-copied {
   color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
+}
+
+.admin-password-value.is-unset {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--muted-2);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  box-shadow: none;
 }
 
 /* Row actions ----------------------------------------------------- */
@@ -1495,12 +1575,6 @@
 
   .admin-screen--blocked:hover {
     border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
-  }
-
-  .admin-copy-btn:hover {
-    color: var(--accent-bright);
-    border-color: var(--accent-line);
-    background: var(--accent-soft);
   }
 
   .admin-input-action:hover {

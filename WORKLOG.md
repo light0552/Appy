@@ -479,12 +479,11 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 - `preview.mjs` — production-build preview smoke test (25 checks + 16 screenshots).
 - `visual.mjs` — 34-shot visual QA across 360/390/768/1440 (overflow, tap targets, fold).
 
-**Final verification (2026-11-08):**
-- `npx tsc --noEmit` clean; `npm run build` green (10 precache entries).
-- `scripts/qa/audit.mjs` — **41/41 PASS**.
-- Flow e2e — **41/41 PASS** (3-strike block, admin add/set/remove/unblock, notice one-time ack, movie no-Continue, TV episode controls).
-- `scripts/qa/preview.mjs` — **25/25 PASS** against the production build (SW, manifest, deep links, admin, watch).
-- `scripts/qa/visual.mjs` — **0 blockers / 0 major / 0 minor** at 360x640, 390x844, 768x1024, 1440x950 (the only INFO is the intentional absence of Previous on S1E1).
-- Netlify config validated with `netlify dev --offline`: `/api/*` → `/.netlify/functions/:splat`, function answers 200/400/403/405/404 correctly, SPA fallback intact, security + cache headers set.
-- **No git, no Netlify deploy, no push performed.**
-- Dev server left running on **http://localhost:5173** (LAN: http://192.168.0.42:5173).
+**Final verification (2026-11-08, server-backed auth):**
+- `npx tsc --noEmit` clean; `npm run build` green.
+- `scripts/qa/auth.mjs` — **10/10 PASS**, including: new passcode survives a full cache/cookie/session/IndexedDB wipe; old 1234 is rejected after the wipe; a 3-strike block survives a wipe; admin can unblock/restore; admin can still sign in after a wipe.
+- `scripts/qa/audit.mjs` — **41/41 PASS** against Netlify Dev (server auth + functions + local Blobs).
+- `scripts/qa/visual.mjs` — **0 blockers / 0 major / 0 minor** at 360x640, 390x844, 768x1024, 1440x950; the clipped "g" in "Who's watching?" is fixed (line-height 1.05 + 0.18em paint padding).
+- Admin console reads every screen passcode from the server (AES-GCM copy keyed from the admin password); the public status endpoint never returns passcodes, and the bundle contains no admin password.
+- `/api/auth` is a new Netlify Function at `config.path = "/api/auth"`; `/api/*` already redirects to `/.netlify/functions/:splat`. No new environment variables are required.
+- **No git, no Netlify deploy, no push performed.** Local test: `netlify dev --offline --port 8888` (LAN `http://192.168.0.42:8888`).

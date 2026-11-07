@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   DEFAULT_SCREEN_PASSWORD,
   MAX_FAILED_ATTEMPTS,
+  MAX_SCREEN_PASSWORD_LENGTH,
+  MIN_SCREEN_PASSWORD_LENGTH,
   credentialsFrom,
   type AdminCredential,
 } from "../lib/auth";
@@ -122,6 +124,39 @@ function statusLabel(credential: AdminCredential): string {
   return "Active";
 }
 
+/**
+ * Turns a thrown admin action into a short line the console can show.
+ * Transport failures get a plain-language message; anything else keeps its
+ * own text when it looks presentable, and otherwise falls back.
+ */
+function failureText(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") {
+      switch (code) {
+        case "invalid_password":
+          return `Passcodes need ${MIN_SCREEN_PASSWORD_LENGTH} to ${MAX_SCREEN_PASSWORD_LENGTH} characters.`;
+        case "admin_required":
+          return "Admin sign-in expired. Lock admin and sign in again.";
+        case "not_found":
+          return "That screen is no longer on the server.";
+        case "profile_limit":
+          return "The screen limit is already reached.";
+        case "forbidden":
+          return "The household key was rejected.";
+        default:
+          break;
+      }
+    }
+    const message = error.message.trim();
+    if (/fetch|network|unreachable|offline|timeout/i.test(message)) {
+      return "Can't reach the server. Try again.";
+    }
+    if (message && message.length <= 140) return message;
+  }
+  return fallback;
+}
+
 function ScreenRow({
   credential,
   index,
@@ -140,19 +175,16 @@ function ScreenRow({
     patch: { name?: string; color?: string },
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
-  const [password, setPassword] = useState(credential.password);
+  const [password, setPassword] = useState("");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pending, setPending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(credential.name);
   const [draftColor, setDraftColor] = useState(credential.color);
   const [renameError, setRenameError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPassword(credential.password);
-  }, [credential.password]);
 
   useEffect(() => {
     setDraftName(credential.name);
@@ -178,6 +210,8 @@ function ScreenRow({
         return;
       }
       setEditing(false);
+    } catch (error) {
+      setRenameError(failureText(error, "Couldn't rename that screen."));
     } finally {
       setPending(false);
     }
@@ -194,30 +228,14 @@ function ScreenRow({
     if (!password.trim() || pending) return;
     setPending(true);
     setSaved(false);
+    setActionError(null);
     try {
       await onSetPassword(credential.profileId, password);
+      setPassword("");
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1800);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const unblock = async () => {
-    if (pending) return;
-    setPending(true);
-    try {
-      await onUnblock(credential.profileId);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const remove = async () => {
-    if (pending) return;
-    setPending(true);
-    try {
-      await onRemove(credential.profileId);
+    } catch (error) {
+      setActionError(failureText(error, "Couldn't save that passcode."));
     } finally {
       setPending(false);
     }
@@ -230,6 +248,32 @@ function ScreenRow({
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       /* Clipboard can be unavailable in private windows; the value stays visible. */
+    }
+  };
+
+  const unblock = async () => {
+    if (pending) return;
+    setPending(true);
+    setActionError(null);
+    try {
+      await onUnblock(credential.profileId);
+    } catch (error) {
+      setActionError(failureText(error, "Couldn't unblock that screen."));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const remove = async () => {
+    if (pending) return;
+    setPending(true);
+    setActionError(null);
+    try {
+      await onRemove(credential.profileId);
+    } catch (error) {
+      setActionError(failureText(error, "Couldn't remove that screen."));
+    } finally {
+      setPending(false);
     }
   };
 
@@ -328,7 +372,7 @@ function ScreenRow({
                   ? `Locked after ${MAX_FAILED_ATTEMPTS} failed attempts — unblock to restore access`
                   : warning
                     ? "Wrong passcodes are counting toward the auto-lock"
-                    : "Ready to unlock with the passcode below"}
+                    : "Ready to unlock with its household passcode"}
               </p>
               <div className="admin-strikes" aria-label={`${credential.failedAttempts} of ${MAX_FAILED_ATTEMPTS} failed attempts`}>
                 {Array.from({ length: MAX_FAILED_ATTEMPTS }, (_, i) => {
@@ -352,16 +396,31 @@ function ScreenRow({
           Passcode
         </span>
         <div className="admin-password-line">
-          <code className="admin-password-value">{credential.password}</code>
-          <button
-            type="button"
-            className={`admin-copy-btn${copied ? " is-copied" : ""}`}
-            aria-label={`Copy password for ${credential.name}`}
-            onClick={() => void copyPassword()}
+          <code
+            className={`admin-password-value${credential.password ? "" : " is-unset"}`}
+            aria-label={
+              credential.password
+                ? `Passcode for ${credential.name}`
+                : `No passcode could be read for ${credential.name}`
+            }
           >
-            {copied ? CheckIcon : CopyIcon}
-          </button>
+            {credential.password || "Unavailable"}
+          </code>
+          {credential.password && (
+            <button
+              type="button"
+              className={`admin-copy-btn${copied ? " is-copied" : ""}`}
+              aria-label={`Copy password for ${credential.name}`}
+              onClick={() => void copyPassword()}
+            >
+              {copied ? CheckIcon : CopyIcon}
+            </button>
+          )}
         </div>
+        <p className={`admin-password-note${credential.hasPassword ? "" : " is-unset"}`}>
+          <span className="admin-password-note-dot" aria-hidden="true" />
+          {credential.hasPassword ? "Stored on server" : "No passcode on server"}
+        </p>
       </div>
 
       <div className="admin-screen-actions">
@@ -377,8 +436,10 @@ function ScreenRow({
               onChange={(event) => {
                 setPassword(event.target.value);
                 setSaved(false);
+                setActionError(null);
               }}
               maxLength={64}
+              placeholder="Enter a new passcode"
               autoComplete="off"
               spellCheck={false}
               aria-label={`New password for ${credential.name}`}
@@ -433,6 +494,11 @@ function ScreenRow({
             </button>
           )}
         </div>
+        {actionError && (
+          <p className="sheet-error" role="alert">
+            {actionError}
+          </p>
+        )}
       </div>
     </li>
   );
@@ -458,6 +524,7 @@ export default function Admin() {
   const [adminPassword, setAdminPassword] = useState("");
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginPending, setLoginPending] = useState(false);
 
   const [name, setName] = useState("");
   const [password, setPassword] = useState(DEFAULT_SCREEN_PASSWORD);
@@ -469,7 +536,7 @@ export default function Admin() {
 
   const [query, setQuery] = useState("");
   const [blockedOnly, setBlockedOnly] = useState(false);
-  const [copiedAll, setCopiedAll] = useState(false);
+  const [copiedNames, setCopiedNames] = useState(false);
 
   if (!ready) {
     return (
@@ -522,16 +589,28 @@ export default function Admin() {
           </div>
 
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              const ok = loginAdmin(adminPassword);
-              if (!ok) {
-                setLoginError("Incorrect admin password.");
-                setAdminPassword("");
-                return;
-              }
+              if (loginPending || !adminPassword) return;
+              setLoginPending(true);
               setLoginError(null);
-              setAdminPassword("");
+              try {
+                const ok = await loginAdmin(adminPassword);
+                if (!ok) {
+                  setLoginError(
+                    navigator.onLine === false
+                      ? "You're offline. Check the connection and try again."
+                      : "Incorrect admin password.",
+                  );
+                  setAdminPassword("");
+                  return;
+                }
+                setAdminPassword("");
+              } catch (error) {
+                setLoginError(failureText(error, "Couldn't sign in. Try again."));
+              } finally {
+                setLoginPending(false);
+              }
             }}
           >
             <label className="admin-field-label" htmlFor="admin-password">
@@ -576,16 +655,21 @@ export default function Admin() {
                 {ArrowLeftIcon}
                 Back to screens
               </button>
-              <button type="submit" className="btn btn-primary" disabled={!adminPassword}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!adminPassword || loginPending}
+                aria-busy={loginPending}
+              >
                 {ShieldIcon}
-                Authenticate
+                {loginPending ? "Authenticating…" : "Authenticate"}
               </button>
             </div>
           </form>
 
           <div className="admin-console-foot">
             <span>LH·CTRL / V1</span>
-            <span>LOCAL DEVICE · ENCRYPTED SESSION</span>
+            <span>SERVER VERIFIED · HASHED PASSCODES</span>
           </div>
         </div>
       </div>
@@ -612,15 +696,15 @@ export default function Admin() {
         ? { key: "offline", label: "OFFLINE" }
         : { key: "online", label: "SYSTEM ONLINE" };
 
-  /** Copies every screen's name and password as plain text for the family. */
-  const copyAllPasswords = async () => {
+  /** Copies every registered screen name, one per line. */
+  const copyAllPasscodes = async () => {
     const text = credentials
-      .map((credential) => `${credential.name}: ${credential.password}`)
+      .map((credential) => `${credential.name}: ${credential.password || "unavailable"}`)
       .join("\n");
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedAll(true);
-      window.setTimeout(() => setCopiedAll(false), 1800);
+      setCopiedNames(true);
+      window.setTimeout(() => setCopiedNames(false), 1800);
     } catch {
       /* Clipboard can be unavailable in private windows. */
     }
@@ -641,6 +725,8 @@ export default function Admin() {
       setPassword(DEFAULT_SCREEN_PASSWORD);
       setColor(DEFAULT_ADD_COLOR);
       setAddNotice(`Added ${result.profile.name}.`);
+    } catch (error) {
+      setAddError(failureText(error, "Couldn't add that screen. Try again."));
     } finally {
       setAddPending(false);
     }
@@ -683,8 +769,13 @@ export default function Admin() {
         </div>
       </header>
 
-      {/* The global offline banner already reports sync state; the admin
-          masthead carries the SYNC FAULT pill, so no duplicate inline line. */}
+      {/* Routine sync state lives in the masthead pill; an actual fault is
+          surfaced here, inline, so a failed admin action has visible context. */}
+      {syncStatus.error && (
+        <p className="admin-sync-error tiny" role="status">
+          {syncStatus.error}
+        </p>
+      )}
 
       <section className="admin-telemetry" aria-label="Household summary">
         <div className="admin-telemetry-head">
@@ -721,7 +812,7 @@ export default function Admin() {
         </div>
         <p className="admin-posture">
           {ShieldIcon}
-          {MAX_FAILED_ATTEMPTS}-STRIKE AUTO-LOCK ENABLED · PASSCODES STORED ON THIS DEVICE
+          {MAX_FAILED_ATTEMPTS}-STRIKE AUTO-LOCK ENABLED · PASSCODES HASHED ON THE SERVER
         </p>
       </section>
 
@@ -820,17 +911,20 @@ export default function Admin() {
           <div className="admin-card-title-wrap">
             <span className="admin-module-tag">02 / REGISTRY</span>
             <h2 id="admin-screens-title" className="admin-card-title">Screens</h2>
-            <p className="tiny muted admin-card-sub">Passcodes are visible only in this console.</p>
+            <p className="tiny muted admin-card-sub">
+              Passcodes are stored on the server. Only this console can read or
+              reset them.
+            </p>
           </div>
           <div className="admin-list-tools">
             <button
               type="button"
-              className={`btn btn-sm btn-secondary admin-copy-all${copiedAll ? " is-copied" : ""}`}
-              onClick={() => void copyAllPasswords()}
+              className={`btn btn-sm btn-secondary admin-copy-names admin-copy-all${copiedNames ? " is-copied" : ""}`}
+              onClick={() => void copyAllPasscodes()}
               disabled={credentials.length === 0}
             >
-              {copiedAll ? CheckIcon : CopyIcon}
-              {copiedAll ? "Copied" : "Copy all"}
+              {copiedNames ? CheckIcon : CopyIcon}
+              {copiedNames ? "Copied" : "Copy all passcodes"}
             </button>
             <div className="admin-filter-wrap">
               <span className="admin-filter-icon" aria-hidden="true">{SearchIcon}</span>

@@ -103,6 +103,8 @@ Playback position cannot be read back from a cross-origin player, so "Continue" 
 looks identical to one that worked, so the player offers a server switch after 6 seconds
 instead of a spinner that can hang forever.
 
-Screen passwords are stored in the browser's own IndexedDB on the household's devices —
-this is a family lock, not an identity system. Anyone holding an unlocked device can read
-them from devtools.
+Screen passcodes are stored in **Netlify Blobs** (`/api/auth`), as scrypt hashes. The
+networked app verifies them server-side, so clearing cache/cookies only ends the local
+session — it cannot reset a passcode or release a 3-strike lock. The admin console can
+read them because the server also keeps an AES-GCM copy encrypted with a key derived
+from the admin password; the public status endpoint never returns passcodes.
