@@ -272,18 +272,28 @@ async function rowPassword(name, target = adminPage) {
 async function wipeDevice(target = page) {
   const cdp = await target.createCDPSession();
   try {
-    await cdp.send("Storage.clearDataForOrigin", { origin: ORIGIN, storageTypes: "all" });
+    // Only the credential-bearing stores. Clearing the service worker on a
+    // production origin fires controllerchange, which can navigate the page
+    // mid-evaluate; the security claim is about cookies/localStorage/IndexedDB.
+    await cdp.send("Storage.clearDataForOrigin", {
+      origin: ORIGIN,
+      storageTypes: "cookies,local_storage,indexeddb",
+    });
   } finally {
     await cdp.detach().catch(() => {});
   }
-  await target.evaluate(() => {
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      /* ignore */
-    }
-  });
+  await target
+    .evaluate(() => {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {
+        /* ignore */
+      }
+    })
+    .catch(() => {
+      /* a service-worker reload can destroy the context; navigation below recovers */
+    });
   await goto(target, "/", ".profiles-page");
   await dismissNotice(target);
 }
