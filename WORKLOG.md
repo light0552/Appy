@@ -519,7 +519,7 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 - **Before any future deploy:** set `AUTH_SECRET` in Netlify env (same value) or admin passcode readback falls back to a local-dev key. Do not rotate it without resetting screens.
 
 **Verification (2026-11-08, local Netlify Dev `http://localhost:8888`, LAN `http://192.168.0.42:8888`):**
-- `scripts/qa/features.mjs` (new) — **39/39 PASS**: OTP creation + forced change + admin readback + ref privacy; self-change + admin readback of the user-set pass + cooldown after a full cookie/localStorage/IndexedDB wipe; per-screen kick on Home and mid-watch; multi-select kick of two live sessions; admin ref edit; history single/multi/select-all tombstone removal + sync to a wiped device; admin passcode reset kicks the live screen and a new OTP reset completes.
+- `scripts/qa/features.mjs` (new) — **39/39 PASS** locally and **39/39 PASS against production** (https://lighthook.netlify.app): OTP creation + forced change + admin readback + ref privacy; self-change + admin readback of the user-set pass + cooldown after a full cookie/localStorage/IndexedDB wipe; per-screen kick on Home and mid-watch; multi-select kick of two live sessions; admin ref edit; history single/multi/select-all tombstone removal + sync to a wiped device; admin passcode reset kicks the live screen and a new OTP reset completes.
 - `scripts/qa/auth.mjs` — **10/10 PASS**.
 - `scripts/qa/persist.mjs` — **10/10 PASS** (cookie survives closes; cache-only clear keeps it; cookie clear asks again; sign-out revokes).
 - `scripts/qa/audit.mjs` — **41/41 PASS**.
@@ -528,4 +528,8 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 - `npx tsc --noEmit` clean; `npm run build` green; no secret in `dist`.
 - Local household left clean: only Sam/Mellu, both passcode `1234`, no ref names, no OTP state; every temporary QA screen removed. Server left running on 8888 (Vite 5173 behind Netlify Dev).
 
-**Not done (deliberately):** no `git add`, commit, push, or Netlify deploy. All feature work is uncommitted in the working tree.
+**Deployed (2026-11-08):**
+- `AUTH_SECRET` set in the Netlify site env (all contexts) before deploy.
+- Feature commit `57e2123`; QA portability fix `17113fa`; both deployed by `.github/workflows/deploy.yml` and green.
+- Live https://lighthook.netlify.app verified: GOAT + Sameer retained their passcodes (the legacy admin-password encryption migrated to `AUTH_SECRET` on the first admin read), remain unblocked, with no OTP state or ref names; every temporary QA screen was removed. A final 8/8 live smoke re-proved OTP → forced change → admin readback → kick → re-entry on the deployed functions.
+- Existing household sessions are preserved by the legacy-token epoch migration; open tabs will hard-reload themselves via the update watcher.
