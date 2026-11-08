@@ -45,6 +45,8 @@ export interface ProfileMeta {
 
 export interface ProfilePrefs {
   preferredProvider?: string;
+  /** One-time reset marker for provider-list changes; see PROVIDER_PREFS_VERSION. */
+  providerPrefsVersion?: number;
   theme?: "dark" | "amoled";
 }
 

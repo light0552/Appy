@@ -4,7 +4,9 @@ import Player from "../components/Player";
 import ServerChips from "../components/ServerChips";
 import {
   availableProviders,
+  DEFAULT_PROVIDER_ID,
   preferredUrl,
+  PROVIDER_PREFS_VERSION,
   type ProviderOption,
 } from "../lib/providers";
 import { getSeason, getTitle, posterUrl } from "../lib/tmdb";
@@ -217,7 +219,23 @@ export default function Watch() {
   );
 
   const options = useMemo(() => availableProviders(mediaRef), [mediaRef]);
-  const preferred = preferredUrl(mediaRef, session.state.prefs.preferredProvider);
+  const providerPrefsVersion = session.state.prefs.providerPrefsVersion ?? 0;
+  // Ignore a saved server from before a provider-list change. The migration
+  // below writes the new default once; after that a deliberate user choice is
+  // honored again.
+  const preferred =
+    providerPrefsVersion >= PROVIDER_PREFS_VERSION
+      ? preferredUrl(mediaRef, session.state.prefs.preferredProvider)
+      : null;
+
+  const setPrefs = session.setPrefs;
+  useEffect(() => {
+    if (providerPrefsVersion >= PROVIDER_PREFS_VERSION) return;
+    setPrefs({
+      providerPrefsVersion: PROVIDER_PREFS_VERSION,
+      preferredProvider: DEFAULT_PROVIDER_ID,
+    });
+  }, [providerPrefsVersion, setPrefs]);
 
   const [probeWinner, setProbeWinner] = useState<string | null>(null);
   const interactedRef = useRef(false);

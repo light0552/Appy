@@ -41,6 +41,7 @@ interface HistoryItem extends Stamped {
 
 interface ProfilePrefs {
   preferredProvider?: string;
+  providerPrefsVersion?: number;
   theme?: "dark" | "amoled";
   [key: string]: unknown;
 }

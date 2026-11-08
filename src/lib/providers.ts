@@ -27,6 +27,14 @@ import type { MediaRef } from "../types";
  * 2026-11-08: the ripstream sidecar (and the whole ad-free "own player"
  * path) is deleted, so Vidsrc is no longer raced anywhere. It stays hidden
  * from the client chips — the household watches the provider frames.
+ *
+ * 2026-11-08 (playback outage): VidLink renders a 0:00 player for newer
+ * titles (confirmed on The Odyssey, TMDB 1368337), VidFast answers 403 and
+ * Videasy's TLS is broken. VidSpark (the source ssflix.pro serves in its
+ * primary frame) plays that title, Fight Club and Game of Thrones S1E1 with
+ * real durations, answers 200 with no X-Frame-Options/CSP, and works with no
+ * sandbox. It is now the first client provider; VidLink stays as the backup
+ * catalogue.
  */
 export interface ProviderDefinition {
   id: string;
@@ -45,9 +53,15 @@ function seasonEpisode(ref: MediaRef): string {
 
 export const PROVIDERS: readonly ProviderDefinition[] = [
   {
+    id: "vidspark",
+    name: "VidSpark",
+    hint: "Plays newest titles",
+    movie: (ref) => `https://vidspark.to/movie/${ref.tmdbId}`,
+    tv: (ref) => `https://vidspark.to/tv/${ref.tmdbId}/${seasonEpisode(ref)}`,
+  },  {
     id: "vidlink",
     name: "VidLink",
-    hint: "Plays most reliably",
+    hint: "Backup catalogue",
     movie: (ref) => `https://vidlink.pro/movie/${ref.tmdbId}`,
     tv: (ref) => `https://vidlink.pro/tv/${ref.tmdbId}/${seasonEpisode(ref)}`,
   },
@@ -78,6 +92,16 @@ export const PROVIDERS: readonly ProviderDefinition[] = [
     tv: (ref) => `https://player.videasy.to/tv/${ref.tmdbId}/${seasonEpisode(ref)}`,
   },
 ];
+
+/**
+ * Bumped when the client provider list changes materially. Watch uses this to
+ * ignore a saved preferred server from before the change and reset it to
+ * `DEFAULT_PROVIDER_ID` once. Version 2 accompanies the VidSpark switch
+ * (2026-11-08) so stale `vidfast`/`vidlink` preferences cannot keep a broken
+ * player first.
+ */
+export const PROVIDER_PREFS_VERSION = 2;
+export const DEFAULT_PROVIDER_ID = "vidspark";
 
 /**
  * Feature policy for the player frame: playback permissions only. With no
@@ -113,6 +137,7 @@ export function providerById(id: string | undefined): ProviderDefinition | undef
 
 export function preferredUrl(ref: MediaRef, preferredProvider?: string): string | null {
   const provider = providerById(preferredProvider);
-  if (!provider) return null;
+  // A saved preference for a hidden/retired provider must not resurrect it.
+  if (!provider || provider.hidden) return null;
   return buildUrl(provider, ref);
 }

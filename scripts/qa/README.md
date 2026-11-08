@@ -144,10 +144,13 @@ It asserts, end to end:
 4. **Kick** — per-row kick returns an active Home screen to the picker with a
    notice; a kick also stops `/watch` mid-movie; multi-select kicks invalidate
    two independent sessions at once and clear the selection.
-5. **History** — per-item multi-select and Select all write tombstones, the
+5. **Playback** — VidSpark is the default, plays The Odyssey by TMDB id and a
+   Game of Thrones episode with real durations, and a stale saved server
+   (`vidfast`) is ignored and migrated once to VidSpark (`providerPrefsVersion`).
+6. **History** — per-item multi-select and Select all write tombstones, the
    server state drops the live entries, and a wiped device pulls the removal
    back down (Home loses Continue watching).
-6. **Diagnostics** — no uncaught page errors.
+7. **Diagnostics** — no uncaught page errors.
 
 Environment overrides: `QA_BASE` (default `http://localhost:5173`),
 `QA_API` (default `http://localhost:8888`), `QA_CHROME`, `QA_PROFILE`,

@@ -533,3 +533,27 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 - Feature commit `57e2123`; QA portability fix `17113fa`; both deployed by `.github/workflows/deploy.yml` and green.
 - Live https://lighthook.netlify.app verified: GOAT + Sameer retained their passcodes (the legacy admin-password encryption migrated to `AUTH_SECRET` on the first admin read), remain unblocked, with no OTP state or ref names; every temporary QA screen was removed. A final 8/8 live smoke re-proved OTP → forced change → admin readback → kick → re-entry on the deployed functions.
 - Existing household sessions are preserved by the legacy-token epoch migration; open tabs will hard-reload themselves via the update watcher.
+
+---
+
+## 14. Playback outage — VidSpark primary + one-time provider-pref migration (2026-11-08)
+
+**Symptom:** movies showed a 0:00 player (no source) on local and live, while ssflix.pro played the same title.
+
+**Root cause:** the live profiles had stale saved servers — GOAT `preferredProvider = vidfast`, Sameer `preferredProvider = vidlink` — and those override the default. VidFast now answers 403, Videasy has a broken TLS cert, and VidLink loads a 0:00 player for newer titles (confirmed with The Odyssey, TMDB 1368337). ssflix's primary frame uses **VidSpark**, which had the full 2h53m source.
+
+**Fix:**
+- `src/lib/providers.ts` — added **VidSpark** (`https://vidspark.to/movie/{tmdbId}`, `/tv/{tmdbId}/{season}/{episode}`) as the first client provider; VidLink is the backup catalogue. Verified frameable, no sandbox, real durations for The Odyssey, Fight Club and Game of Thrones S1E1.
+- `providerPrefsVersion: 2` — Watch ignores a saved preferred server from before the change and writes VidSpark once. `mergeStates` now lets the higher prefs version win wholesale, so an old device pushing `vidfast`/`vidlink` cannot undo the migration on the next pull.
+- `preferredUrl` no longer honors a saved hidden provider (Vidsrc).
+- `scripts/qa/features.mjs` — added playback checks: VidSpark plays the movie and TV episode with a real duration, and a remote `vidfast` preference is ignored and migrated to `vidspark` on the server.
+- `scripts/qa/README.md` + this section updated.
+
+**Local verification:** `npx tsc --noEmit` clean; `features.mjs` **42/42 PASS**, including `VidSpark / 2:52:35` for The Odyssey, a real TV duration, and `version=2 pref=vidspark` after seeding a stale `vidfast` preference. Build green.
+
+**Deployment (2026-11-08):**
+- Netlify account moved to **LIGHTHOOK** (`sameerxp10180@gmail.com`). New site **`lighthook`** (`3266c450-5b47-40ad-aa45-0ce3ccce597e`, https://lighthook.netlify.app), freshly created under that account.
+- Fresh Blobs: the new site starts with the default admin (`light0552`) and the seeded **Sam / Mellu** profiles; GOAT/Sameer and their history are not migrated (old site remains untouched on the previous account at `backuplighthook.netlify.app`).
+- New site env set: `FAMILY_KEY`, `VITE_FAMILY_KEY`, `VITE_TMDB_TOKEN`, `VITE_TMDB_API_KEY`, `AUTH_SECRET`, `NODE_VERSION=20`.
+- `.github/workflows/deploy.yml` retired (deleted) so a Git push cannot deploy to the old account. Netlify's own Git integration on `lighthook` now builds and publishes every push to `main`.
+- This playback fix ships in one batched commit and one Netlify Git-integration deploy.

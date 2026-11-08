@@ -351,6 +351,37 @@ async function waitForServerHistory(profileId, predicate, timeout = 15000) {
   return last;
 }
 
+/** Reads the player frame until it reports a real duration (h:mm:ss). */
+async function waitForProviderDuration(prefix, timeout = 30000) {
+  const startedAt = Date.now();
+  let text = "";
+  while (Date.now() - startedAt < timeout) {
+    for (const frame of page.frames()) {
+      if (!frame.url().startsWith(prefix)) continue;
+      try {
+        text = await frame.evaluate(() => document.body?.innerText ?? "");
+      } catch {
+        /* the provider frame is still navigating */
+      }
+      if (/\d{1,2}:\d{2}:\d{2}/.test(text)) return text;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return text;
+}
+
+async function waitForServerPrefs(profileId, predicate, timeout = 15000) {
+  const startedAt = Date.now();
+  let prefs = {};
+  while (Date.now() - startedAt < timeout) {
+    const res = await stateApi("GET", profileId);
+    prefs = res.data.prefs ?? {};
+    if (predicate(prefs)) return prefs;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return prefs;
+}
+
 /* -------------------------------------------------------------------------- */
 
 let profileA = null;
@@ -539,8 +570,33 @@ try {
 
   await unlock(A_NAME, A_SELF);
   await waitHome();
+
+  step("primary provider + stale-pref migration");
+  await stateApi("POST", profileA.id, { prefs: { preferredProvider: "vidfast" } });
+  await goto(page, "/watch/movie/1368337", ".watch-stage");
+  const selectedProvider = await page.evaluate(
+    () => document.querySelector(".watch-source-name")?.textContent?.trim() ?? "",
+  );
+  const movieFrame = await waitForProviderDuration("https://vidspark.to/");
+  check(
+    "VidSpark is the default and plays The Odyssey",
+    selectedProvider === "VidSpark" && /\d{1,2}:\d{2}:\d{2}/.test(movieFrame),
+    `${selectedProvider} / ${movieFrame.replace(/\s+/g, " ").slice(0, 40)}`,
+  );
+  const migratedPrefs = await waitForServerPrefs(
+    profileA.id,
+    (prefs) => prefs.providerPrefsVersion === 2 && prefs.preferredProvider === "vidspark",
+  );
+  check(
+    "A stale saved server is migrated once to VidSpark",
+    migratedPrefs.providerPrefsVersion === 2 && migratedPrefs.preferredProvider === "vidspark",
+    `version=${migratedPrefs.providerPrefsVersion} pref=${migratedPrefs.preferredProvider}`,
+  );
+
   step("kick mid-watch");
   await goto(page, "/watch/tv/1399?s=1&e=1", ".watch-stage");
+  const tvFrame = await waitForProviderDuration("https://vidspark.to/", 20000);
+  check("VidSpark also plays the TV episode", /\d{1,2}:\d{2}:\d{2}/.test(tvFrame));
   await clickRowButton(adminPage, A_NAME, "Kick session");
   await clickRowButton(adminPage, A_NAME, "Confirm kick");
   await page.bringToFront();

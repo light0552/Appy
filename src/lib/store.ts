@@ -272,12 +272,24 @@ export function mergeById<T extends Stamped>(local: T[], remote: T[]): T[] {
   return [...out.values()];
 }
 
+/**
+ * Prefs with a higher providerPrefsVersion win wholesale, so an old device
+ * pushing a stale preferred server cannot undo the one-time provider migration.
+ * Equal versions merge normally (remote last), preserving theme/edit behavior.
+ */
+function mergePrefs(local: ProfilePrefs, remote: ProfilePrefs): ProfilePrefs {
+  const localVersion = local.providerPrefsVersion ?? 0;
+  const remoteVersion = remote.providerPrefsVersion ?? 0;
+  if (localVersion > remoteVersion) return { ...remote, ...local };
+  return { ...local, ...remote };
+}
+
 export function mergeStates(local: ProfileState, remote: ProfileState): ProfileState {
   return {
     profileId: local.profileId,
     watchlist: mergeById<WatchItem>(local.watchlist, remote.watchlist),
     history: mergeById<HistoryItem>(local.history, remote.history),
-    prefs: { ...local.prefs, ...remote.prefs },
+    prefs: mergePrefs(local.prefs, remote.prefs),
     updatedAt: Math.max(local.updatedAt, remote.updatedAt),
   };
 }
