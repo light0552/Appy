@@ -271,20 +271,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             )
           : undefined;
 
-      // Closing the browser clears sessionStorage but not the device token.
-      // Resume the last active profile without a passcode when the token is
-      // still valid server-side.
+      // Closing the browser clears sessionStorage but not the HttpOnly session
+      // cookie. Try the server resume for the last active profile; the cookie
+      // is sent automatically.
       if (!active && storedActive) {
         const candidate = withMeta.find(
           (profile) => profile.id === storedActive && !nextAuth[profile.id]?.blocked,
         );
-        if (candidate && auth.hasDeviceToken(storedActive)) {
-          if (await auth.resumeProfile(storedActive)) {
-            active = candidate;
-          } else if (!auth.hasDeviceToken(storedActive)) {
-            // Token was rejected/revoked — ask for the passcode next time.
-            await kvDel(KEY_ACTIVE);
-          }
+        if (candidate && (await auth.resumeProfile(storedActive))) {
+          active = candidate;
         }
       }
 

@@ -482,9 +482,10 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 **Final verification (2026-11-08, server-backed auth + auto-update):**
 - `npx tsc --noEmit` clean; `npm run build` green, emits `dist/version.json` (build id `COMMIT_REF` on Netlify, timestamp locally).
 - `scripts/qa/auth.mjs` — **10/10 PASS**: new passcode survives a full cache/cookie/IndexedDB/session wipe; old 1234 is rejected after the wipe; a 3-strike block survives a wipe; admin unblock/restore; admin can sign in after a wipe.
-- `scripts/qa/persist.mjs` — **5/5 PASS**: unlock stores a 256-bit device token; close/reopen the same browser profile skips the passcode; clearing site data asks again; Sign out revokes the token; reopening after sign-out shows the picker.
+- `scripts/qa/persist.mjs` — **10/10 PASS**: unlock sets an HttpOnly session cookie; close/reopen the same browser profile skips the passcode; clearing only the HTTP cache keeps the session; clearing cookies asks again; the remembered hint appears; Sign out revokes the session; reopening after sign-out shows the picker.
 - `scripts/qa/audit.mjs` — **41/41 PASS** against Netlify Dev (server auth + functions + local Blobs).
 - Update watcher verified against `vite preview`: an open tab automatically reloads when `/version.json` changes (soft reload, then one cache-reset escalation if the bundle is still stale).
 - Admin console reads every screen passcode from the server (AES-GCM copy keyed from the admin password); the public status endpoint never returns passcodes, and the bundle contains no admin password.
-- Device tokens are SHA-256 hashed in Blobs, scoped to one profile, valid 180 days sliding, and revoked by sign-out, password change, block or profile removal.
+- Device sessions are random 256-bit tokens in **per-token Blobs** (SHA-256 keys), delivered as a 10-year HttpOnly `SameSite=Lax` cookie (`Secure` on HTTPS), bound to the screen's `passwordVersion`, and ignored after sign-out, passcode change, block or profile removal. Legacy index tokens and localStorage tokens are migrated once, so existing sessions survive the upgrade.
+- The Profiles footer shows the running build id and a "This device stays signed in" hint for at-a-glance diagnosis.
 - **No git, no Netlify deploy, no push performed.** Local test: `netlify dev --offline --port 8888` (LAN `http://192.168.0.42:8888`).

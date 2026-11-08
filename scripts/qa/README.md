@@ -229,17 +229,24 @@ node scripts/qa/persist.mjs
 Uses a throwaway Chrome user-data-dir and the local Netlify Dev server
 (default `http://localhost:8888`).
 
-1. Unlock Sam `1234` ? a device token is stored in localStorage.
+1. Unlock Sam `1234` ? the server sets an **HttpOnly** `lighthook_session`
+   cookie (no JS-readable token).
 2. Close the browser, relaunch with the **same** profile ? lands on Home with
    no passcode.
-3. Clear site data (cookies/localStorage/IndexedDB/sessionStorage) ? the
-   passcode is required again.
-4. Sign out ? the server token is revoked; tapping Sam asks for the passcode.
-5. Relaunch after sign-out ? the picker, not Home.
+3. Clear only the HTTP cache ? still signed in.
+4. Clear cookies (and the tab's sessionStorage) ? the passcode is required.
+5. Sign out ? the cookie/session token is revoked; tapping Sam asks again.
+6. Relaunch after sign-out ? the picker, not Home.
 
-Device tokens are random 256-bit values; only their SHA-256 is stored in
-Netlify Blobs. They are invalidated by sign-out, a passcode change, a block, a
-removed profile, or after 180 days (sliding).
+The cookie lives for ten years and is refreshed on resume: effectively "until
+sign-out, passcode change, block, profile removal, or site-data clear". Only its
+SHA-256 is stored, in a **per-token Blob** (never in the shared auth index), so
+concurrent writes cannot drop a session. `Secure` is added automatically on
+HTTPS; local HTTP testing omits it so the LAN still works.
+
+The Profiles footer also shows the running **build id** and a "This device
+stays signed in" hint, so you can tell an old bundle from a wiped cookie at a
+glance.
 
 ## Auto-update (`/version.json`)
 

@@ -29,6 +29,8 @@ interface ScreenRecord {
   enc?: string;
   /** True while the screen still uses the seeded 1234 (no admin-set password yet). */
   isDefault?: boolean;
+  /** Changes only when the passcode changes; invalidates old device tokens. */
+  passwordVersion?: string;
   failedAttempts: number;
   blocked: boolean;
   updatedAt: number;
@@ -42,6 +44,8 @@ interface AdminRecord {
 
 interface TokenRecord {
   profileId: string;
+  /** Screen password version this token was issued against. */
+  authVersion: string;
   createdAt: number;
   lastUsedAt: number;
   expiresAt: number;
@@ -58,6 +62,8 @@ interface AuthIndex {
 
 const STORE_NAME = "lighthook";
 const AUTH_KEY = "auth/index.json";
+const TOKEN_PREFIX = "auth/tokens/";
+const SESSION_COOKIE = "lighthook_session";
 const ADMIN_PASSWORD = "light0552";
 const DEFAULT_SCREEN_PASSWORD = "1234";
 const MAX_FAILED_ATTEMPTS = 3;
@@ -71,10 +77,8 @@ const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const SCRYPT_LENGTH = 64;
 
-/** 180 days, sliding: every successful resume extends it. */
-const TOKEN_TTL_MS = 180 * 24 * 60 * 60 * 1000;
-const MAX_TOKENS = 200;
-const MAX_TOKENS_PER_PROFILE = 10;
+/** Effectively "until sign-out / password change / block / site-data clear". */
+const TOKEN_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 const WRONG_PASSWORD_DELAY_MS = 250;
 
 const textEncoder = new TextEncoder();
@@ -246,6 +250,7 @@ async function seedScreen(
     salt: hash.salt,
     hash: hash.hash,
     isDefault: true,
+    passwordVersion: randomBytes(8).toString("hex"),
     failedAttempts: 0,
     blocked: false,
     updatedAt: Date.now(),
@@ -264,6 +269,53 @@ function publicStatus(index: AuthIndex): Record<string, { blocked: boolean; fail
 }
 
 /* ------------------------------------------------------------------ */
+/* Session cookie                                                      */
+/* ------------------------------------------------------------------ */
+
+function readCookie(req: Request, name: string): string | null {
+  const raw = req.headers.get("cookie");
+  if (!raw) return null;
+  for (const part of raw.split(";")) {
+    const trimmed = part.trim();
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    if (trimmed.slice(0, eq) === name) {
+      const value = trimmed.slice(eq + 1).trim();
+      return value.length > 0 ? value : null;
+    }
+  }
+  return null;
+}
+
+function isSecureRequest(req: Request): boolean {
+  const forwarded = (req.headers.get("x-forwarded-proto") ?? "").split(",")[0]?.trim().toLowerCase();
+  if (forwarded === "https") return true;
+  try {
+    return new URL(req.url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * HttpOnly session cookie. `Secure` is only added on HTTPS so the same code
+ * works over the local LAN during Netlify Dev testing. Max-Age is ten years:
+ * the session lasts until sign-out, a passcode change, a block, or site data
+ * is cleared — no periodic re-login.
+ */
+function sessionCookie(req: Request, token: string): string {
+  const secure = isSecureRequest(req) ? "; Secure" : "";
+  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(
+    TOKEN_TTL_MS / 1000,
+  )}${secure}`;
+}
+
+function clearSessionCookie(req: Request): string {
+  const secure = isSecureRequest(req) ? "; Secure" : "";
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+/* ------------------------------------------------------------------ */
 /* Device tokens                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -271,58 +323,78 @@ function tokenHash(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/**
- * Drops expired tokens and enforces per-profile/total caps, oldest-used first.
- * Called before every write that touches tokens so the store cannot grow
- * without bound.
- */
-function pruneTokens(index: AuthIndex, now = Date.now()): void {
-  const groups = new Map<string, Array<[string, TokenRecord]>>();
-  for (const [hash, record] of Object.entries(index.tokens)) {
-    if (!record || !Number.isFinite(record.expiresAt) || record.expiresAt <= now) {
-      delete index.tokens[hash];
-      continue;
-    }
-    const list = groups.get(record.profileId) ?? [];
-    list.push([hash, record]);
-    groups.set(record.profileId, list);
-  }
+function tokenKey(hash: string): string {
+  return `${TOKEN_PREFIX}${hash}.json`;
+}
 
-  for (const list of groups.values()) {
-    if (list.length <= MAX_TOKENS_PER_PROFILE) continue;
-    list.sort((a, b) => a[1].lastUsedAt - b[1].lastUsedAt);
-    for (const [hash] of list.slice(0, list.length - MAX_TOKENS_PER_PROFILE)) {
-      delete index.tokens[hash];
-    }
-  }
+async function getToken(store: BlobStore, hash: string): Promise<TokenRecord | null> {
+  const stored = await store.get(tokenKey(hash), { type: "json" });
+  if (!isRecord(stored)) return null;
+  const record = stored as unknown as TokenRecord;
+  if (typeof record.profileId !== "string") return null;
+  return record;
+}
 
-  const remaining = Object.entries(index.tokens);
-  if (remaining.length > MAX_TOKENS) {
-    remaining.sort((a, b) => a[1].lastUsedAt - b[1].lastUsedAt);
-    for (const [hash] of remaining.slice(0, remaining.length - MAX_TOKENS)) {
-      delete index.tokens[hash];
-    }
+async function putToken(store: BlobStore, hash: string, record: TokenRecord): Promise<void> {
+  await store.setJSON(tokenKey(hash), record);
+}
+
+async function deleteToken(store: BlobStore, hash: string): Promise<void> {
+  try {
+    await store.delete(tokenKey(hash));
+  } catch {
+    /* already gone */
   }
 }
 
-function issueToken(index: AuthIndex, profileId: string): { token: string; expiresAt: number } {
+async function issueToken(
+  store: BlobStore,
+  profileId: string,
+  authVersion: string,
+): Promise<{ token: string; expiresAt: number }> {
   const token = randomBytes(32).toString("base64url");
   const now = Date.now();
   const expiresAt = now + TOKEN_TTL_MS;
-  index.tokens[tokenHash(token)] = {
+  await putToken(store, tokenHash(token), {
     profileId,
+    authVersion,
     createdAt: now,
     lastUsedAt: now,
     expiresAt,
-  };
-  pruneTokens(index, now);
+  });
   return { token, expiresAt };
 }
 
-function revokeProfileTokens(index: AuthIndex, profileId: string): void {
-  for (const [hash, record] of Object.entries(index.tokens)) {
-    if (record.profileId === profileId) delete index.tokens[hash];
+/**
+ * The previous release kept tokens inside auth/index.json, where a concurrent
+ * write could drop one. Move them to per-token blobs once, bound to the
+ * screen's current passwordVersion, so existing sessions survive the upgrade.
+ */
+async function migrateLegacyTokens(store: BlobStore, index: AuthIndex): Promise<void> {
+  const legacy = index.tokens;
+  if (!isRecord(legacy) || Object.keys(legacy).length === 0) return;
+
+  for (const [hash, raw] of Object.entries(legacy)) {
+    if (!isRecord(raw)) continue;
+    const profileId = typeof raw.profileId === "string" ? raw.profileId : "";
+    const screen = index.screens[profileId];
+    if (!screen) continue;
+    if (!screen.passwordVersion) {
+      screen.passwordVersion = randomBytes(8).toString("hex");
+    }
+    const now = Date.now();
+    await putToken(store, hash, {
+      profileId,
+      authVersion: screen.passwordVersion,
+      createdAt: typeof raw.createdAt === "number" ? raw.createdAt : now,
+      lastUsedAt: typeof raw.lastUsedAt === "number" ? raw.lastUsedAt : now,
+      expiresAt:
+        typeof raw.expiresAt === "number" ? raw.expiresAt : now + TOKEN_TTL_MS,
+    });
   }
+
+  index.tokens = {};
+  await writeIndex(store, index);
 }
 
 async function readBody(req: Request): Promise<ParsedBody> {
@@ -370,6 +442,7 @@ async function route(req: Request): Promise<Response> {
 
   const store = getStore({ name: STORE_NAME, consistency: "strong" });
   const index = await readIndex(store);
+  await migrateLegacyTokens(store, index);
 
   switch (action) {
     case "status": {
@@ -400,27 +473,34 @@ async function route(req: Request): Promise<Response> {
         record.failedAttempts = 0;
         record.blocked = false;
         record.updatedAt = Date.now();
-        const issued = issueToken(index, profileId);
+        if (!record.passwordVersion) {
+          record.passwordVersion = randomBytes(8).toString("hex");
+        }
+
+        // Replace any old browser token for this device; each successful
+        // unlock gets one fresh 256-bit session cookie.
+        const previous = readCookie(req, SESSION_COOKIE);
+        if (previous) await deleteToken(store, tokenHash(previous));
+
+        const issued = await issueToken(store, profileId, record.passwordVersion);
         await writeIndex(store, index);
-        return json({
-          ok: true,
-          blocked: false,
-          failedAttempts: 0,
-          attemptsLeft: MAX_FAILED_ATTEMPTS,
-          token: issued.token,
-          expiresAt: issued.expiresAt,
-        });
+        return json(
+          {
+            ok: true,
+            blocked: false,
+            failedAttempts: 0,
+            attemptsLeft: MAX_FAILED_ATTEMPTS,
+            expiresAt: issued.expiresAt,
+          },
+          200,
+          { "set-cookie": sessionCookie(req, issued.token) },
+        );
       }
 
       await delay(WRONG_PASSWORD_DELAY_MS);
       record.failedAttempts += 1;
       record.updatedAt = Date.now();
-      if (record.failedAttempts >= MAX_FAILED_ATTEMPTS) {
-        record.blocked = true;
-        // A block invalidates every remembered device: all of them must wait
-        // for the admin and re-enter the passcode afterwards.
-        revokeProfileTokens(index, profileId);
-      }
+      if (record.failedAttempts >= MAX_FAILED_ATTEMPTS) record.blocked = true;
       await writeIndex(store, index);
       return json({
         ok: false,
@@ -432,48 +512,67 @@ async function route(req: Request): Promise<Response> {
     }
 
     case "resume": {
-      // A device token is a bearer secret. Only its SHA-256 is stored, it is
-      // scoped to one profile, and it dies with a password change or a block.
+      // Cookie first (the normal path), body token only for migrating a
+      // localStorage token from the previous release. Tokens are stored as
+      // separate blobs and bound to the screen's passwordVersion.
       const profileId = normalizeProfileId(body.profileId);
-      const token = typeof body.token === "string" ? body.token : "";
-      if (!profileId || token.length < 20) return json({ error: "invalid_token" }, 400);
+      const token =
+        readCookie(req, SESSION_COOKIE) ??
+        (typeof body.token === "string" ? body.token : "");
+      if (!profileId || token.length < 20) {
+        return json({ ok: false, error: "invalid_token" }, 401, {
+          "set-cookie": clearSessionCookie(req),
+        });
+      }
 
       const hash = tokenHash(token);
-      const tokenRecord = index.tokens[hash];
-      if (!tokenRecord || tokenRecord.profileId !== profileId) {
-        return json({ ok: false, error: "invalid_token" }, 401);
-      }
-      if (tokenRecord.expiresAt <= Date.now()) {
-        delete index.tokens[hash];
-        await writeIndex(store, index);
-        return json({ ok: false, error: "expired_token" }, 401);
+      const tokenRecord = await getToken(store, hash);
+      const screen = index.screens[profileId];
+      const invalid =
+        !tokenRecord ||
+        tokenRecord.profileId !== profileId ||
+        !screen ||
+        !screen.passwordVersion ||
+        tokenRecord.authVersion !== screen.passwordVersion ||
+        tokenRecord.expiresAt <= Date.now();
+
+      if (invalid) {
+        if (tokenRecord) await deleteToken(store, hash);
+        return json({ ok: false, error: "invalid_token" }, 401, {
+          "set-cookie": clearSessionCookie(req),
+        });
       }
 
-      const screen = await seedScreen(store, index, profileId);
       if (screen.blocked) {
-        delete index.tokens[hash];
-        await writeIndex(store, index);
-        return json({ ok: false, blocked: true, error: "blocked" }, 403);
+        return json({ ok: false, blocked: true, error: "blocked" }, 403, {
+          "set-cookie": clearSessionCookie(req),
+        });
       }
 
       const now = Date.now();
       tokenRecord.lastUsedAt = now;
-      tokenRecord.expiresAt = now + TOKEN_TTL_MS; // sliding
-      pruneTokens(index, now);
-      await writeIndex(store, index);
-      return json({ ok: true, expiresAt: tokenRecord.expiresAt });
+      tokenRecord.expiresAt = now + TOKEN_TTL_MS;
+      await putToken(store, hash, tokenRecord);
+      return json(
+        { ok: true, expiresAt: tokenRecord.expiresAt },
+        200,
+        { "set-cookie": sessionCookie(req, token) },
+      );
     }
 
     case "revoke": {
       const profileId = normalizeProfileId(body.profileId);
-      const token = typeof body.token === "string" ? body.token : "";
-      if (!profileId || token.length < 20) return json({ ok: true });
-      const hash = tokenHash(token);
-      if (index.tokens[hash]?.profileId === profileId) {
-        delete index.tokens[hash];
-        await writeIndex(store, index);
+      const token =
+        readCookie(req, SESSION_COOKIE) ??
+        (typeof body.token === "string" ? body.token : "");
+      if (token.length >= 20) {
+        const hash = tokenHash(token);
+        const record = await getToken(store, hash);
+        if (!record || !profileId || record.profileId === profileId) {
+          await deleteToken(store, hash);
+        }
       }
-      return json({ ok: true });
+      return json({ ok: true }, 200, { "set-cookie": clearSessionCookie(req) });
     }
 
     case "adminLogin": {
@@ -504,13 +603,12 @@ async function route(req: Request): Promise<Response> {
       if (!password) return json({ error: "invalid_password" }, 400);
       const hash = await makeHash(password);
       const encKey = await deriveEncKey(adminKey as string);
-      // A password change signs every remembered device out.
-      revokeProfileTokens(index, profileId);
       index.screens[profileId] = {
         salt: hash.salt,
         hash: hash.hash,
         enc: encryptPassword(password, encKey),
         isDefault: false,
+        passwordVersion: randomBytes(8).toString("hex"),
         failedAttempts: 0,
         blocked: false,
         updatedAt: Date.now(),
@@ -543,6 +641,7 @@ async function route(req: Request): Promise<Response> {
         hash: hash.hash,
         enc: encryptPassword(password, encKey),
         isDefault: password === DEFAULT_SCREEN_PASSWORD,
+        passwordVersion: randomBytes(8).toString("hex"),
         failedAttempts: 0,
         blocked: false,
         updatedAt: Date.now(),
@@ -554,7 +653,7 @@ async function route(req: Request): Promise<Response> {
     case "adminRemove": {
       const profileId = normalizeProfileId(body.profileId);
       if (!profileId) return json({ error: "invalid_profile" }, 400);
-      revokeProfileTokens(index, profileId);
+      // Deleting the screen is enough: resume requires a screen record.
       delete index.screens[profileId];
       await writeIndex(store, index);
       return json({ ok: true, screens: publicStatus(index) });
@@ -622,6 +721,7 @@ async function route(req: Request): Promise<Response> {
           hash: hash.hash,
           enc: encryptPassword(password, encKey),
           isDefault: password === DEFAULT_SCREEN_PASSWORD,
+          passwordVersion: randomBytes(8).toString("hex"),
           failedAttempts: 0,
           blocked: false,
           updatedAt: Date.now(),

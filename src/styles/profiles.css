@@ -838,6 +838,34 @@
   flex: 0 0 auto;
 }
 
+/* Device-session hint + build tag: quiet diagnostics, useful on a phone. */
+.profiles-remembered {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--muted);
+}
+
+.profiles-remembered-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.profiles-build {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--muted-2);
+  opacity: 0.75;
+}
+
 .profiles-sync-error {
   color: var(--danger);
   font-weight: 600;

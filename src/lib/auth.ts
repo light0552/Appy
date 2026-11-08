@@ -111,13 +111,25 @@ function deviceKey(profileId: string): string {
   return DEVICE_PREFIX + profileId;
 }
 
+const REMEMBERED_PREFIX = "lighthook:remembered:";
+const SIGNED_OUT_PREFIX = "lighthook:signedOut:";
+
+/** Non-sensitive UI hint: "this device has a server session for this screen". */
+export function isRemembered(profileId: string): boolean {
+  return localGet(REMEMBERED_PREFIX + profileId) === "1";
+}
+
+function markRemembered(profileId: string): void {
+  localSet(REMEMBERED_PREFIX + profileId, "1");
+}
+
+function clearRemembered(profileId: string): void {
+  localSet(REMEMBERED_PREFIX + profileId, null);
+}
+
 export function hasDeviceToken(profileId: string): boolean {
   const token = localGet(deviceKey(profileId));
   return typeof token === "string" && token.length >= 20;
-}
-
-function storeDeviceToken(profileId: string, token: string | undefined): void {
-  if (token && token.length >= 20) localSet(deviceKey(profileId), token);
 }
 
 export function clearDeviceToken(profileId: string): void {
@@ -187,6 +199,7 @@ async function call(
     res = await fetch(ENDPOINT, {
       method: "POST",
       cache: "no-store",
+      credentials: "include",
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -352,10 +365,13 @@ export async function verifyProfilePassword(
 
     setProfileUnlocked(profileId, result.ok);
     if (result.ok) {
-      storeDeviceToken(profileId, result.token);
-    } else if (result.blocked) {
-      // The server revoked every device token on the third failure.
+      // The server set the HttpOnly cookie; no JS-readable token is kept.
       clearDeviceToken(profileId);
+      localSet(SIGNED_OUT_PREFIX + profileId, null);
+      markRemembered(profileId);
+    } else if (result.blocked) {
+      clearDeviceToken(profileId);
+      clearRemembered(profileId);
     }
     return { result, map };
   } catch (err) {
@@ -390,37 +406,58 @@ export async function verifyProfilePassword(
  * passcode, while a password change / block / sign-out revokes the token.
  */
 export async function resumeProfile(profileId: string): Promise<boolean> {
-  const token = localGet(deviceKey(profileId));
-  if (!token || token.length < 20) return false;
+  // An explicit sign-out wins even if the network was down and the server
+  // cookie could not be cleared: stay signed out until a passcode is entered.
+  if (localGet(SIGNED_OUT_PREFIX + profileId) === "1") {
+    clearRemembered(profileId);
+    return false;
+  }
+
+  // The session lives in an HttpOnly cookie, so always ask the server. A
+  // localStorage token from the previous release is sent once for migration.
+  const legacyToken = localGet(deviceKey(profileId));
 
   try {
-    const data = await call({ action: "resume", profileId, token });
+    const data = await call({
+      action: "resume",
+      profileId,
+      ...(legacyToken && legacyToken.length >= 20 ? { token: legacyToken } : {}),
+    });
     if (data.ok !== true) {
       clearDeviceToken(profileId);
+      clearRemembered(profileId);
       return false;
     }
+    clearDeviceToken(profileId);
+    markRemembered(profileId);
     setProfileUnlocked(profileId, true);
     return true;
   } catch (err) {
     const code = errorCode(err);
-    // A real rejection (invalid/expired/blocked) means the token is dead.
-    // A transport failure keeps it for the next attempt.
+    // A real rejection means the cookie/token is dead. A transport failure
+    // keeps everything for the next attempt.
     if (code !== null && code !== "offline" && code !== "timeout") {
       clearDeviceToken(profileId);
+      clearRemembered(profileId);
     }
     return false;
   }
 }
 
-/** Revokes this device's token server-side, then forgets it locally. */
+/** Revokes this device's session server-side, then forgets it locally. */
 export async function revokeDeviceToken(profileId: string): Promise<void> {
-  const token = localGet(deviceKey(profileId));
+  const legacyToken = localGet(deviceKey(profileId));
   clearDeviceToken(profileId);
-  if (!token) return;
+  clearRemembered(profileId);
+  localSet(SIGNED_OUT_PREFIX + profileId, "1");
   try {
-    await call({ action: "revoke", profileId, token });
+    await call({
+      action: "revoke",
+      profileId,
+      ...(legacyToken && legacyToken.length >= 20 ? { token: legacyToken } : {}),
+    });
   } catch {
-    /* best effort — the server token expires on its own */
+    /* best effort — the signed-out flag blocks resume even if this failed */
   }
 }
 
@@ -475,6 +512,8 @@ export async function adminSetPassword(
     password: password.slice(0, MAX_SCREEN_PASSWORD_LENGTH),
   });
   setProfileUnlocked(profileId, false);
+  clearDeviceToken(profileId);
+  clearRemembered(profileId);
   return map;
 }
 
@@ -499,6 +538,7 @@ export async function adminRemoveRecord(profileId: string): Promise<ProfileAuthM
   const map = await adminCall({ action: "adminRemove", profileId });
   setProfileUnlocked(profileId, false);
   clearDeviceToken(profileId);
+  clearRemembered(profileId);
   return map;
 }
 

@@ -8,6 +8,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import Sheet from "../components/Sheet";
 import { useSession } from "../lib/session";
+import { isRemembered } from "../lib/auth";
 import type { ProfileAuthError } from "../lib/auth";
 import { initials } from "../lib/profiles";
 import type { ProfileMeta } from "../types";
@@ -482,6 +483,15 @@ export default function Profiles() {
         <p className="profiles-foot-note">
           <LockGlyph size={12} />
           Three incorrect attempts lock a screen until admin unblocks it.
+        </p>
+        {activeProfile && isRemembered(activeProfile.id) && (
+          <p className="profiles-remembered">
+            <span className="profiles-remembered-dot" aria-hidden="true" />
+            This device stays signed in until you sign out.
+          </p>
+        )}
+        <p className="profiles-build" title="Running app build">
+          build {__BUILD_ID__}
         </p>
         {activeProfile && (
           <button
