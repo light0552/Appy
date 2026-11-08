@@ -5,3 +5,6 @@ dist/
 .env.local
 .DS_Store
 *.log
+
+# Leftover nested checkout; was a broken gitlink with no .gitmodules URL.
+/Appy/
