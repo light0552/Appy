@@ -51,8 +51,9 @@
 
 .library-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 12px 14px;
 }
 
 /* The profile medallion — the shared .avatar primitive tinted with the
@@ -81,7 +82,51 @@
 }
 
 .library-head-text {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Change-passcode entry point — calm glass pill, right-aligned in the
+   header and allowed to wrap onto its own row on narrow phones. */
+.library-passcode-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.library-passcode-btn svg {
+  color: var(--library-color, var(--accent-bright));
+}
+
+.library-passcode-btn:active {
+  transform: scale(0.97);
+}
+
+.library-shelf-actions {
+  margin-left: auto;
+}
+
+.library-shelf-actions .btn {
+  min-height: 44px;
 }
 
 /* Beam-dot eyebrow: a glowing pip before the caps label, tinted with the
@@ -233,6 +278,135 @@
   box-shadow: 0 0 12px var(--accent-glow);
 }
 
+/* History multi-select ----------------------------------------------- */
+
+.library-select-bar {
+  margin: 4px 0 16px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 22px rgba(0, 0, 0, 0.18);
+}
+
+.library-select-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.library-select-count {
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.library-select-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.library-select-actions .btn {
+  min-height: 44px;
+}
+
+.library-select-confirm p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.library-select-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.library-select-confirm-actions .btn {
+  min-height: 44px;
+}
+
+/* The card wrapper owns the selection ring; the poster itself stays
+   untouched so the shared card primitives keep working. */
+.library-select-item {
+  position: relative;
+  min-width: 0;
+}
+
+.library-select-item.is-selected .poster-media {
+  border-color: color-mix(in srgb, var(--accent-bright) 62%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 78%, transparent),
+    0 0 28px color-mix(in srgb, var(--accent) 26%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.library-select-item.is-selected .poster-card {
+  transform: translateY(-2px);
+}
+
+/* A real checkbox with a 44px hit area, drawn as a glass tick box. */
+.library-select-toggle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.library-select-toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.library-select-box {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1.5px solid rgba(255, 255, 255, 0.58);
+  background: color-mix(in srgb, var(--bg) 58%, transparent);
+  color: var(--accent-ink);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+  pointer-events: none;
+}
+
+.library-select-toggle input:checked + .library-select-box {
+  border-color: transparent;
+  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.library-select-toggle input:focus-visible + .library-select-box {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 3px;
+}
+
 /* Grid -------------------------------------------------------------- */
 
 /* .poster-grid already carries --page-x padding; .page supplies it here
@@ -255,6 +429,182 @@
 .library-note {
   margin: 20px 0 0;
   text-align: center;
+}
+
+/* Change-passcode sheet --------------------------------------------- */
+
+.library-page .library-sheet {
+  max-width: 430px;
+}
+
+.library-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.library-sheet-icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--accent-line);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 66%),
+    var(--surface-2);
+  color: var(--accent-bright);
+  box-shadow: 0 0 24px var(--accent-glow);
+}
+
+.library-sheet-heading {
+  min-width: 0;
+}
+
+.library-page .library-sheet-eyebrow {
+  color: var(--accent);
+}
+
+.library-sheet-heading h2 {
+  margin-top: 2px;
+}
+
+.library-sheet-sub {
+  margin-top: 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.library-passcode-form {
+  margin-top: 18px;
+}
+
+.library-field-label {
+  display: block;
+  margin: 14px 0 8px;
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.library-field-label:first-child {
+  margin-top: 0;
+}
+
+.library-page .library-field {
+  min-height: 52px;
+  padding: 0 12px 0 14px;
+  border-radius: 14px;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface-2));
+}
+
+.library-page .library-field:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.library-page .library-field--error,
+.library-page .library-field--error:focus-within {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.library-field-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--muted-2);
+}
+
+.library-field input {
+  letter-spacing: 0.04em;
+}
+
+.library-passcode-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.library-passcode-rule {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted-2);
+}
+
+.library-reveal-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.library-reveal-toggle:active {
+  background: var(--surface-3);
+}
+
+.library-reveal-toggle[aria-pressed="true"] {
+  color: var(--accent-bright);
+}
+
+.library-passcode-hint {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 56%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.library-page .library-sheet-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger-soft) 55%, transparent);
+  color: color-mix(in srgb, var(--danger) 82%, var(--text));
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.library-sheet-error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.library-page .library-sheet .sheet-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.library-page .library-sheet .sheet-actions .btn {
+  flex: 1 1 0;
+  min-height: 48px;
 }
 
 /* Empty states ------------------------------------------------------ */
@@ -318,6 +668,15 @@
   }
 }
 
+/* Phones: the passcode action drops to its own full-width row so the
+   profile name never has to squeeze. */
+@media (max-width: 479px) {
+  .library-passcode-btn {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* Tablet and up ----------------------------------------------------- */
 
 @media (min-width: 640px) {
@@ -340,6 +699,23 @@
 /* Pointer hover — desktop mice only, never touch --------------------- */
 
 @media (hover: hover) {
+  .library-passcode-btn:hover {
+    border-color: var(--accent-line);
+    background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 22px var(--accent-glow);
+  }
+
+  .library-reveal-toggle:hover {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+
+  .library-select-toggle:hover .library-select-box {
+    border-color: var(--accent-bright);
+  }
+
   .page.library-page .library-tabs button:not([aria-pressed="true"]):hover {
     color: var(--text);
     background: rgba(255, 255, 255, 0.05);

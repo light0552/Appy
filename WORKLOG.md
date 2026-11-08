@@ -485,7 +485,47 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 - `scripts/qa/persist.mjs` — **10/10 PASS**: unlock sets an HttpOnly session cookie; close/reopen the same browser profile skips the passcode; clearing only the HTTP cache keeps the session; clearing cookies asks again; the remembered hint appears; Sign out revokes the session; reopening after sign-out shows the picker.
 - `scripts/qa/audit.mjs` — **41/41 PASS** against Netlify Dev (server auth + functions + local Blobs).
 - Update watcher verified against `vite preview`: an open tab automatically reloads when `/version.json` changes (soft reload, then one cache-reset escalation if the bundle is still stale).
-- Admin console reads every screen passcode from the server (AES-GCM copy keyed from the admin password); the public status endpoint never returns passcodes, and the bundle contains no admin password.
+- Admin console reads every screen passcode from the server (AES-GCM copy keyed from the server-only `AUTH_SECRET`; copies from releases that used the admin-password key migrate on read); the public status endpoint never returns passcodes, and the bundle contains no admin password or secret.
 - Device sessions are random 256-bit tokens in **per-token Blobs** (SHA-256 keys), delivered as a 10-year HttpOnly `SameSite=Lax` cookie (`Secure` on HTTPS), bound to the screen's `passwordVersion`, and ignored after sign-out, passcode change, block or profile removal. Legacy index tokens and localStorage tokens are migrated once, so existing sessions survive the upgrade.
 - The Profiles footer shows the running build id and a "This device stays signed in" hint for at-a-glance diagnosis.
 - **No git, no Netlify deploy, no push performed.** Local test: `netlify dev --offline --port 8888` (LAN `http://192.168.0.42:8888`).
+
+---
+
+## 13. OTP passes, kicks, ref names, self-service passcode + history removal (2026-11-08, local build verified)
+
+**User mandate:** server-enforced one-time passes with a forced first-login change; admin can kick one or many screens even mid-movie; admin-only reference names; a self-service passcode change limited to one per 7 days; per-item multi-select history removal synced to every device; `AUTH_SECRET` so the admin can read passcodes users set themselves. All enforcement must be server-side. Build and test locally only — no git, no Netlify.
+
+**Server (`netlify/functions/auth.mts`):**
+- `ScreenRecord` now carries `sessionEpoch` + `sessionEpochAt` (kick), `mustChange` (OTP), `lastSelfChangeAt` (weekly cooldown), and `adminName` (admin-only ref label).
+- `verify` with an OTP returns `mustChange` + a 15-minute `changeToken` and **no session cookie**; `changePassword` consumes that token, sets the permanent pass, rotates version/epoch, then issues the session. The OTP cannot become the permanent pass (`same_password`).
+- `changePass` is the self-service path: verifies the current passcode, checks `lastSelfChangeAt` on the server, refuses a second change inside 7 days with `retryAt`, rotates every token, and issues a fresh cookie for the current device. An admin reset clears the cooldown.
+- `adminKick` rotates `sessionEpoch` for one or many screens without touching the passcode; every token for those screens fails `resume` with 401. Tokens from the pre-kick release are accepted once only if no kick happened after issue.
+- `adminSet` / `adminAdd` accept `temporary` and `adminName`; `adminSetAdminName` edits the ref label. `adminList` returns `adminName`, `mustChange`, `lastSelfChangeAt`, and the decrypted pass.
+- Passcodes are AES-GCM encrypted with `AUTH_SECRET` (server-only `.env` / Netlify env). Legacy copies encrypted with the admin-password key migrate on the first admin read. Rotating `AUTH_SECRET` makes old copies unreadable until each screen is reset (documented in `.env.example`).
+- Fixed a real regression found by the audit: `resume` for another screen on the same device no longer deletes the valid cookie/token for the current screen.
+
+**Client:**
+- `src/lib/auth.ts` — change-token/OTP fields, `completePasswordChange`, `changePassword` (with `retryAt`), `probeSession`, `clearLocalSession`, admin kick/ref-name calls, temporary option on add/set.
+- `src/lib/session.tsx` — forced change, self-service change, admin kick/addition options, `removeHistory` (tombstones + immediate flush).
+- `src/components/SessionGuard.tsx` (new) — polls `resume` every 15s and on focus/visibility while a screen is active; only an explicit 401/403 signs it out, so a network outage never kicks. It skips `/profiles` and `/admin`; a kick hard-navigates to the picker, unmounting `/watch` and its iframe.
+- `src/pages/Profiles.tsx` — “Choose your passcode” step for OTPs (never enters Home first), kick notice on the picker, build tag/hint preserved.
+- `src/pages/Library.tsx` — “Change passcode” sheet (server cooldown copy with date/days), history Select/Select all/Clear/Remove selected with confirmation.
+- `src/pages/Admin.tsx` — one-time + admin ref name at add; per-row one-time set and `ref:` line; inline ref edit; per-row kick with confirm; multi-select kick toolbar; all existing hooks kept.
+- `src/App.tsx` — mounts `SessionGuard`. Narrow-phone admin password row now stacks input/Save at full width.
+
+**Environment:**
+- `.env` has a 64-hex `AUTH_SECRET`; `.env.example` documents it. It is not in the client bundle.
+- **Before any future deploy:** set `AUTH_SECRET` in Netlify env (same value) or admin passcode readback falls back to a local-dev key. Do not rotate it without resetting screens.
+
+**Verification (2026-11-08, local Netlify Dev `http://localhost:8888`, LAN `http://192.168.0.42:8888`):**
+- `scripts/qa/features.mjs` (new) — **39/39 PASS**: OTP creation + forced change + admin readback + ref privacy; self-change + admin readback of the user-set pass + cooldown after a full cookie/localStorage/IndexedDB wipe; per-screen kick on Home and mid-watch; multi-select kick of two live sessions; admin ref edit; history single/multi/select-all tombstone removal + sync to a wiped device; admin passcode reset kicks the live screen and a new OTP reset completes.
+- `scripts/qa/auth.mjs` — **10/10 PASS**.
+- `scripts/qa/persist.mjs` — **10/10 PASS** (cookie survives closes; cache-only clear keeps it; cookie clear asks again; sign-out revokes).
+- `scripts/qa/audit.mjs` — **41/41 PASS**.
+- `scripts/qa/visual.mjs` — **0 blocker / 0 major / 0 minor**, 1 informational (S1E2 episode-button probe).
+- `scripts/qa/preview.mjs` — **25/25 PASS** on the production bundle.
+- `npx tsc --noEmit` clean; `npm run build` green; no secret in `dist`.
+- Local household left clean: only Sam/Mellu, both passcode `1234`, no ref names, no OTP state; every temporary QA screen removed. Server left running on 8888 (Vite 5173 behind Netlify Dev).
+
+**Not done (deliberately):** no `git add`, commit, push, or Netlify deploy. All feature work is uncommitted in the working tree.

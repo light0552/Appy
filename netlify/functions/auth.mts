@@ -25,12 +25,22 @@ import {
 interface ScreenRecord {
   salt: string;
   hash: string;
-  /** AES-GCM copy for the admin view; encrypted with a key derived from the admin password. */
+  /** AES-GCM copy for the admin view; encrypted with the server AUTH_SECRET. */
   enc?: string;
   /** True while the screen still uses the seeded 1234 (no admin-set password yet). */
   isDefault?: boolean;
   /** Changes only when the passcode changes; invalidates old device tokens. */
   passwordVersion?: string;
+  /** Rotated by an admin kick; invalidates every device session for this screen. */
+  sessionEpoch?: string;
+  /** When sessionEpoch was last rotated; rejects pre-upgrade tokens after a kick. */
+  sessionEpochAt?: number;
+  /** One-time pass: the user must choose a new passcode before entering. */
+  mustChange?: boolean;
+  /** Last self-service passcode change (server-enforced once per 7 days). */
+  lastSelfChangeAt?: number;
+  /** Admin-only reference name; never shown on the picker. */
+  adminName?: string;
   failedAttempts: number;
   blocked: boolean;
   updatedAt: number;
@@ -46,8 +56,19 @@ interface TokenRecord {
   profileId: string;
   /** Screen password version this token was issued against. */
   authVersion: string;
+  /** Screen session epoch this token was issued against (admin kick rotates it). */
+  sessionEpoch: string;
   createdAt: number;
   lastUsedAt: number;
+  expiresAt: number;
+}
+
+/** Short-lived proof that a one-time pass was accepted; never a session. */
+interface ChangeRecord {
+  profileId: string;
+  /** Password version the one-time pass belonged to. */
+  authVersion: string;
+  createdAt: number;
   expiresAt: number;
 }
 
@@ -63,6 +84,7 @@ interface AuthIndex {
 const STORE_NAME = "lighthook";
 const AUTH_KEY = "auth/index.json";
 const TOKEN_PREFIX = "auth/tokens/";
+const CHANGE_PREFIX = "auth/changes/";
 const SESSION_COOKIE = "lighthook_session";
 const ADMIN_PASSWORD = "light0552";
 const DEFAULT_SCREEN_PASSWORD = "1234";
@@ -79,7 +101,14 @@ const SCRYPT_LENGTH = 64;
 
 /** Effectively "until sign-out / password change / block / site-data clear". */
 const TOKEN_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
+const CHANGE_TOKEN_TTL_MS = 15 * 60 * 1000;
+const SELF_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const WRONG_PASSWORD_DELAY_MS = 250;
+
+/** Server-only secret for the admin-readable passcode copy. */
+const AUTH_SECRET =
+  (process.env.AUTH_SECRET ?? "").trim() ||
+  `dev-${(process.env.FAMILY_KEY ?? "samandmellu").trim()}`;
 
 const textEncoder = new TextEncoder();
 
@@ -155,14 +184,22 @@ async function verifyHash(password: string, pair: { salt: string; hash: string }
 
 /**
  * The admin view needs the actual passcode, while verification must only ever
- * use the hash. The encrypted copy is keyed from the admin password, which the
- * server receives on every admin request, so no extra environment secret is
- * required. Losing/rotating the admin password makes old copies unreadable —
- * the admin then resets those screens, which is the safe failure mode.
+ * use the hash. The encrypted copy is keyed from AUTH_SECRET (server-only), so
+ * a user can change their own passcode and the admin can still read it. Copies
+ * from the previous release were keyed from the admin password; adminList
+ * migrates them on read.
  */
 const ENC_SALT = Buffer.from("lighthook-admin-enc-v1");
+let cachedServerKey: Promise<Buffer> | null = null;
 
-async function deriveEncKey(adminPassword: string): Promise<Buffer> {
+/** Key for the admin-readable passcode copy; server-only AUTH_SECRET. */
+function deriveServerEncKey(): Promise<Buffer> {
+  if (!cachedServerKey) cachedServerKey = scryptHash(AUTH_SECRET, ENC_SALT, 32);
+  return cachedServerKey;
+}
+
+/** Previous release encrypted with the admin password; used only for migration. */
+async function deriveLegacyEncKey(adminPassword: string): Promise<Buffer> {
   return scryptHash(adminPassword, ENC_SALT, 32);
 }
 
@@ -199,6 +236,11 @@ function normalizePassword(value: unknown, fallback?: string): string | null {
 
 function normalizeProfileId(value: unknown): string | null {
   return typeof value === "string" && ID_PATTERN.test(value) ? value : null;
+}
+
+/** Admin-only reference label; empty clears it. Never sent to non-admin callers. */
+function normalizeAdminName(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, 48) : "";
 }
 
 /* ------------------------------------------------------------------ */
@@ -238,19 +280,53 @@ async function writeIndex(store: BlobStore, index: AuthIndex): Promise<void> {
   await store.setJSON(AUTH_KEY, index);
 }
 
+/**
+ * Older records predate kicks (`sessionEpoch`) or password versions. Fill them
+ * in without rotating anything, so existing sessions keep working once.
+ */
+function ensureScreenSecurity(record: ScreenRecord): boolean {
+  let changed = false;
+  if (!record.passwordVersion) {
+    record.passwordVersion = randomBytes(8).toString("hex");
+    changed = true;
+  }
+  if (!record.sessionEpoch) {
+    record.sessionEpoch = randomBytes(8).toString("hex");
+    changed = true;
+  }
+  if (record.sessionEpochAt === undefined) {
+    record.sessionEpochAt = 0;
+    changed = true;
+  }
+  return changed;
+}
+
+function rotateScreenSecurity(record: ScreenRecord): void {
+  record.passwordVersion = randomBytes(8).toString("hex");
+  record.sessionEpoch = randomBytes(8).toString("hex");
+  record.sessionEpochAt = Date.now();
+}
+
 async function seedScreen(
   store: BlobStore,
   index: AuthIndex,
   profileId: string,
 ): Promise<ScreenRecord> {
   const existing = index.screens[profileId];
-  if (existing) return existing;
+  if (existing) {
+    if (ensureScreenSecurity(existing)) await writeIndex(store, index);
+    return existing;
+  }
   const hash = await makeHash(DEFAULT_SCREEN_PASSWORD);
   const record: ScreenRecord = {
     salt: hash.salt,
     hash: hash.hash,
     isDefault: true,
     passwordVersion: randomBytes(8).toString("hex"),
+    sessionEpoch: randomBytes(8).toString("hex"),
+    sessionEpochAt: 0,
+    mustChange: false,
+    lastSelfChangeAt: 0,
     failedAttempts: 0,
     blocked: false,
     updatedAt: Date.now(),
@@ -351,6 +427,7 @@ async function issueToken(
   store: BlobStore,
   profileId: string,
   authVersion: string,
+  sessionEpoch: string,
 ): Promise<{ token: string; expiresAt: number }> {
   const token = randomBytes(32).toString("base64url");
   const now = Date.now();
@@ -358,11 +435,40 @@ async function issueToken(
   await putToken(store, tokenHash(token), {
     profileId,
     authVersion,
+    sessionEpoch,
     createdAt: now,
     lastUsedAt: now,
     expiresAt,
   });
   return { token, expiresAt };
+}
+
+/* ------------------------------------------------------------------ */
+/* One-time-pass change tokens                                          */
+/* ------------------------------------------------------------------ */
+
+function changeKey(hash: string): string {
+  return `${CHANGE_PREFIX}${hash}.json`;
+}
+
+async function getChange(store: BlobStore, hash: string): Promise<ChangeRecord | null> {
+  const stored = await store.get(changeKey(hash), { type: "json" });
+  if (!isRecord(stored)) return null;
+  const record = stored as unknown as ChangeRecord;
+  if (typeof record.profileId !== "string") return null;
+  return record;
+}
+
+async function putChange(store: BlobStore, hash: string, record: ChangeRecord): Promise<void> {
+  await store.setJSON(changeKey(hash), record);
+}
+
+async function deleteChange(store: BlobStore, hash: string): Promise<void> {
+  try {
+    await store.delete(changeKey(hash));
+  } catch {
+    /* already gone */
+  }
 }
 
 /**
@@ -379,13 +485,12 @@ async function migrateLegacyTokens(store: BlobStore, index: AuthIndex): Promise<
     const profileId = typeof raw.profileId === "string" ? raw.profileId : "";
     const screen = index.screens[profileId];
     if (!screen) continue;
-    if (!screen.passwordVersion) {
-      screen.passwordVersion = randomBytes(8).toString("hex");
-    }
+    ensureScreenSecurity(screen);
     const now = Date.now();
     await putToken(store, hash, {
       profileId,
-      authVersion: screen.passwordVersion,
+      authVersion: screen.passwordVersion as string,
+      sessionEpoch: screen.sessionEpoch as string,
       createdAt: typeof raw.createdAt === "number" ? raw.createdAt : now,
       lastUsedAt: typeof raw.lastUsedAt === "number" ? raw.lastUsedAt : now,
       expiresAt:
@@ -473,8 +578,39 @@ async function route(req: Request): Promise<Response> {
         record.failedAttempts = 0;
         record.blocked = false;
         record.updatedAt = Date.now();
-        if (!record.passwordVersion) {
-          record.passwordVersion = randomBytes(8).toString("hex");
+        ensureScreenSecurity(record);
+
+        // A one-time pass must never become a session. Accept it only long
+        // enough to hand out a short-lived change token, then require the user
+        // to choose their own passcode.
+        if (record.mustChange === true) {
+          const changeToken = randomBytes(32).toString("base64url");
+          const now = Date.now();
+          await putChange(store, tokenHash(changeToken), {
+            profileId,
+            authVersion: record.passwordVersion as string,
+            createdAt: now,
+            expiresAt: now + CHANGE_TOKEN_TTL_MS,
+          });
+
+          // Drop any older browser session for this screen.
+          const previous = readCookie(req, SESSION_COOKIE);
+          if (previous) await deleteToken(store, tokenHash(previous));
+
+          await writeIndex(store, index);
+          return json(
+            {
+              ok: true,
+              blocked: false,
+              failedAttempts: 0,
+              attemptsLeft: MAX_FAILED_ATTEMPTS,
+              mustChange: true,
+              changeToken,
+              expiresAt: now + CHANGE_TOKEN_TTL_MS,
+            },
+            200,
+            { "set-cookie": clearSessionCookie(req) },
+          );
         }
 
         // Replace any old browser token for this device; each successful
@@ -482,7 +618,12 @@ async function route(req: Request): Promise<Response> {
         const previous = readCookie(req, SESSION_COOKIE);
         if (previous) await deleteToken(store, tokenHash(previous));
 
-        const issued = await issueToken(store, profileId, record.passwordVersion);
+        const issued = await issueToken(
+          store,
+          profileId,
+          record.passwordVersion as string,
+          record.sessionEpoch as string,
+        );
         await writeIndex(store, index);
         return json(
           {
@@ -527,17 +668,35 @@ async function route(req: Request): Promise<Response> {
 
       const hash = tokenHash(token);
       const tokenRecord = await getToken(store, hash);
+
+      // The cookie belongs to the device, not to the screen being requested.
+      // Probing another tile must never revoke the session the user is on.
+      if (!tokenRecord) {
+        return json({ ok: false, error: "invalid_token" }, 401, {
+          "set-cookie": clearSessionCookie(req),
+        });
+      }
+      if (tokenRecord.profileId !== profileId) {
+        return json({ ok: false, error: "invalid_token" }, 401);
+      }
+
       const screen = index.screens[profileId];
+      if (screen && ensureScreenSecurity(screen)) await writeIndex(store, index);
+
+      // Tokens from the previous release predate kicks. They are accepted only
+      // if no kick happened after they were issued; a kick records its time.
+      const epochMatches = tokenRecord.sessionEpoch
+        ? tokenRecord.sessionEpoch === screen?.sessionEpoch
+        : (screen?.sessionEpochAt ?? 0) <= tokenRecord.createdAt;
       const invalid =
-        !tokenRecord ||
-        tokenRecord.profileId !== profileId ||
         !screen ||
         !screen.passwordVersion ||
         tokenRecord.authVersion !== screen.passwordVersion ||
+        !epochMatches ||
         tokenRecord.expiresAt <= Date.now();
 
       if (invalid) {
-        if (tokenRecord) await deleteToken(store, hash);
+        await deleteToken(store, hash);
         return json({ ok: false, error: "invalid_token" }, 401, {
           "set-cookie": clearSessionCookie(req),
         });
@@ -552,6 +711,9 @@ async function route(req: Request): Promise<Response> {
       const now = Date.now();
       tokenRecord.lastUsedAt = now;
       tokenRecord.expiresAt = now + TOKEN_TTL_MS;
+      if (!tokenRecord.sessionEpoch) {
+        tokenRecord.sessionEpoch = screen.sessionEpoch as string;
+      }
       await putToken(store, hash, tokenRecord);
       return json(
         { ok: true, expiresAt: tokenRecord.expiresAt },
@@ -573,6 +735,151 @@ async function route(req: Request): Promise<Response> {
         }
       }
       return json({ ok: true }, 200, { "set-cookie": clearSessionCookie(req) });
+    }
+
+    case "changePassword": {
+      // Forced first-login change: consumes a one-time change token issued by
+      // verify, sets the permanent passcode, then opens the session. No session
+      // exists before this point.
+      const profileId = normalizeProfileId(body.profileId);
+      const changeToken = typeof body.changeToken === "string" ? body.changeToken : "";
+      const password = normalizePassword(body.password);
+      if (!profileId) return json({ error: "invalid_profile" }, 400);
+      if (!password) return json({ error: "invalid_password" }, 400);
+      if (changeToken.length < 20) return json({ error: "invalid_token" }, 401);
+
+      const screen = index.screens[profileId];
+      if (!screen) return json({ error: "invalid_token" }, 401);
+      ensureScreenSecurity(screen);
+      if (screen.blocked) return json({ error: "blocked" }, 403);
+
+      const hash = tokenHash(changeToken);
+      const change = await getChange(store, hash);
+      if (
+        !change ||
+        change.profileId !== profileId ||
+        change.authVersion !== screen.passwordVersion ||
+        change.expiresAt <= Date.now()
+      ) {
+        if (change) await deleteChange(store, hash);
+        return json({ error: "expired" }, 401);
+      }
+
+      // The one-time pass must not simply become the permanent passcode.
+      if (await verifyHash(password, screen)) {
+        return json({ error: "same_password" }, 400);
+      }
+
+      const nextHash = await makeHash(password);
+      const encKey = await deriveServerEncKey();
+      screen.salt = nextHash.salt;
+      screen.hash = nextHash.hash;
+      screen.enc = encryptPassword(password, encKey);
+      screen.isDefault = false;
+      screen.mustChange = false;
+      screen.failedAttempts = 0;
+      screen.blocked = false;
+      // The forced change belongs to the one-time-pass flow, not the weekly
+      // self-service change, so it must not consume the cooldown.
+      rotateScreenSecurity(screen);
+      screen.updatedAt = Date.now();
+
+      await deleteChange(store, hash);
+      const previous = readCookie(req, SESSION_COOKIE);
+      if (previous) await deleteToken(store, tokenHash(previous));
+
+      const issued = await issueToken(
+        store,
+        profileId,
+        screen.passwordVersion as string,
+        screen.sessionEpoch as string,
+      );
+      await writeIndex(store, index);
+      return json(
+        { ok: true, expiresAt: issued.expiresAt },
+        200,
+        { "set-cookie": sessionCookie(req, issued.token) },
+      );
+    }
+
+    case "changePass": {
+      // Self-service change from the profile. The cooldown is stored on the
+      // screen record, so clearing cookies or local storage cannot reset it.
+      const profileId = normalizeProfileId(body.profileId);
+      const currentPassword =
+        typeof body.currentPassword === "string"
+          ? body.currentPassword.slice(0, MAX_PASSWORD_LENGTH)
+          : "";
+      const password = normalizePassword(body.password);
+      if (!profileId) return json({ error: "invalid_profile" }, 400);
+      if (!password) return json({ error: "invalid_password" }, 400);
+
+      const screen = await seedScreen(store, index, profileId);
+      if (screen.blocked) {
+        return json({ error: "blocked", blocked: true }, 403);
+      }
+
+      const good = await verifyHash(currentPassword, screen);
+      if (!good) {
+        await delay(WRONG_PASSWORD_DELAY_MS);
+        screen.failedAttempts += 1;
+        screen.updatedAt = Date.now();
+        if (screen.failedAttempts >= MAX_FAILED_ATTEMPTS) screen.blocked = true;
+        await writeIndex(store, index);
+        return json(
+          {
+            ok: false,
+            blocked: screen.blocked,
+            failedAttempts: screen.failedAttempts,
+            attemptsLeft: Math.max(0, MAX_FAILED_ATTEMPTS - screen.failedAttempts),
+            error: screen.blocked ? "blocked" : "wrong_password",
+          },
+          screen.blocked ? 403 : 401,
+        );
+      }
+
+      const now = Date.now();
+      const last = screen.lastSelfChangeAt ?? 0;
+      if (last > 0 && now - last < SELF_CHANGE_COOLDOWN_MS) {
+        return json(
+          { error: "cooldown", retryAt: last + SELF_CHANGE_COOLDOWN_MS },
+          403,
+        );
+      }
+
+      if (await verifyHash(password, screen)) {
+        return json({ error: "same_password" }, 400);
+      }
+
+      const nextHash = await makeHash(password);
+      const encKey = await deriveServerEncKey();
+      screen.salt = nextHash.salt;
+      screen.hash = nextHash.hash;
+      screen.enc = encryptPassword(password, encKey);
+      screen.isDefault = false;
+      screen.mustChange = false;
+      screen.lastSelfChangeAt = now;
+      screen.failedAttempts = 0;
+      screen.blocked = false;
+      // Changing the passcode signs every other device out.
+      rotateScreenSecurity(screen);
+      screen.updatedAt = now;
+
+      const previous = readCookie(req, SESSION_COOKIE);
+      if (previous) await deleteToken(store, tokenHash(previous));
+
+      const issued = await issueToken(
+        store,
+        profileId,
+        screen.passwordVersion as string,
+        screen.sessionEpoch as string,
+      );
+      await writeIndex(store, index);
+      return json(
+        { ok: true, expiresAt: issued.expiresAt },
+        200,
+        { "set-cookie": sessionCookie(req, issued.token) },
+      );
     }
 
     case "adminLogin": {
@@ -601,20 +908,65 @@ async function route(req: Request): Promise<Response> {
       if (!profileId) return json({ error: "invalid_profile" }, 400);
       const password = normalizePassword(body.password);
       if (!password) return json({ error: "invalid_password" }, 400);
+      const temporary = body.temporary === true;
       const hash = await makeHash(password);
-      const encKey = await deriveEncKey(adminKey as string);
+      const encKey = await deriveServerEncKey();
+      const now = Date.now();
       index.screens[profileId] = {
         salt: hash.salt,
         hash: hash.hash,
         enc: encryptPassword(password, encKey),
         isDefault: false,
         passwordVersion: randomBytes(8).toString("hex"),
+        sessionEpoch: randomBytes(8).toString("hex"),
+        sessionEpochAt: now,
+        mustChange: temporary,
+        // An admin reset always clears the self-service cooldown and ref name
+        // is kept: only the passcode changed.
+        lastSelfChangeAt: 0,
+        adminName: index.screens[profileId]?.adminName,
         failedAttempts: 0,
         blocked: false,
-        updatedAt: Date.now(),
+        updatedAt: now,
       };
       await writeIndex(store, index);
       return json({ ok: true, screens: publicStatus(index) });
+    }
+
+    case "adminKick": {
+      // Rotates the session epoch so every existing device token for these
+      // screens is invalid immediately. The passcode is untouched.
+      const rawIds = Array.isArray(body.profileIds)
+        ? body.profileIds
+        : typeof body.profileId === "string"
+          ? [body.profileId]
+          : [];
+      const now = Date.now();
+      const kicked: string[] = [];
+      for (const raw of rawIds.slice(0, 100)) {
+        const id = normalizeProfileId(raw);
+        if (!id) continue;
+        const record = index.screens[id];
+        if (!record) continue;
+        ensureScreenSecurity(record);
+        record.sessionEpoch = randomBytes(8).toString("hex");
+        record.sessionEpochAt = now;
+        record.updatedAt = now;
+        kicked.push(id);
+      }
+      if (kicked.length > 0) await writeIndex(store, index);
+      return json({ ok: true, kicked, screens: publicStatus(index) });
+    }
+
+    case "adminSetAdminName": {
+      const profileId = normalizeProfileId(body.profileId);
+      if (!profileId) return json({ error: "invalid_profile" }, 400);
+      const adminName = normalizeAdminName(body.adminName);
+      const record = await seedScreen(store, index, profileId);
+      record.adminName = adminName;
+      record.updatedAt = Date.now();
+      await writeIndex(store, index);
+      return json({ ok: true, adminName });
     }
 
     case "adminUnblock": {
@@ -634,17 +986,25 @@ async function route(req: Request): Promise<Response> {
       if (!profileId) return json({ error: "invalid_profile" }, 400);
       const password = normalizePassword(body.password, DEFAULT_SCREEN_PASSWORD);
       if (!password) return json({ error: "invalid_password" }, 400);
+      const temporary = body.temporary === true;
+      const adminName = normalizeAdminName(body.adminName);
       const hash = await makeHash(password);
-      const encKey = await deriveEncKey(adminKey as string);
+      const encKey = await deriveServerEncKey();
+      const now = Date.now();
       index.screens[profileId] = {
         salt: hash.salt,
         hash: hash.hash,
         enc: encryptPassword(password, encKey),
         isDefault: password === DEFAULT_SCREEN_PASSWORD,
         passwordVersion: randomBytes(8).toString("hex"),
+        sessionEpoch: randomBytes(8).toString("hex"),
+        sessionEpochAt: now,
+        mustChange: temporary,
+        lastSelfChangeAt: 0,
+        adminName,
         failedAttempts: 0,
         blocked: false,
-        updatedAt: Date.now(),
+        updatedAt: now,
       };
       await writeIndex(store, index);
       return json({ ok: true, screens: publicStatus(index) });
@@ -660,11 +1020,11 @@ async function route(req: Request): Promise<Response> {
     }
 
     case "adminList": {
-      // Admin-only readback. The encrypted copy is decrypted with a key derived
-      // from the admin password supplied on this request. Screens with no
-      // record yet still have the seeded default, so report that instead of a
-      // blank row on a brand-new Blobs store.
-      const encKey = await deriveEncKey(adminKey as string);
+      // Admin-only readback. Passcodes are decrypted with the server
+      // AUTH_SECRET; copies from the previous release (encrypted with a key
+      // derived from the admin password) are migrated here.
+      const encKey = await deriveServerEncKey();
+      const legacyKey = await deriveLegacyEncKey(adminKey as string);
       const ids = Array.isArray(body.profileIds)
         ? body.profileIds.filter(
             (id): id is string => typeof id === "string" && ID_PATTERN.test(id),
@@ -672,16 +1032,39 @@ async function route(req: Request): Promise<Response> {
         : [];
       const screens: Record<
         string,
-        { blocked: boolean; failedAttempts: number; password: string | null }
+        {
+          blocked: boolean;
+          failedAttempts: number;
+          password: string | null;
+          adminName?: string;
+          mustChange?: boolean;
+          lastSelfChangeAt?: number;
+        }
       > = {};
+      let migrated = false;
+
       for (const [id, record] of Object.entries(index.screens)) {
         let password: string | null = null;
-        if (record.enc) password = decryptPassword(record.enc, encKey);
-        else if (record.isDefault !== false) password = DEFAULT_SCREEN_PASSWORD;
+        if (record.enc) {
+          password = decryptPassword(record.enc, encKey);
+          if (password === null) {
+            const legacy = decryptPassword(record.enc, legacyKey);
+            if (legacy !== null) {
+              record.enc = encryptPassword(legacy, encKey);
+              password = legacy;
+              migrated = true;
+            }
+          }
+        } else if (record.isDefault !== false) {
+          password = DEFAULT_SCREEN_PASSWORD;
+        }
         screens[id] = {
           blocked: record.blocked,
           failedAttempts: record.failedAttempts,
           password,
+          adminName: record.adminName ?? "",
+          mustChange: record.mustChange === true,
+          lastSelfChangeAt: record.lastSelfChangeAt ?? 0,
         };
       }
       for (const id of ids.slice(0, 50)) {
@@ -690,9 +1073,13 @@ async function route(req: Request): Promise<Response> {
             blocked: false,
             failedAttempts: 0,
             password: DEFAULT_SCREEN_PASSWORD,
+            adminName: "",
+            mustChange: false,
+            lastSelfChangeAt: 0,
           };
         }
       }
+      if (migrated) await writeIndex(store, index);
       return json({ screens });
     }
 
@@ -715,16 +1102,22 @@ async function route(req: Request): Promise<Response> {
         }
 
         const hash = await makeHash(password);
-        const encKey = await deriveEncKey(adminKey as string);
+        const encKey = await deriveServerEncKey();
+        const now = Date.now();
         index.screens[profileId] = {
           salt: hash.salt,
           hash: hash.hash,
           enc: encryptPassword(password, encKey),
           isDefault: password === DEFAULT_SCREEN_PASSWORD,
           passwordVersion: randomBytes(8).toString("hex"),
+          sessionEpoch: randomBytes(8).toString("hex"),
+          sessionEpochAt: now,
+          mustChange: false,
+          lastSelfChangeAt: 0,
+          adminName: existing?.adminName,
           failedAttempts: 0,
           blocked: false,
-          updatedAt: Date.now(),
+          updatedAt: now,
         };
         changed += 1;
       }

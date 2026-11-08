@@ -7,19 +7,51 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import Sheet from "../components/Sheet";
+import { KICKED_NOTICE_KEY } from "../components/SessionGuard";
 import { useSession } from "../lib/session";
-import { isRemembered } from "../lib/auth";
-import type { ProfileAuthError } from "../lib/auth";
+import {
+  MAX_SCREEN_PASSWORD_LENGTH,
+  MIN_SCREEN_PASSWORD_LENGTH,
+  isRemembered,
+  revokeDeviceToken,
+} from "../lib/auth";
+import type { ProfileAuthError, ProfileAuthResult } from "../lib/auth";
 import { initials } from "../lib/profiles";
 import type { ProfileMeta } from "../types";
 import "../styles/profiles.css";
 
+/**
+ * The unlock result gains these two fields when the screen still holds a
+ * one-time pass. Declared locally so this page compiles against both the old
+ * and the updated session layer while the auth work lands in parallel.
+ */
+type ForcedChangeResult = ProfileAuthResult & {
+  mustChange?: boolean;
+  changeToken?: string;
+};
+
+/** The forced first-login completion action supplied by the session layer. */
+interface ForcedChangeApi {
+  completePasswordChange: (
+    profileId: string,
+    newPassword: string,
+    changeToken: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
+}
+
 interface UnlockSheet {
   profile: ProfileMeta;
+  /** "unlock" asks for the pass; "choose" is the forced first-login change. */
+  step: "unlock" | "choose";
   password: string;
   error: string | null;
   pending: boolean;
   reveal: boolean;
+  /** One-time token from unlockProfile; set only in the "choose" step. */
+  changeToken: string | null;
+  newPassword: string;
+  confirmPassword: string;
+  revealPasscode: boolean;
 }
 
 /** Server-side lockout threshold; only used to word the copy. */
@@ -57,6 +89,33 @@ function unlockErrorMessage(
     }
   }
 }
+
+/** Maps a failed forced passcode change to user-facing copy. */
+function forcedChangeErrorMessage(error: string | undefined): string {
+  switch (error) {
+    case "unreachable":
+      return UNREACHABLE_MESSAGE;
+    case "blocked":
+      return BLOCKED_MESSAGE;
+    case "wrong_password":
+    case "expired":
+    case "invalid_token":
+      return "That one-time pass is no longer valid. Go back and try again.";
+    case "same_password":
+      return "Choose a passcode that’s different from the one-time pass.";
+    case "weak_password":
+    case "invalid_password":
+      return `Passcodes need ${MIN_SCREEN_PASSWORD_LENGTH} to ${MAX_SCREEN_PASSWORD_LENGTH} characters.`;
+    case "cooldown":
+      return "Too many attempts. Wait a moment, then try again.";
+    default:
+      return error && error.trim().length > 0
+        ? error
+        : "Couldn’t save the new passcode. Try again.";
+  }
+}
+
+const PASSCODE_RULE = `${MIN_SCREEN_PASSWORD_LENGTH}–${MAX_SCREEN_PASSWORD_LENGTH} characters.`;
 
 function Glyph({
   children,
@@ -161,6 +220,7 @@ const BeaconGlyph = ({ size = 30 }: { size?: number }) => (
 );
 
 export default function Profiles() {
+  const session = useSession();
   const {
     ready,
     profiles,
@@ -170,11 +230,27 @@ export default function Profiles() {
     resumeProfile,
     signOut,
     syncStatus,
-  } = useSession();
+  } = session;
+  // Supplied by the parallel session work; the cast keeps this page compiling
+  // until it lands, then resolves to the identical signature.
+  const { completePasswordChange } = session as typeof session & ForcedChangeApi;
   const navigate = useNavigate();
 
   const [sheet, setSheet] = useState<UnlockSheet | null>(null);
   const [query, setQuery] = useState("");
+  const [kicked, setKicked] = useState(false);
+
+  // SessionGuard leaves this flag before bouncing here after an admin kick.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(KICKED_NOTICE_KEY) === "1") {
+        sessionStorage.removeItem(KICKED_NOTICE_KEY);
+        setKicked(true);
+      }
+    } catch {
+      /* storage disabled — no notice, but the picker still works */
+    }
+  }, []);
 
   const filteredProfiles = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -186,17 +262,36 @@ export default function Profiles() {
 
   const showFilter = profiles.length > 6 || query.trim().length > 0;
 
-  // Lock the page behind an open sheet and let Escape dismiss it.
+  /**
+   * Closing the forced-change step abandons the one-time pass and returns to
+   * the picker. If the session layer already made this screen active, drop it
+   * so a one-time pass can never carry anyone into Home. The Sheet handles
+   * Escape/backdrop dismissal, so this is the single close path.
+   */
+  const closeSheet = () => {
+    const current = sheet;
+    // A request is in flight: let it settle rather than arriving at Home
+    // after an apparent cancel.
+    if (current?.pending) return;
+    setSheet(null);
+    if (current?.step !== "choose") return;
+
+    if (activeProfile?.id === current.profile.id) {
+      // Make sure abandoning the step cannot leave this screen active.
+      signOut();
+    } else {
+      // Also drop any device session the one-time unlock may have opened, so
+      // the picker cannot silently resume past the forced change.
+      void revokeDeviceToken(current.profile.id);
+    }
+  };
+
+  // Lock the page behind an open sheet.
   useEffect(() => {
     if (!sheet) return;
     document.body.classList.add("no-scroll");
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSheet(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.classList.remove("no-scroll");
-      window.removeEventListener("keydown", onKeyDown);
     };
   }, [sheet]);
 
@@ -212,10 +307,15 @@ export default function Profiles() {
     }
     setSheet({
       profile,
+      step: "unlock",
       password: "",
       error: null,
       pending: false,
       reveal: false,
+      changeToken: null,
+      newPassword: "",
+      confirmPassword: "",
+      revealPasscode: false,
     });
   };
 
@@ -233,7 +333,45 @@ export default function Profiles() {
     setSheet((current) => (current ? { ...current, pending: true, error: null } : current));
 
     try {
-      const result = await unlockProfile(profile.id, password);
+      const result = (await unlockProfile(profile.id, password)) as ForcedChangeResult;
+
+      if (result.ok && result.mustChange) {
+        // A one-time pass never enters the app: swap the sheet to the forced
+        // first-login step and let the user choose their own passcode.
+        if (!result.changeToken) {
+          setSheet((current) =>
+            current
+              ? {
+                  ...current,
+                  pending: false,
+                  password: "",
+                  reveal: false,
+                  error:
+                    "This screen still uses a one-time pass, but no change token was issued. Ask the admin to reset it.",
+                }
+              : current,
+          );
+          return;
+        }
+        const changeToken = result.changeToken;
+        setSheet((current) =>
+          current
+            ? {
+                ...current,
+                step: "choose",
+                password: "",
+                reveal: false,
+                pending: false,
+                error: null,
+                changeToken,
+                newPassword: "",
+                confirmPassword: "",
+                revealPasscode: false,
+              }
+            : current,
+        );
+        return;
+      }
 
       if (result.ok) {
         setSheet(null);
@@ -261,6 +399,84 @@ export default function Profiles() {
       // problem, not a bad password: never clear what the user typed.
       setSheet((current) =>
         current ? { ...current, pending: false, error: UNREACHABLE_MESSAGE } : current,
+      );
+    }
+  };
+
+  /** Completes the forced first-login change, then enters Home. */
+  const submitPasscode = async () => {
+    if (!sheet || sheet.step !== "choose" || sheet.pending) return;
+    const { profile, changeToken, newPassword, confirmPassword } = sheet;
+
+    if (!changeToken) {
+      setSheet((current) =>
+        current
+          ? {
+              ...current,
+              error: "That one-time pass can’t be completed. Go back and try again.",
+            }
+          : current,
+      );
+      return;
+    }
+
+    if (
+      newPassword.length < MIN_SCREEN_PASSWORD_LENGTH ||
+      newPassword.length > MAX_SCREEN_PASSWORD_LENGTH
+    ) {
+      setSheet((current) =>
+        current
+          ? {
+              ...current,
+              error: `Passcodes need ${MIN_SCREEN_PASSWORD_LENGTH} to ${MAX_SCREEN_PASSWORD_LENGTH} characters.`,
+            }
+          : current,
+      );
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setSheet((current) =>
+        current ? { ...current, error: "Those passcodes don’t match." } : current,
+      );
+      return;
+    }
+
+    setSheet((current) =>
+      current ? { ...current, pending: true, error: null } : current,
+    );
+
+    try {
+      const result = await completePasswordChange(
+        profile.id,
+        newPassword,
+        changeToken,
+      );
+
+      if (result.ok) {
+        setSheet(null);
+        navigate("/", { replace: true });
+        return;
+      }
+
+      setSheet((current) =>
+        current
+          ? {
+              ...current,
+              pending: false,
+              error: forcedChangeErrorMessage(result.error),
+            }
+          : current,
+      );
+    } catch {
+      setSheet((current) =>
+        current
+          ? {
+              ...current,
+              pending: false,
+              error: UNREACHABLE_MESSAGE,
+            }
+          : current,
       );
     }
   };
@@ -306,6 +522,26 @@ export default function Profiles() {
           Admin
         </button>
       </header>
+
+      {kicked && (
+        <div className="profiles-kicked" role="status">
+          <span className="profiles-kicked__mark" aria-hidden="true">
+            !
+          </span>
+          <p>
+            Your screen was signed out by the admin. Enter your passcode to
+            continue.
+          </p>
+          <button
+            type="button"
+            className="profiles-kicked__dismiss"
+            aria-label="Dismiss sign-out notice"
+            onClick={() => setKicked(false)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <section className="profiles-hero" aria-labelledby="profiles-title">
         <p className="profiles-eyebrow">
@@ -507,17 +743,21 @@ export default function Profiles() {
 
       {sheet && (
         <Sheet
-          key={sheet.profile.id}
+          key={`${sheet.profile.id}:${sheet.step}`}
           title={
-            blocked
-              ? `${sheet.profile.name} is blocked`
-              : `Unlock ${sheet.profile.name}`
+            sheet.step === "choose"
+              ? "Choose your passcode"
+              : blocked
+                ? `${sheet.profile.name} is blocked`
+                : `Unlock ${sheet.profile.name}`
           }
-          onClose={() => setSheet(null)}
+          onClose={closeSheet}
           className="profiles-unlock-sheet"
         >
           <div
-            className={`unlock-head${blocked ? " unlock-head--blocked" : ""}`}
+            className={`unlock-head${
+              blocked && sheet.step === "unlock" ? " unlock-head--blocked" : ""
+            }`}
           >
             <span
               className="unlock-avatar-wrap"
@@ -527,24 +767,169 @@ export default function Profiles() {
               <span className="avatar unlock-avatar">
                 {initials(sheet.profile.name)}
               </span>
-              {blocked && (
+              {blocked && sheet.step === "unlock" && (
                 <span className="unlock-avatar-badge" aria-hidden="true">
+                  <LockGlyph size={13} />
+                </span>
+              )}
+              {sheet.step === "choose" && (
+                <span className="unlock-avatar-badge unlock-avatar-badge--key" aria-hidden="true">
                   <LockGlyph size={13} />
                 </span>
               )}
             </span>
             <p className="eyebrow unlock-eyebrow">
-              {blocked ? "Screen blocked" : "Password required"}
+              {sheet.step === "choose"
+                ? "One-time pass"
+                : blocked
+                  ? "Screen blocked"
+                  : "Password required"}
             </p>
-            <h2 className="unlock-name">{sheet.profile.name}</h2>
-            {!blocked && (
+            <h2 className="unlock-name">
+              {sheet.step === "choose" ? "Choose your passcode" : sheet.profile.name}
+            </h2>
+            {sheet.step === "choose" ? (
               <p className="unlock-sub">
-                Enter this screen&apos;s password to continue watching.
+                Set a passcode you&apos;ll remember. It replaces the one-time pass
+                and unlocks {sheet.profile.name} from now on.
               </p>
+            ) : (
+              !blocked && (
+                <p className="unlock-sub">
+                  Enter this screen&apos;s password to continue watching.
+                </p>
+              )
             )}
           </div>
 
-          {blocked ? (
+          {sheet.step === "choose" ? (
+            <form
+              className="unlock-form unlock-passcode-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitPasscode();
+              }}
+            >
+              <label className="unlock-label" htmlFor="passcode-new">
+                New passcode
+              </label>
+              <div
+                className={`field unlock-field${
+                  sheet.error ? " unlock-field--error" : ""
+                }`}
+              >
+                <span className="unlock-field-icon" aria-hidden="true">
+                  <LockGlyph size={16} />
+                </span>
+                <input
+                  id="passcode-new"
+                  type={sheet.revealPasscode ? "text" : "password"}
+                  value={sheet.newPassword}
+                  onChange={(event) =>
+                    setSheet((current) =>
+                      current
+                        ? {
+                            ...current,
+                            newPassword: event.target.value,
+                            error: null,
+                          }
+                        : current,
+                    )
+                  }
+                  autoFocus
+                  autoComplete="new-password"
+                  enterKeyHint="next"
+                  placeholder="New passcode"
+                  aria-label={`New passcode for ${sheet.profile.name}`}
+                  aria-invalid={sheet.error ? true : undefined}
+                  spellCheck={false}
+                />
+              </div>
+
+              <label className="unlock-label" htmlFor="passcode-confirm">
+                Confirm passcode
+              </label>
+              <div
+                className={`field unlock-field${
+                  sheet.error ? " unlock-field--error" : ""
+                }`}
+              >
+                <span className="unlock-field-icon" aria-hidden="true">
+                  <LockGlyph size={16} />
+                </span>
+                <input
+                  id="passcode-confirm"
+                  type={sheet.revealPasscode ? "text" : "password"}
+                  value={sheet.confirmPassword}
+                  onChange={(event) =>
+                    setSheet((current) =>
+                      current
+                        ? {
+                            ...current,
+                            confirmPassword: event.target.value,
+                            error: null,
+                          }
+                        : current,
+                    )
+                  }
+                  autoComplete="new-password"
+                  enterKeyHint="done"
+                  placeholder="Confirm passcode"
+                  aria-label={`Confirm passcode for ${sheet.profile.name}`}
+                  aria-invalid={sheet.error ? true : undefined}
+                  spellCheck={false}
+                />
+              </div>
+
+              <div className="unlock-passcode-tools">
+                <span className="unlock-passcode-rule">{PASSCODE_RULE}</span>
+                <button
+                  type="button"
+                  className="unlock-reveal-toggle"
+                  onClick={() =>
+                    setSheet((current) =>
+                      current
+                        ? { ...current, revealPasscode: !current.revealPasscode }
+                        : current,
+                    )
+                  }
+                  aria-label={sheet.revealPasscode ? "Hide passcodes" : "Show passcodes"}
+                  aria-pressed={sheet.revealPasscode}
+                >
+                  <EyeGlyph off={sheet.revealPasscode} size={16} />
+                  {sheet.revealPasscode ? "Hide" : "Show"}
+                </button>
+              </div>
+
+              {sheet.error && (
+                <p id="passcode-error" className="sheet-error unlock-error" role="alert">
+                  <AlertGlyph />
+                  <span>{sheet.error}</span>
+                </p>
+              )}
+
+              <div className="sheet-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeSheet}
+                  disabled={sheet.pending}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    sheet.pending || !sheet.newPassword || !sheet.confirmPassword
+                  }
+                  aria-busy={sheet.pending}
+                >
+                  {sheet.pending ? "Saving…" : "Save passcode"}
+                </button>
+              </div>
+            </form>
+          ) : blocked ? (
             <>
               <div className="unlock-blocked" role="status">
                 <span className="unlock-blocked-icon" aria-hidden="true">
@@ -571,7 +956,7 @@ export default function Profiles() {
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => setSheet(null)}
+                  onClick={closeSheet}
                   autoFocus
                 >
                   Back to screens
@@ -664,7 +1049,8 @@ export default function Profiles() {
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  onClick={() => setSheet(null)}
+                  onClick={closeSheet}
+                  disabled={sheet.pending}
                 >
                   Cancel
                 </button>

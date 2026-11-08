@@ -119,6 +119,45 @@ describes the exact mismatch (file locations go in the bug report, not the
 script) and the app side fixes the source — then the script should pass again
 unchanged.
 
+## Feature release QA (`features.mjs`)
+
+`features.mjs` is the access-control regression for the one-time-pass release.
+It creates its own two screens (`QA OTP`, `QA Kick`), drives both the admin
+console and a screen tab in one real Chrome session, and removes everything it
+created in a `finally` block. Run the dev server first:
+
+```powershell
+node scripts/qa/features.mjs
+```
+
+It asserts, end to end:
+
+1. **One-time pass** — admin chooses OTP + an admin-only ref name at creation;
+   the pass opens a forced “Choose your passcode” step (never Home); the user's
+   chosen pass then works; the admin console reads the new pass; the ref name
+   survives; the OTP is dead afterwards.
+2. **Ref-name privacy** — the ref name is absent from the picker and from
+   `/api/profiles`.
+3. **Self-service change** — Library changes the pass; a second change in seven
+   days is refused with cooldown copy; the cooldown still refuses after a full
+   cookie + localStorage + IndexedDB wipe.
+4. **Kick** — per-row kick returns an active Home screen to the picker with a
+   notice; a kick also stops `/watch` mid-movie; multi-select kicks invalidate
+   two independent sessions at once and clear the selection.
+5. **History** — per-item multi-select and Select all write tombstones, the
+   server state drops the live entries, and a wiped device pulls the removal
+   back down (Home loses Continue watching).
+6. **Diagnostics** — no uncaught page errors.
+
+Environment overrides: `QA_BASE` (default `http://localhost:5173`),
+`QA_API` (default `http://localhost:8888`), `QA_CHROME`, `QA_PROFILE`,
+`QA_FAMILY_KEY`, `QA_ADMIN_KEY`.
+
+> **Two tabs need focus.** Puppeteer's real-mouse click hangs when it targets a
+> background tab, so the suite brings the tab it is about to use to the front.
+> A screen tab is also brought forward after each kick to emulate the household
+> device being visible; a background tab correctly skips the session poll.
+
 ## Preview (production build)
 
 `preview.mjs` is the release check: it proves the app works from the built

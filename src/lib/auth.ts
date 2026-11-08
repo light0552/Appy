@@ -27,6 +27,12 @@ export interface ProfileAuthRecord {
   hasPassword: boolean;
   /** Plaintext is only present on admin-read responses (adminList). */
   password?: string | null;
+  /** Admin-only reference label (adminList only). */
+  adminName?: string;
+  /** One-time pass waiting for the user to choose their own passcode. */
+  mustChange?: boolean;
+  /** When the user last changed their own passcode (adminList only). */
+  lastSelfChangeAt?: number;
 }
 
 export type ProfileAuthMap = Record<string, ProfileAuthRecord>;
@@ -40,6 +46,10 @@ export interface ProfileAuthResult {
   attemptsLeft: number;
   /** Present on a successful verify; also mirrored into the device token store. */
   token?: string;
+  /** One-time pass accepted: choose a new passcode before entering. */
+  mustChange?: boolean;
+  /** Short-lived proof for completePasswordChange; never a session token. */
+  changeToken?: string;
   error?: ProfileAuthError;
 }
 
@@ -51,6 +61,9 @@ export interface AdminCredential {
   blocked: boolean;
   hasPassword: boolean;
   password: string;
+  adminName?: string;
+  mustChange?: boolean;
+  lastSelfChangeAt?: number;
 }
 
 const ENDPOINT = "/api/auth";
@@ -151,6 +164,8 @@ class AuthUnreachableError extends Error {
 interface CodedError extends Error {
   code: string;
   status?: number;
+  /** Parsed JSON payload from the failed response (e.g. cooldown retryAt). */
+  data?: Record<string, unknown>;
 }
 
 function codedError(code: string, message: string, status?: number): CodedError {
@@ -225,7 +240,9 @@ async function call(
     }
     if (res.status >= 500) throw new AuthUnreachableError();
     const code = typeof data.error === "string" ? data.error : `http_${res.status}`;
-    throw codedError(code, `Auth request failed (${res.status}).`, res.status);
+    const error = codedError(code, `Auth request failed (${res.status}).`, res.status);
+    error.data = data;
+    throw error;
   }
 
   return data;
@@ -261,6 +278,9 @@ function mapFromScreens(screens: unknown, now = Date.now()): ProfileAuthMap {
       // exists here because status returned it, so this is always true.
       hasPassword: true,
       password: typeof raw.password === "string" ? raw.password : null,
+      adminName: typeof raw.adminName === "string" ? raw.adminName : undefined,
+      mustChange: raw.mustChange === true,
+      lastSelfChangeAt: toCount(raw.lastSelfChangeAt),
     };
   }
   return map;
@@ -333,8 +353,23 @@ function resultFromVerify(data: Record<string, unknown>): ProfileAuthResult {
       : "wrong_password";
 
   const token = typeof data.token === "string" && data.token.length >= 20 ? data.token : undefined;
+  const changeToken =
+    typeof data.changeToken === "string" && data.changeToken.length >= 20
+      ? data.changeToken
+      : undefined;
+  const mustChange = data.mustChange === true;
 
-  return { ok, blocked, failedAttempts, attemptsLeft, ...(token ? { token } : {}), ...(error ? { error } : {}) };
+  return {
+    ok,
+    blocked,
+    failedAttempts,
+    attemptsLeft,
+    ...(token ? { token } : {}),
+    ...(mustChange
+      ? { mustChange: true, ...(changeToken ? { changeToken } : {}) }
+      : {}),
+    ...(error ? { error } : {}),
+  };
 }
 
 /**
@@ -363,12 +398,17 @@ export async function verifyProfilePassword(
     };
     remember(map);
 
-    setProfileUnlocked(profileId, result.ok);
-    if (result.ok) {
+    setProfileUnlocked(profileId, result.ok && !result.mustChange);
+    if (result.ok && !result.mustChange) {
       // The server set the HttpOnly cookie; no JS-readable token is kept.
       clearDeviceToken(profileId);
       localSet(SIGNED_OUT_PREFIX + profileId, null);
       markRemembered(profileId);
+    } else if (result.ok && result.mustChange) {
+      // A one-time pass never becomes a remembered device; the change step
+      // must complete first.
+      clearDeviceToken(profileId);
+      clearRemembered(profileId);
     } else if (result.blocked) {
       clearDeviceToken(profileId);
       clearRemembered(profileId);
@@ -394,6 +434,114 @@ export async function verifyProfilePassword(
       map,
     };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Passcode changes                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface ChangePasswordResult {
+  ok: boolean;
+  error?: string;
+  /** Epoch ms when the server-cooldown allows another self-service change. */
+  retryAt?: number;
+}
+
+/**
+ * Completes the forced first-login change for a one-time pass. The change
+ * token comes from verify and is consumed by the server; only then does the
+ * server issue the session cookie.
+ */
+export async function completePasswordChange(
+  profileId: string,
+  newPassword: string,
+  changeToken: string,
+): Promise<ChangePasswordResult> {
+  try {
+    const data = await call({
+      action: "changePassword",
+      profileId,
+      changeToken,
+      password: newPassword.slice(0, MAX_SCREEN_PASSWORD_LENGTH),
+    });
+    if (data.ok !== true) {
+      return { ok: false, error: typeof data.error === "string" ? data.error : "unknown" };
+    }
+    setProfileUnlocked(profileId, true);
+    clearDeviceToken(profileId);
+    localSet(SIGNED_OUT_PREFIX + profileId, null);
+    markRemembered(profileId);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof AuthUnreachableError) return { ok: false, error: "unreachable" };
+    return { ok: false, error: errorCode(err) ?? "unreachable" };
+  }
+}
+
+/**
+ * Self-service change from the profile. The server enforces one change per
+ * seven days from the screen record, so clearing browser storage cannot reset
+ * the cooldown.
+ */
+export async function changePassword(
+  profileId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  try {
+    const data = await call({
+      action: "changePass",
+      profileId,
+      currentPassword: currentPassword.slice(0, MAX_SCREEN_PASSWORD_LENGTH),
+      password: newPassword.slice(0, MAX_SCREEN_PASSWORD_LENGTH),
+    });
+    if (data.ok !== true) {
+      return { ok: false, error: typeof data.error === "string" ? data.error : "unknown" };
+    }
+    setProfileUnlocked(profileId, true);
+    clearDeviceToken(profileId);
+    localSet(SIGNED_OUT_PREFIX + profileId, null);
+    markRemembered(profileId);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof AuthUnreachableError) return { ok: false, error: "unreachable" };
+    const payload = (err as CodedError).data;
+    const retryAt =
+      typeof payload?.retryAt === "number" && Number.isFinite(payload.retryAt)
+        ? payload.retryAt
+        : undefined;
+    return {
+      ok: false,
+      error: errorCode(err) ?? "unreachable",
+      ...(retryAt !== undefined ? { retryAt } : {}),
+    };
+  }
+}
+
+/** Result of the background session check used to detect an admin kick. */
+export type SessionProbe = "ok" | "rejected" | "offline";
+
+/**
+ * Asks the server whether this device's session is still valid. Network
+ * failures return "offline" and must never sign the user out.
+ */
+export async function probeSession(profileId: string): Promise<SessionProbe> {
+  try {
+    const data = await call({ action: "resume", profileId });
+    return data.ok === true ? "ok" : "rejected";
+  } catch (err) {
+    if (err instanceof AuthUnreachableError) return "offline";
+    const status = (err as CodedError).status;
+    if (status === 401 || status === 403) return "rejected";
+    return "offline";
+  }
+}
+
+/** Forgets a dead session locally (kick/block). Entering a passcode still works. */
+export function clearLocalSession(profileId: string): void {
+  setProfileUnlocked(profileId, false);
+  clearDeviceToken(profileId);
+  clearRemembered(profileId);
 }
 
 /* ------------------------------------------------------------------ */
@@ -505,11 +653,13 @@ export async function loadAdminPasswords(profileIds: string[] = []): Promise<Pro
 export async function adminSetPassword(
   profileId: string,
   password: string,
+  temporary = false,
 ): Promise<ProfileAuthMap> {
   const map = await adminCall({
     action: "adminSet",
     profileId,
     password: password.slice(0, MAX_SCREEN_PASSWORD_LENGTH),
+    temporary,
   });
   setProfileUnlocked(profileId, false);
   clearDeviceToken(profileId);
@@ -524,14 +674,39 @@ export async function adminUnblock(profileId: string): Promise<ProfileAuthMap> {
 export async function adminAddRecord(
   profileId: string,
   password = DEFAULT_SCREEN_PASSWORD,
+  options: { temporary?: boolean; adminName?: string } = {},
 ): Promise<ProfileAuthMap> {
   const map = await adminCall({
     action: "adminAdd",
     profileId,
     password: password.slice(0, MAX_SCREEN_PASSWORD_LENGTH),
+    temporary: options.temporary === true,
+    adminName: options.adminName?.trim() ?? "",
   });
   setProfileUnlocked(profileId, false);
   return map;
+}
+
+/** Rotates the server session epoch; every device for these screens must re-enter. */
+export async function adminKick(profileIds: string[]): Promise<ProfileAuthMap> {
+  const map = await adminCall({ action: "adminKick", profileIds });
+  for (const id of profileIds) {
+    setProfileUnlocked(id, false);
+    clearDeviceToken(id);
+    clearRemembered(id);
+  }
+  return map;
+}
+
+/** Admin-only reference label (never part of /api/profiles). */
+export async function adminSetRefName(
+  profileId: string,
+  adminName: string,
+): Promise<void> {
+  await call(
+    { action: "adminSetAdminName", profileId, adminName: adminName.trim().slice(0, 48) },
+    { admin: true },
+  );
 }
 
 export async function adminRemoveRecord(profileId: string): Promise<ProfileAuthMap> {
@@ -608,6 +783,9 @@ export function credentialsFrom(
       blocked: record?.blocked ?? false,
       hasPassword: record?.hasPassword ?? false,
       password: record?.password ?? "",
+      adminName: record?.adminName ?? "",
+      mustChange: record?.mustChange === true,
+      lastSelfChangeAt: record?.lastSelfChangeAt ?? 0,
     };
   });
 }

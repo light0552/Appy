@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import NoticeBoard from "./components/NoticeBoard";
+import SessionGuard from "./components/SessionGuard";
 import TabBar from "./components/TabBar";
 import UpdateWatcher from "./components/UpdateWatcher";
 import Admin from "./pages/Admin";
@@ -74,6 +75,7 @@ export default function App() {
       <ThemeSync />
       <ScrollToTop />
       <UpdateWatcher />
+      <SessionGuard />
 
       {showNotice && <NoticeBoard />}
 

@@ -72,26 +72,47 @@ export interface SessionValue {
   unlockProfile: (id: string, password: string) => Promise<ProfileAuthResult>;
   /** Passwordless resume from a stored device token; false when it is gone. */
   resumeProfile: (id: string) => Promise<boolean>;
+  /** Completes a forced first-login change for a one-time pass, then enters. */
+  completePasswordChange: (
+    profileId: string,
+    newPassword: string,
+    changeToken: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
+  /** Self-service passcode change; the server enforces the weekly cooldown. */
+  changePassword: (
+    profileId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<{ ok: boolean; error?: string; retryAt?: number }>;
   signOut: () => void;
   loginAdmin: (password: string) => Promise<boolean>;
   logoutAdmin: () => void;
   /** Admin-only screen management. Nothing else may add/remove/rename a screen. */
-  adminSetProfilePassword: (id: string, password: string) => Promise<void>;
+  adminSetProfilePassword: (
+    id: string,
+    password: string,
+    temporary?: boolean,
+  ) => Promise<void>;
   adminUnblockProfile: (id: string) => Promise<void>;
   adminRenameProfile: (
     id: string,
-    patch: { name?: string; color?: string },
+    patch: { name?: string; color?: string; adminName?: string },
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   adminAddProfile: (
     name: string,
     color: string | undefined,
     password: string,
+    options?: { adminName?: string; temporary?: boolean },
   ) => Promise<AddProfileResult>;
   adminDeleteProfile: (id: string) => Promise<void>;
+  /** Rotates the server session epoch for one or many screens. */
+  adminKickProfiles: (ids: string[]) => Promise<void>;
   addToWatchlist: (media: Media) => void;
   removeFromWatchlist: (id: string) => void;
   isInWatchlist: (id: string) => boolean;
   recordHistory: (media: Media, opts?: { season?: number; episode?: number }) => void;
+  /** Marks history entries deleted and syncs the tombstones to every device. */
+  removeHistory: (ids: string[]) => void;
   setPrefs: (patch: Partial<ProfilePrefs>) => void;
 }
 
@@ -421,7 +442,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (id: string, password: string): Promise<ProfileAuthResult> => {
       const { result, map } = await auth.verifyProfilePassword(id, password);
       setAuthMap({ ...map });
-      if (result.ok) await chooseProfile(id);
+      // A one-time pass must not enter the app; Profiles shows the forced
+      // change step and calls completePasswordChange next.
+      if (result.ok && !result.mustChange) await chooseProfile(id);
       return result;
     },
     [chooseProfile],
@@ -435,6 +458,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return ok;
     },
     [chooseProfile],
+  );
+
+  const completePasswordChange = useCallback(
+    async (
+      profileId: string,
+      newPassword: string,
+      changeToken: string,
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const result = await auth.completePasswordChange(
+        profileId,
+        newPassword,
+        changeToken,
+      );
+      if (result.ok) await chooseProfile(profileId);
+      return result;
+    },
+    [chooseProfile],
+  );
+
+  const changePassword = useCallback(
+    async (
+      profileId: string,
+      currentPassword: string,
+      newPassword: string,
+    ): Promise<{ ok: boolean; error?: string; retryAt?: number }> => {
+      return auth.changePassword(profileId, currentPassword, newPassword);
+    },
+    [],
   );
 
   const signOut = useCallback(() => {
@@ -577,13 +628,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAdminAuthed(false);
   }, []);
 
-  const adminSetProfilePassword = useCallback(async (id: string, password: string) => {
-    const trimmed = password.trim();
-    if (!trimmed) return;
-    await auth.adminSetPassword(id, trimmed);
-    auth.clearDeviceToken(id);
-    setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
-  }, []);
+  const adminSetProfilePassword = useCallback(
+    async (id: string, password: string, temporary = false) => {
+      const trimmed = password.trim();
+      if (!trimmed) return;
+      await auth.adminSetPassword(id, trimmed, temporary);
+      auth.clearDeviceToken(id);
+      setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
+    },
+    [],
+  );
 
   const adminUnblockProfile = useCallback(async (id: string) => {
     await auth.adminUnblock(id);
@@ -591,13 +645,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Admin-only rename/recolour. Falls back to the local write path when the
-   * server is unreachable so the change is never silently lost.
+   * Admin-only rename/recolour/ref-label. Name and colour go to the profiles
+   * API (visible to everyone); adminName goes to the auth record and is only
+   * ever returned to an admin-authenticated caller.
    */
   const adminRenameProfile = useCallback(
     async (
       id: string,
-      patch: { name?: string; color?: string },
+      patch: { name?: string; color?: string; adminName?: string },
     ): Promise<{ ok: true } | { ok: false; error: string }> => {
       const trimmedName = patch.name?.trim();
       if (trimmedName !== undefined && trimmedName.length === 0) {
@@ -606,15 +661,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (trimmedName !== undefined && trimmedName.length > 24) {
         return { ok: false, error: "Names are capped at 24 characters." };
       }
+      if (patch.adminName !== undefined && patch.adminName.trim().length > 48) {
+        return { ok: false, error: "Reference names are capped at 48 characters." };
+      }
 
       try {
-        await updateProfile(id, {
-          ...(trimmedName !== undefined ? { name: trimmedName } : {}),
-          ...(patch.color !== undefined ? { color: patch.color } : {}),
-        });
+        if (trimmedName !== undefined || patch.color !== undefined) {
+          await updateProfile(id, {
+            ...(trimmedName !== undefined ? { name: trimmedName } : {}),
+            ...(patch.color !== undefined ? { color: patch.color } : {}),
+          });
+        }
+        if (patch.adminName !== undefined) {
+          await auth.adminSetRefName(id, patch.adminName);
+        }
+        setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
         return { ok: true };
       } catch {
-        return { ok: false, error: "Couldn't rename that screen." };
+        return { ok: false, error: "Couldn't update that screen." };
       }
     },
     [updateProfile],
@@ -625,6 +689,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       name: string,
       color: string | undefined,
       password: string,
+      options: { adminName?: string; temporary?: boolean } = {},
     ): Promise<AddProfileResult> => {
       // Check before creating anything: the screen would otherwise be left on
       // the server with no password the admin asked for.
@@ -635,12 +700,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await auth.adminAddRecord(
           result.profile.id,
           password.trim() || auth.DEFAULT_SCREEN_PASSWORD,
+          options,
         );
         setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
       }
       return result;
     },
     [addProfile],
+  );
+
+  const adminKickProfiles = useCallback(
+    async (ids: string[]) => {
+      const unique = [...new Set(ids)];
+      if (unique.length === 0) return;
+      setAuthMap(await auth.adminKick(unique));
+
+      // Kicking the screen this tab is using signs it out immediately as well;
+      // other devices are caught by SessionGuard within one poll.
+      if (activeId && unique.includes(activeId)) {
+        auth.clearLocalSession(activeId);
+        setActiveId(null);
+        stateRef.current = emptyState("");
+        setState(emptyState(""));
+        await kvDel(KEY_ACTIVE);
+      }
+    },
+    [activeId],
   );
 
   const adminDeleteProfile = useCallback(
@@ -661,12 +746,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /* ---------------------------------------------------------------- */
 
   const commit = useCallback(
-    (updater: (prev: ProfileState) => ProfileState, includePrefs = false) => {
+    (
+      updater: (prev: ProfileState) => ProfileState,
+      includePrefs = false,
+      flush = false,
+    ) => {
       if (!activeId) return;
       const next = touch(updater(stateRef.current));
       stateRef.current = next;
       setState(next);
-      void saveState(next).then(() => sync.queuePush(next, includePrefs));
+      void saveState(next).then(() => {
+        sync.queuePush(next, includePrefs);
+        // History tombstones should reach the server immediately so other
+        // devices cannot re-merge a title the user just removed.
+        if (flush) void sync.flushPush();
+      });
     },
     [activeId],
   );
@@ -743,6 +837,40 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  /**
+   * Removes history by writing tombstones, not by deleting locally: the
+   * tombstones are part of the pushed state, so the removal reaches every
+   * device and survives a cache wipe. Home and Library both hide them.
+   */
+  const removeHistory = useCallback(
+    (ids: string[]) => {
+      if (!activeId) return;
+      const targets = new Set(ids);
+      if (targets.size === 0) return;
+      if (
+        !stateRef.current.history.some(
+          (item) => targets.has(item.id) && !item.deletedAt,
+        )
+      ) {
+        return;
+      }
+      const now = Date.now();
+      commit(
+        (prev) => ({
+          ...prev,
+          history: prev.history.map((item) =>
+            targets.has(item.id) && !item.deletedAt
+              ? { ...item, deletedAt: now, updatedAt: now }
+              : item,
+          ),
+        }),
+        false,
+        true,
+      );
+    },
+    [activeId, commit],
+  );
+
   const setPrefs = useCallback(
     (patch: Partial<ProfilePrefs>) => {
       commit((prev) => ({ ...prev, prefs: { ...prev.prefs, ...patch } }), true);
@@ -767,6 +895,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       chooseProfile,
       unlockProfile,
       resumeProfile,
+      completePasswordChange,
+      changePassword,
       signOut,
       loginAdmin,
       logoutAdmin,
@@ -775,10 +905,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       adminRenameProfile,
       adminAddProfile,
       adminDeleteProfile,
+      adminKickProfiles,
       addToWatchlist,
       removeFromWatchlist,
       isInWatchlist,
       recordHistory,
+      removeHistory,
       setPrefs,
     }),
     [
@@ -792,6 +924,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       chooseProfile,
       unlockProfile,
       resumeProfile,
+      completePasswordChange,
+      changePassword,
       signOut,
       loginAdmin,
       logoutAdmin,
@@ -800,10 +934,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       adminRenameProfile,
       adminAddProfile,
       adminDeleteProfile,
+      adminKickProfiles,
       addToWatchlist,
       removeFromWatchlist,
       isInWatchlist,
       recordHistory,
+      removeHistory,
       setPrefs,
     ],
   );

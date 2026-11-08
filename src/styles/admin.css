@@ -1450,6 +1450,159 @@
   color: var(--danger);
 }
 
+/* Session selection + kick ---------------------------------------- */
+
+.admin-select-box {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  margin-left: -10px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.admin-select-box input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.admin-screen.is-selected {
+  border-color: var(--accent-line);
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    0 0 22px color-mix(in srgb, var(--accent-glow) 26%, transparent);
+}
+
+.admin-onetime-badge {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--warn) 42%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
+  font-family: var(--admin-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-ref {
+  margin-top: 4px;
+  color: var(--muted-2);
+  font-family: var(--admin-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.admin-kick-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.admin-kick-note {
+  line-height: 1.45;
+}
+
+.admin-select-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-select-toolbar .btn {
+  min-height: 44px;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.admin-row-buttons .btn {
+  min-height: 44px;
+}
+
+.admin-kick {
+  color: var(--danger);
+}
+
+.admin-kick:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  background: var(--danger-soft);
+}
+
+/* Checkbox rows: add-form option and per-row one-time toggle. */
+.admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.admin-check input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.admin-check--add {
+  align-items: flex-start;
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-3) 26%, transparent);
+}
+
+.admin-check-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.admin-check-title {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.admin-check--one-time {
+  margin-top: 8px;
+  max-width: 100%;
+  color: var(--muted);
+  font-family: var(--admin-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.admin-check--one-time > span {
+  min-width: 0;
+}
+
+.admin-rename-ref {
+  font-family: var(--admin-mono);
+  letter-spacing: 0.03em;
+}
+
 /* ==================================================================
    Responsive enhancements (mobile-first).
    ================================================================== */
@@ -1703,5 +1856,17 @@
   .admin-rename .admin-swatches.swatch-grid {
     grid-template-columns: repeat(10, minmax(0, 1fr));
     gap: 6px;
+  }
+}
+
+/* Narrow phones: give the passcode field and Save their own rows. */
+@media (max-width: 520px) {
+  .admin-password-row {
+    flex-wrap: wrap;
+  }
+
+  .admin-password-row input,
+  .admin-password-row .btn {
+    flex: 1 1 100%;
   }
 }

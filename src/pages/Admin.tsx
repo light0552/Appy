@@ -160,36 +160,46 @@ function failureText(error: unknown, fallback: string): string {
 function ScreenRow({
   credential,
   index,
+  selected,
+  onToggleSelect,
   onSetPassword,
   onUnblock,
   onRemove,
+  onKick,
   onRename,
 }: {
   credential: AdminCredential;
   index: number;
-  onSetPassword: (id: string, password: string) => Promise<void>;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+  onSetPassword: (id: string, password: string, temporary?: boolean) => Promise<void>;
   onUnblock: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  onKick: (id: string) => Promise<void>;
   onRename: (
     id: string,
-    patch: { name?: string; color?: string },
+    patch: { name?: string; color?: string; adminName?: string },
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const [password, setPassword] = useState("");
+  const [temporary, setTemporary] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmKick, setConfirmKick] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(credential.name);
   const [draftColor, setDraftColor] = useState(credential.color);
+  const [draftAdminName, setDraftAdminName] = useState(credential.adminName ?? "");
   const [renameError, setRenameError] = useState<string | null>(null);
 
   useEffect(() => {
     setDraftName(credential.name);
     setDraftColor(credential.color);
-  }, [credential.name, credential.color]);
+    setDraftAdminName(credential.adminName ?? "");
+  }, [credential.name, credential.color, credential.adminName]);
 
   const saveRename = async () => {
     if (pending) return;
@@ -204,6 +214,7 @@ function ScreenRow({
       const result = await onRename(credential.profileId, {
         name: nextName,
         color: draftColor,
+        adminName: draftAdminName.trim(),
       });
       if (!result.ok) {
         setRenameError(result.error);
@@ -221,6 +232,7 @@ function ScreenRow({
     setEditing(false);
     setDraftName(credential.name);
     setDraftColor(credential.color);
+    setDraftAdminName(credential.adminName ?? "");
     setRenameError(null);
   };
 
@@ -230,8 +242,9 @@ function ScreenRow({
     setSaved(false);
     setActionError(null);
     try {
-      await onSetPassword(credential.profileId, password);
+      await onSetPassword(credential.profileId, password, temporary);
       setPassword("");
+      setTemporary(false);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1800);
     } catch (error) {
@@ -277,12 +290,38 @@ function ScreenRow({
     }
   };
 
+  const kick = async () => {
+    if (pending) return;
+    setPending(true);
+    setActionError(null);
+    try {
+      await onKick(credential.profileId);
+      setConfirmKick(false);
+    } catch (error) {
+      setActionError(failureText(error, "Couldn't kick that session."));
+    } finally {
+      setPending(false);
+    }
+  };
+
   const blocked = credential.blocked;
   const warning = !blocked && credential.failedAttempts > 0;
 
   return (
-    <li className={`admin-screen${blocked ? " admin-screen--blocked" : ""}`}>
+    <li
+      className={`admin-screen${blocked ? " admin-screen--blocked" : ""}${
+        selected ? " is-selected" : ""
+      }`}
+    >
       <div className="admin-screen-identity">
+        <label className="admin-select-box">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(credential.profileId)}
+            aria-label={`Select ${credential.name}`}
+          />
+        </label>
         <span className="admin-screen-index" aria-hidden="true">
           {String(index + 1).padStart(2, "0")}
         </span>
@@ -307,6 +346,9 @@ function ScreenRow({
             >
               {statusLabel(credential)}
             </span>
+            {credential.mustChange && (
+              <span className="admin-onetime-badge">One-time · change pending</span>
+            )}
             {!editing && (
               <button
                 type="button"
@@ -339,6 +381,19 @@ function ScreenRow({
                 autoComplete="off"
                 spellCheck={false}
                 aria-label={`Name for ${credential.name}`}
+              />
+              <input
+                className="admin-rename-input admin-rename-ref"
+                value={draftAdminName}
+                onChange={(event) => {
+                  setDraftAdminName(event.target.value);
+                  setRenameError(null);
+                }}
+                maxLength={24}
+                placeholder="Admin ref (optional)"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label={`Admin ref name for ${credential.name}`}
               />
               <Swatches value={draftColor} onPick={setDraftColor} />
               {renameError && (
@@ -374,6 +429,9 @@ function ScreenRow({
                     ? "Wrong passcodes are counting toward the auto-lock"
                     : "Ready to unlock with its household passcode"}
               </p>
+              {credential.adminName && (
+                <p className="admin-ref">ref: {credential.adminName}</p>
+              )}
               <div className="admin-strikes" aria-label={`${credential.failedAttempts} of ${MAX_FAILED_ATTEMPTS} failed attempts`}>
                 {Array.from({ length: MAX_FAILED_ATTEMPTS }, (_, i) => {
                   const filled = blocked || i < credential.failedAttempts;
@@ -453,6 +511,18 @@ function ScreenRow({
               {pending ? "Saving…" : saved ? "Saved" : "Save"}
             </button>
           </div>
+          <label className="admin-check admin-check--one-time">
+            <input
+              type="checkbox"
+              checked={temporary}
+              onChange={(event) => {
+                setTemporary(event.target.checked);
+                setSaved(false);
+              }}
+              aria-label={`One-time passcode for ${credential.name}`}
+            />
+            <span>One-time · require change on next unlock</span>
+          </label>
         </div>
 
         <div className="admin-row-buttons">
@@ -464,6 +534,35 @@ function ScreenRow({
           >
             {blocked ? "Unblock screen" : "Not blocked"}
           </button>
+          {confirmKick ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={() => void kick()}
+                disabled={pending}
+              >
+                Confirm kick
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={() => setConfirmKick(false)}
+                disabled={pending}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost admin-kick"
+              onClick={() => setConfirmKick(true)}
+              disabled={pending}
+            >
+              Kick session
+            </button>
+          )}
           {confirmRemove ? (
             <>
               <button
@@ -517,6 +616,7 @@ export default function Admin() {
     adminRenameProfile,
     adminAddProfile,
     adminDeleteProfile,
+    adminKickProfiles,
     syncStatus,
   } = useSession();
   const navigate = useNavigate();
@@ -530,6 +630,8 @@ export default function Admin() {
   const [password, setPassword] = useState(DEFAULT_SCREEN_PASSWORD);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [color, setColor] = useState(DEFAULT_ADD_COLOR);
+  const [adminName, setAdminName] = useState("");
+  const [temporaryNew, setTemporaryNew] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addNotice, setAddNotice] = useState<string | null>(null);
   const [addPending, setAddPending] = useState(false);
@@ -537,6 +639,9 @@ export default function Admin() {
   const [query, setQuery] = useState("");
   const [blockedOnly, setBlockedOnly] = useState(false);
   const [copiedNames, setCopiedNames] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [kickPending, setKickPending] = useState(false);
+  const [kickError, setKickError] = useState<string | null>(null);
 
   if (!ready) {
     return (
@@ -688,6 +793,44 @@ export default function Admin() {
   const filterActive = normalizedQuery.length > 0 || blockedOnly;
   const capacityPercent = Math.min(100, (credentials.length / MAX_PROFILES) * 100);
 
+  const visibleIds = visibleCredentials.map((credential) => credential.profileId);
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+
+  const toggleSelect = (id: string) => {
+    setKickError(null);
+    setSelectedIds((previous) =>
+      previous.includes(id)
+        ? previous.filter((value) => value !== id)
+        : [...previous, id],
+    );
+  };
+
+  const selectAllVisible = () => {
+    setKickError(null);
+    setSelectedIds((previous) => Array.from(new Set([...previous, ...visibleIds])));
+  };
+
+  const clearSelection = () => {
+    setKickError(null);
+    setSelectedIds([]);
+  };
+
+  const kickSelected = async () => {
+    if (kickPending || selectedIds.length === 0) return;
+    const ids = [...selectedIds];
+    setKickPending(true);
+    setKickError(null);
+    try {
+      await adminKickProfiles(ids);
+      setSelectedIds([]);
+    } catch (error) {
+      setKickError(failureText(error, "Couldn't kick those sessions."));
+    } finally {
+      setKickPending(false);
+    }
+  };
+
   const system = syncStatus.error
     ? { key: "fault", label: "SYNC FAULT" }
     : syncStatus.syncing
@@ -716,7 +859,10 @@ export default function Admin() {
     setAddNotice(null);
     setAddPending(true);
     try {
-      const result = await adminAddProfile(name, color, password);
+      const result = await adminAddProfile(name, color, password, {
+        adminName: adminName.trim() || undefined,
+        temporary: temporaryNew,
+      });
       if (!result.ok) {
         setAddError(result.error);
         return;
@@ -724,6 +870,8 @@ export default function Admin() {
       setName("");
       setPassword(DEFAULT_SCREEN_PASSWORD);
       setColor(DEFAULT_ADD_COLOR);
+      setAdminName("");
+      setTemporaryNew(false);
       setAddNotice(`Added ${result.profile.name}.`);
     } catch (error) {
       setAddError(failureText(error, "Couldn't add that screen. Try again."));
@@ -879,9 +1027,43 @@ export default function Admin() {
                 </button>
               </div>
             </label>
+            <label className="admin-field admin-field--ref">
+              <span className="admin-field-label">Admin ref name</span>
+              <input
+                value={adminName}
+                onChange={(event) => {
+                  setAdminName(event.target.value);
+                  setAddError(null);
+                  setAddNotice(null);
+                }}
+                maxLength={24}
+                placeholder="e.g. zyn (optional)"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Admin reference name"
+              />
+            </label>
           </div>
           <p className="eyebrow admin-swatch-label">Colour ID</p>
           <Swatches value={color} onPick={setColor} />
+          <label className="admin-check admin-check--add">
+            <input
+              type="checkbox"
+              checked={temporaryNew}
+              onChange={(event) => {
+                setTemporaryNew(event.target.checked);
+                setAddError(null);
+                setAddNotice(null);
+              }}
+              aria-label="One-time passcode"
+            />
+            <span className="admin-check-text">
+              <span className="admin-check-title">One-time passcode</span>
+              <span className="tiny muted">
+                They choose their own passcode on first unlock.
+              </span>
+            </span>
+          </label>
           {addError && (
             <p className="sheet-error" role="alert">
               {addError}
@@ -958,6 +1140,45 @@ export default function Admin() {
           </span>
         </div>
 
+        {credentials.length > 0 && (
+          <div className="admin-kick-bar">
+            <p className="admin-kick-note tiny muted">
+              A kick signs that device out — they&apos;ll need their passcode again.
+            </p>
+            <div className="admin-select-toolbar" role="group" aria-label="Session controls">
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={selectAllVisible}
+                disabled={visibleIds.length === 0 || allVisibleSelected}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={clearSelection}
+                disabled={selectedIds.length === 0}
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger admin-kick-selected"
+                onClick={() => void kickSelected()}
+                disabled={selectedIds.length === 0 || kickPending}
+              >
+                {kickPending ? "Kicking…" : `Kick selected (${selectedIds.length})`}
+              </button>
+            </div>
+            {kickError && (
+              <p className="sheet-error" role="alert">
+                {kickError}
+              </p>
+            )}
+          </div>
+        )}
+
         {credentials.length === 0 ? (
           <div className="empty-state admin-empty">
             <span className="admin-empty-radar" aria-hidden="true"><span /><span /><span /></span>
@@ -987,9 +1208,17 @@ export default function Admin() {
                 key={credential.profileId}
                 credential={credential}
                 index={index}
+                selected={selectedIds.includes(credential.profileId)}
+                onToggleSelect={toggleSelect}
                 onSetPassword={adminSetProfilePassword}
                 onUnblock={adminUnblockProfile}
-                onRemove={adminDeleteProfile}
+                onRemove={async (id) => {
+                  await adminDeleteProfile(id);
+                  setSelectedIds((previous) => previous.filter((value) => value !== id));
+                }}
+                onKick={async (id) => {
+                  await adminKickProfiles([id]);
+                }}
                 onRename={adminRenameProfile}
               />
             ))}
