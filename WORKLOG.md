@@ -479,11 +479,12 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 - `preview.mjs` — production-build preview smoke test (25 checks + 16 screenshots).
 - `visual.mjs` — 34-shot visual QA across 360/390/768/1440 (overflow, tap targets, fold).
 
-**Final verification (2026-11-08, server-backed auth):**
-- `npx tsc --noEmit` clean; `npm run build` green.
-- `scripts/qa/auth.mjs` — **10/10 PASS**, including: new passcode survives a full cache/cookie/session/IndexedDB wipe; old 1234 is rejected after the wipe; a 3-strike block survives a wipe; admin can unblock/restore; admin can still sign in after a wipe.
+**Final verification (2026-11-08, server-backed auth + auto-update):**
+- `npx tsc --noEmit` clean; `npm run build` green, emits `dist/version.json` (build id `COMMIT_REF` on Netlify, timestamp locally).
+- `scripts/qa/auth.mjs` — **10/10 PASS**: new passcode survives a full cache/cookie/IndexedDB/session wipe; old 1234 is rejected after the wipe; a 3-strike block survives a wipe; admin unblock/restore; admin can sign in after a wipe.
+- `scripts/qa/persist.mjs` — **5/5 PASS**: unlock stores a 256-bit device token; close/reopen the same browser profile skips the passcode; clearing site data asks again; Sign out revokes the token; reopening after sign-out shows the picker.
 - `scripts/qa/audit.mjs` — **41/41 PASS** against Netlify Dev (server auth + functions + local Blobs).
-- `scripts/qa/visual.mjs` — **0 blockers / 0 major / 0 minor** at 360x640, 390x844, 768x1024, 1440x950; the clipped "g" in "Who's watching?" is fixed (line-height 1.05 + 0.18em paint padding).
+- Update watcher verified against `vite preview`: an open tab automatically reloads when `/version.json` changes (soft reload, then one cache-reset escalation if the bundle is still stale).
 - Admin console reads every screen passcode from the server (AES-GCM copy keyed from the admin password); the public status endpoint never returns passcodes, and the bundle contains no admin password.
-- `/api/auth` is a new Netlify Function at `config.path = "/api/auth"`; `/api/*` already redirects to `/.netlify/functions/:splat`. No new environment variables are required.
+- Device tokens are SHA-256 hashed in Blobs, scoped to one profile, valid 180 days sliding, and revoked by sign-out, password change, block or profile removal.
 - **No git, no Netlify deploy, no push performed.** Local test: `netlify dev --offline --port 8888` (LAN `http://192.168.0.42:8888`).

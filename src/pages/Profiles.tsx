@@ -166,6 +166,7 @@ export default function Profiles() {
     activeProfile,
     authMap,
     unlockProfile,
+    resumeProfile,
     signOut,
     syncStatus,
   } = useSession();
@@ -198,8 +199,13 @@ export default function Profiles() {
     };
   }, [sheet]);
 
-  const pick = (profile: ProfileMeta) => {
+  const pick = async (profile: ProfileMeta) => {
     if (activeProfile?.id === profile.id) {
+      navigate("/", { replace: true });
+      return;
+    }
+    // A remembered device skips the passcode. No token = instant false.
+    if (await resumeProfile(profile.id)) {
       navigate("/", { replace: true });
       return;
     }
@@ -412,7 +418,7 @@ export default function Profiles() {
                       <button
                         type="button"
                         className="profile-tile__select"
-                        onClick={() => pick(profile)}
+                        onClick={() => void pick(profile)}
                         aria-label={
                           active
                             ? `Continue as ${profile.name}`

@@ -2,6 +2,7 @@ import { getStore } from "@netlify/blobs";
 import {
   createCipheriv,
   createDecipheriv,
+  createHash,
   randomBytes,
   scrypt as scryptCallback,
   timingSafeEqual,
@@ -39,10 +40,19 @@ interface AdminRecord {
   updatedAt: number;
 }
 
+interface TokenRecord {
+  profileId: string;
+  createdAt: number;
+  lastUsedAt: number;
+  expiresAt: number;
+}
+
 interface AuthIndex {
   version: 1;
   admin: AdminRecord | null;
   screens: Record<string, ScreenRecord>;
+  /** SHA-256(token) -> device session. Never stores the token itself. */
+  tokens: Record<string, TokenRecord>;
   updatedAt: number;
 }
 
@@ -60,6 +70,12 @@ const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const SCRYPT_LENGTH = 64;
+
+/** 180 days, sliding: every successful resume extends it. */
+const TOKEN_TTL_MS = 180 * 24 * 60 * 60 * 1000;
+const MAX_TOKENS = 200;
+const MAX_TOKENS_PER_PROFILE = 10;
+const WRONG_PASSWORD_DELAY_MS = 250;
 
 const textEncoder = new TextEncoder();
 
@@ -193,7 +209,10 @@ async function readIndex(store: BlobStore): Promise<AuthIndex> {
     ((stored as unknown as AuthIndex).admin === null ||
       isRecord((stored as unknown as AuthIndex).admin))
   ) {
-    return stored as unknown as AuthIndex;
+    const index = stored as unknown as AuthIndex;
+    // Older records predate device tokens.
+    if (!isRecord(index.tokens)) index.tokens = {};
+    return index;
   }
 
   // First run: seed the admin hash only. Screen records are created lazily so
@@ -203,6 +222,7 @@ async function readIndex(store: BlobStore): Promise<AuthIndex> {
     version: 1,
     admin: { ...admin, updatedAt: Date.now() },
     screens: {},
+    tokens: {},
     updatedAt: Date.now(),
   };
   await store.setJSON(AUTH_KEY, fresh);
@@ -241,6 +261,68 @@ function publicStatus(index: AuthIndex): Record<string, { blocked: boolean; fail
     out[id] = { blocked: record.blocked, failedAttempts: record.failedAttempts };
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Device tokens                                                       */
+/* ------------------------------------------------------------------ */
+
+function tokenHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Drops expired tokens and enforces per-profile/total caps, oldest-used first.
+ * Called before every write that touches tokens so the store cannot grow
+ * without bound.
+ */
+function pruneTokens(index: AuthIndex, now = Date.now()): void {
+  const groups = new Map<string, Array<[string, TokenRecord]>>();
+  for (const [hash, record] of Object.entries(index.tokens)) {
+    if (!record || !Number.isFinite(record.expiresAt) || record.expiresAt <= now) {
+      delete index.tokens[hash];
+      continue;
+    }
+    const list = groups.get(record.profileId) ?? [];
+    list.push([hash, record]);
+    groups.set(record.profileId, list);
+  }
+
+  for (const list of groups.values()) {
+    if (list.length <= MAX_TOKENS_PER_PROFILE) continue;
+    list.sort((a, b) => a[1].lastUsedAt - b[1].lastUsedAt);
+    for (const [hash] of list.slice(0, list.length - MAX_TOKENS_PER_PROFILE)) {
+      delete index.tokens[hash];
+    }
+  }
+
+  const remaining = Object.entries(index.tokens);
+  if (remaining.length > MAX_TOKENS) {
+    remaining.sort((a, b) => a[1].lastUsedAt - b[1].lastUsedAt);
+    for (const [hash] of remaining.slice(0, remaining.length - MAX_TOKENS)) {
+      delete index.tokens[hash];
+    }
+  }
+}
+
+function issueToken(index: AuthIndex, profileId: string): { token: string; expiresAt: number } {
+  const token = randomBytes(32).toString("base64url");
+  const now = Date.now();
+  const expiresAt = now + TOKEN_TTL_MS;
+  index.tokens[tokenHash(token)] = {
+    profileId,
+    createdAt: now,
+    lastUsedAt: now,
+    expiresAt,
+  };
+  pruneTokens(index, now);
+  return { token, expiresAt };
+}
+
+function revokeProfileTokens(index: AuthIndex, profileId: string): void {
+  for (const [hash, record] of Object.entries(index.tokens)) {
+    if (record.profileId === profileId) delete index.tokens[hash];
+  }
 }
 
 async function readBody(req: Request): Promise<ParsedBody> {
@@ -318,13 +400,27 @@ async function route(req: Request): Promise<Response> {
         record.failedAttempts = 0;
         record.blocked = false;
         record.updatedAt = Date.now();
+        const issued = issueToken(index, profileId);
         await writeIndex(store, index);
-        return json({ ok: true, blocked: false, failedAttempts: 0, attemptsLeft: MAX_FAILED_ATTEMPTS });
+        return json({
+          ok: true,
+          blocked: false,
+          failedAttempts: 0,
+          attemptsLeft: MAX_FAILED_ATTEMPTS,
+          token: issued.token,
+          expiresAt: issued.expiresAt,
+        });
       }
 
+      await delay(WRONG_PASSWORD_DELAY_MS);
       record.failedAttempts += 1;
       record.updatedAt = Date.now();
-      if (record.failedAttempts >= MAX_FAILED_ATTEMPTS) record.blocked = true;
+      if (record.failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        record.blocked = true;
+        // A block invalidates every remembered device: all of them must wait
+        // for the admin and re-enter the passcode afterwards.
+        revokeProfileTokens(index, profileId);
+      }
       await writeIndex(store, index);
       return json({
         ok: false,
@@ -333,6 +429,51 @@ async function route(req: Request): Promise<Response> {
         attemptsLeft: Math.max(0, MAX_FAILED_ATTEMPTS - record.failedAttempts),
         error: record.blocked ? "blocked" : "wrong_password",
       });
+    }
+
+    case "resume": {
+      // A device token is a bearer secret. Only its SHA-256 is stored, it is
+      // scoped to one profile, and it dies with a password change or a block.
+      const profileId = normalizeProfileId(body.profileId);
+      const token = typeof body.token === "string" ? body.token : "";
+      if (!profileId || token.length < 20) return json({ error: "invalid_token" }, 400);
+
+      const hash = tokenHash(token);
+      const tokenRecord = index.tokens[hash];
+      if (!tokenRecord || tokenRecord.profileId !== profileId) {
+        return json({ ok: false, error: "invalid_token" }, 401);
+      }
+      if (tokenRecord.expiresAt <= Date.now()) {
+        delete index.tokens[hash];
+        await writeIndex(store, index);
+        return json({ ok: false, error: "expired_token" }, 401);
+      }
+
+      const screen = await seedScreen(store, index, profileId);
+      if (screen.blocked) {
+        delete index.tokens[hash];
+        await writeIndex(store, index);
+        return json({ ok: false, blocked: true, error: "blocked" }, 403);
+      }
+
+      const now = Date.now();
+      tokenRecord.lastUsedAt = now;
+      tokenRecord.expiresAt = now + TOKEN_TTL_MS; // sliding
+      pruneTokens(index, now);
+      await writeIndex(store, index);
+      return json({ ok: true, expiresAt: tokenRecord.expiresAt });
+    }
+
+    case "revoke": {
+      const profileId = normalizeProfileId(body.profileId);
+      const token = typeof body.token === "string" ? body.token : "";
+      if (!profileId || token.length < 20) return json({ ok: true });
+      const hash = tokenHash(token);
+      if (index.tokens[hash]?.profileId === profileId) {
+        delete index.tokens[hash];
+        await writeIndex(store, index);
+      }
+      return json({ ok: true });
     }
 
     case "adminLogin": {
@@ -363,6 +504,8 @@ async function route(req: Request): Promise<Response> {
       if (!password) return json({ error: "invalid_password" }, 400);
       const hash = await makeHash(password);
       const encKey = await deriveEncKey(adminKey as string);
+      // A password change signs every remembered device out.
+      revokeProfileTokens(index, profileId);
       index.screens[profileId] = {
         salt: hash.salt,
         hash: hash.hash,
@@ -411,6 +554,7 @@ async function route(req: Request): Promise<Response> {
     case "adminRemove": {
       const profileId = normalizeProfileId(body.profileId);
       if (!profileId) return json({ error: "invalid_profile" }, 400);
+      revokeProfileTokens(index, profileId);
       delete index.screens[profileId];
       await writeIndex(store, index);
       return json({ ok: true, screens: publicStatus(index) });

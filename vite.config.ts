@@ -1,12 +1,50 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+// @types/node is not installed for this project, so the two globals the config
+// needs from the Node runtime are declared locally instead of pulling a dep.
+declare const process: { env: Record<string, string | undefined> };
+
 const PROVIDER_HOSTS = String.raw`vidlink\.pro|vidsrc\.to|vidfast\.vc|player\.videasy\.to`;
 
+/**
+ * Identity of the bundle produced by this build. Netlify exposes the deployed
+ * commit as COMMIT_REF, which makes the value stable across repeated builds of
+ * the same commit; local builds fall back to VITE_BUILD_ID or a timestamp.
+ */
+const buildId = (
+  process.env.COMMIT_REF ||
+  process.env.VITE_BUILD_ID ||
+  Date.now().toString(36)
+).slice(0, 12);
+
+/**
+ * Writes /version.json next to sw.js in the build output. A running client
+ * polls it to learn which bundle is deployed right now. It is emitted here
+ * rather than kept in public/ so it can never be forgotten after a deploy and
+ * never drifts from the bundle it describes.
+ */
+function versionFilePlugin(): Plugin {
+  return {
+    name: "lighthook-version-file",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: JSON.stringify({ version: buildId }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
+  // Substituted into the client at build time; see src/components/UpdateWatcher.tsx.
+  define: { __BUILD_ID__: JSON.stringify(buildId) },
   plugins: [
     react(),
+    versionFilePlugin(),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",

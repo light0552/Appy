@@ -215,3 +215,37 @@ The admin passcode and every screen passcode are stored server-side as scrypt
 hashes; the admin console reads them from an AES-GCM copy encrypted with a key
 derived from the admin password. Plain passcodes never appear in the client
 bundle or in the public status endpoint.
+
+---
+
+## Persistent unlock (`persist.mjs`)
+
+Proves the "stay signed in on this device" behaviour end to end:
+
+```bash
+node scripts/qa/persist.mjs
+```
+
+Uses a throwaway Chrome user-data-dir and the local Netlify Dev server
+(default `http://localhost:8888`).
+
+1. Unlock Sam `1234` ? a device token is stored in localStorage.
+2. Close the browser, relaunch with the **same** profile ? lands on Home with
+   no passcode.
+3. Clear site data (cookies/localStorage/IndexedDB/sessionStorage) ? the
+   passcode is required again.
+4. Sign out ? the server token is revoked; tapping Sam asks for the passcode.
+5. Relaunch after sign-out ? the picker, not Home.
+
+Device tokens are random 256-bit values; only their SHA-256 is stored in
+Netlify Blobs. They are invalidated by sign-out, a passcode change, a block, a
+removed profile, or after 180 days (sliding).
+
+## Auto-update (`/version.json`)
+
+Every production build writes `dist/version.json` containing the build id
+(`COMMIT_REF` on Netlify). `src/components/UpdateWatcher.tsx` checks it on
+launch, focus, visibility and every 60s; a mismatch refreshes the service
+worker and hard-reloads the tab. A second mismatch escalates to unregistering
+the SW and clearing CacheStorage once. `/version.json` is served `no-store`
+(see `netlify.toml`), so a deploy is never hidden behind a cached response.

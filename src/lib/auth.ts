@@ -38,6 +38,8 @@ export interface ProfileAuthResult {
   blocked: boolean;
   failedAttempts: number;
   attemptsLeft: number;
+  /** Present on a successful verify; also mirrored into the device token store. */
+  token?: string;
   error?: ProfileAuthError;
 }
 
@@ -58,6 +60,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 const ADMIN_KEY_STORAGE = "lighthook:adminKey";
 const UNLOCK_PREFIX = "lighthook:unlocked:";
+const DEVICE_PREFIX = "lighthook:device:";
 
 /** Legacy local records (plaintext passwords) migrated once to the server. */
 const LEGACY_AUTH_KEY = "auth:v1";
@@ -82,6 +85,43 @@ function sessionSet(key: string, value: string | null): void {
   } catch {
     /* private mode / storage disabled — the in-memory context still works */
   }
+}
+
+/* Device tokens live in localStorage: "stay signed in until sign-out or a
+   cache wipe", while the admin session stays per-tab in sessionStorage. */
+
+function localGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function localSet(key: string, value: string | null): void {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    /* storage disabled — the token simply does not persist */
+  }
+}
+
+function deviceKey(profileId: string): string {
+  return DEVICE_PREFIX + profileId;
+}
+
+export function hasDeviceToken(profileId: string): boolean {
+  const token = localGet(deviceKey(profileId));
+  return typeof token === "string" && token.length >= 20;
+}
+
+function storeDeviceToken(profileId: string, token: string | undefined): void {
+  if (token && token.length >= 20) localSet(deviceKey(profileId), token);
+}
+
+export function clearDeviceToken(profileId: string): void {
+  localSet(deviceKey(profileId), null);
 }
 
 /* ------------------------------------------------------------------ */
@@ -279,7 +319,9 @@ function resultFromVerify(data: Record<string, unknown>): ProfileAuthResult {
       ? "blocked"
       : "wrong_password";
 
-  return { ok, blocked, failedAttempts, attemptsLeft, ...(error ? { error } : {}) };
+  const token = typeof data.token === "string" && data.token.length >= 20 ? data.token : undefined;
+
+  return { ok, blocked, failedAttempts, attemptsLeft, ...(token ? { token } : {}), ...(error ? { error } : {}) };
 }
 
 /**
@@ -309,6 +351,12 @@ export async function verifyProfilePassword(
     remember(map);
 
     setProfileUnlocked(profileId, result.ok);
+    if (result.ok) {
+      storeDeviceToken(profileId, result.token);
+    } else if (result.blocked) {
+      // The server revoked every device token on the third failure.
+      clearDeviceToken(profileId);
+    }
     return { result, map };
   } catch (err) {
     const code = errorCode(err);
@@ -329,6 +377,50 @@ export async function verifyProfilePassword(
       },
       map,
     };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Persistent device unlock                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tries to resume a profile from its stored device token. This is what makes
+ * closing Brave/Chrome and reopening land straight in the profile without a
+ * passcode, while a password change / block / sign-out revokes the token.
+ */
+export async function resumeProfile(profileId: string): Promise<boolean> {
+  const token = localGet(deviceKey(profileId));
+  if (!token || token.length < 20) return false;
+
+  try {
+    const data = await call({ action: "resume", profileId, token });
+    if (data.ok !== true) {
+      clearDeviceToken(profileId);
+      return false;
+    }
+    setProfileUnlocked(profileId, true);
+    return true;
+  } catch (err) {
+    const code = errorCode(err);
+    // A real rejection (invalid/expired/blocked) means the token is dead.
+    // A transport failure keeps it for the next attempt.
+    if (code !== null && code !== "offline" && code !== "timeout") {
+      clearDeviceToken(profileId);
+    }
+    return false;
+  }
+}
+
+/** Revokes this device's token server-side, then forgets it locally. */
+export async function revokeDeviceToken(profileId: string): Promise<void> {
+  const token = localGet(deviceKey(profileId));
+  clearDeviceToken(profileId);
+  if (!token) return;
+  try {
+    await call({ action: "revoke", profileId, token });
+  } catch {
+    /* best effort — the server token expires on its own */
   }
 }
 
@@ -406,6 +498,7 @@ export async function adminAddRecord(
 export async function adminRemoveRecord(profileId: string): Promise<ProfileAuthMap> {
   const map = await adminCall({ action: "adminRemove", profileId });
   setProfileUnlocked(profileId, false);
+  clearDeviceToken(profileId);
   return map;
 }
 

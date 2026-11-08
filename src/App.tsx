@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import NoticeBoard from "./components/NoticeBoard";
 import TabBar from "./components/TabBar";
+import UpdateWatcher from "./components/UpdateWatcher";
 import Admin from "./pages/Admin";
 import Browse from "./pages/Browse";
 import Home from "./pages/Home";
@@ -72,6 +73,7 @@ export default function App() {
     <div className="app">
       <ThemeSync />
       <ScrollToTop />
+      <UpdateWatcher />
 
       {showNotice && <NoticeBoard />}
 

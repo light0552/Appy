@@ -70,6 +70,8 @@ export interface SessionValue {
   adminAuthed: boolean;
   chooseProfile: (id: string) => Promise<void>;
   unlockProfile: (id: string, password: string) => Promise<ProfileAuthResult>;
+  /** Passwordless resume from a stored device token; false when it is gone. */
+  resumeProfile: (id: string) => Promise<boolean>;
   signOut: () => void;
   loginAdmin: (password: string) => Promise<boolean>;
   logoutAdmin: () => void;
@@ -262,12 +264,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setAuthMap(nextAuth);
 
       const storedActive = await kvGet<string>(KEY_ACTIVE);
-      const active =
+      let active =
         storedActive && auth.isProfileUnlocked(storedActive)
           ? withMeta.find(
               (profile) => profile.id === storedActive && !nextAuth[profile.id]?.blocked,
             )
           : undefined;
+
+      // Closing the browser clears sessionStorage but not the device token.
+      // Resume the last active profile without a passcode when the token is
+      // still valid server-side.
+      if (!active && storedActive) {
+        const candidate = withMeta.find(
+          (profile) => profile.id === storedActive && !nextAuth[profile.id]?.blocked,
+        );
+        if (candidate && auth.hasDeviceToken(storedActive)) {
+          if (await auth.resumeProfile(storedActive)) {
+            active = candidate;
+          } else if (!auth.hasDeviceToken(storedActive)) {
+            // Token was rejected/revoked — ask for the passcode next time.
+            await kvDel(KEY_ACTIVE);
+          }
+        }
+      }
 
       if (active) {
         const stored = await loadState(active.id);
@@ -413,9 +432,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [chooseProfile],
   );
 
+  /** Passwordless resume for a device that already has a valid token. */
+  const resumeProfile = useCallback(
+    async (id: string): Promise<boolean> => {
+      const ok = await auth.resumeProfile(id);
+      if (ok) await chooseProfile(id);
+      return ok;
+    },
+    [chooseProfile],
+  );
+
   const signOut = useCallback(() => {
     void sync.flushPush();
-    if (activeId) auth.setProfileUnlocked(activeId, false);
+    if (activeId) {
+      auth.setProfileUnlocked(activeId, false);
+      void auth.revokeDeviceToken(activeId);
+    }
     setActiveId(null);
     stateRef.current = emptyState("");
     setState(emptyState(""));
@@ -554,6 +586,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const trimmed = password.trim();
     if (!trimmed) return;
     await auth.adminSetPassword(id, trimmed);
+    auth.clearDeviceToken(id);
     setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
   }, []);
 
@@ -738,6 +771,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       adminAuthed,
       chooseProfile,
       unlockProfile,
+      resumeProfile,
       signOut,
       loginAdmin,
       logoutAdmin,
@@ -762,6 +796,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       adminAuthed,
       chooseProfile,
       unlockProfile,
+      resumeProfile,
       signOut,
       loginAdmin,
       logoutAdmin,

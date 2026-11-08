@@ -232,11 +232,26 @@ async function openUnlockSheet(name) {
     timeout: 15_000,
   });
   await page.click(`button[aria-label="Unlock ${name} with a password"]`);
-  await page.waitForSelector(".sheet", { timeout: 10_000 });
+
+  // A remembered device resumes straight to Home; a new device shows the sheet.
+  return Promise.race([
+    page
+      .waitForSelector(".sheet", { timeout: 15_000 })
+      .then(() => "sheet")
+      .catch(() => null),
+    page
+      .waitForFunction(
+        () => location.pathname === "/" && Boolean(document.querySelector(".home")),
+        { timeout: 15_000 },
+      )
+      .then(() => "home")
+      .catch(() => null),
+  ]);
 }
 
 async function unlockScreen(name, password) {
-  await openUnlockSheet(name);
+  const outcome = await openUnlockSheet(name);
+  if (outcome === "home") return; // device token still valid
   await fill(`input[aria-label="Password for ${name}"]`, password);
   await page.keyboard.press("Enter");
 }

@@ -66,6 +66,12 @@
     Service-Worker-Allowed = "/"
 
 [[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
+    Content-Type = "application/json"
+
+[[headers]]
   for = "/registerSW.js"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
