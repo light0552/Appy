@@ -11,8 +11,13 @@ Dev server must be up first (Chrome + Node are preinstalled on this machine):
 
 ```
 npm run dev            # from E:\OPENCODE\Appy
+$env:QA_ADMIN_KEY = "<the admin password>"   # never stored in this repo
 node scripts/qa/audit.mjs
 ```
+
+`QA_ADMIN_KEY` is required by the admin-backed suites (`audit`, `auth`,
+`features`, `preview`). It comes from the shell or your gitignored local
+`.env`; there is no default in the repository.
 
 Options:
 
@@ -53,7 +58,7 @@ Split into eight phases; a failed check never aborts the rest of the suite
    "1 attempt left", the third blocks with "Contact admin" copy, the picker
    shows a blocked tile, and the blocked sheet offers no password field so the
    correct password cannot be used while blocked.
-5. **Admin console** — wrong password rejected, `light0552` opens the
+5. **Admin console** — wrong password rejected, the env admin password opens the
    dashboard, screens + passwords are listed (Sam/Mellu → `1234`), "Copy all"
    exists, blocked screens show a Blocked badge and can be unblocked (and then
    accept their password again), a new screen "QA Test" can be added with a
@@ -205,7 +210,7 @@ What it verifies against `http://localhost:4173`:
 6. **Title + watch** — `/title/movie/550` renders `.title-page` with a Play
    control; `/watch/tv/1399?s=1&e=1` renders `.watch-bar`, the `S1 · E1` badge,
    `.watch-episode-name`, Next episode, Reload stream, and no Previous episode.
-7. **Admin** — `/admin` shows the login gate; `light0552` opens the dashboard
+7. **Admin** — `/admin` shows the login gate; the env admin password opens the dashboard
    and registry.
 8. **Diagnostics** — no uncaught `pageerror` events and no failed same-origin
    responses. `/api` responses are ignored on purpose: `vite preview` has no

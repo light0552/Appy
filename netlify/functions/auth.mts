@@ -86,7 +86,13 @@ const AUTH_KEY = "auth/index.json";
 const TOKEN_PREFIX = "auth/tokens/";
 const CHANGE_PREFIX = "auth/changes/";
 const SESSION_COOKIE = "lighthook_session";
-const ADMIN_PASSWORD = "light0552";
+/**
+ * Server-only admin password. There is deliberately no default: a missing
+ * value leaves a fresh store with admin disabled, and leaves an existing
+ * admin hash untouched (so a site that has not been configured yet keeps
+ * working until the env is set). Both Netlify sites set this explicitly.
+ */
+const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD ?? "").trim();
 const DEFAULT_SCREEN_PASSWORD = "1234";
 const MAX_FAILED_ATTEMPTS = 3;
 const MIN_PASSWORD_LENGTH = 4;
@@ -261,12 +267,13 @@ async function readIndex(store: BlobStore): Promise<AuthIndex> {
     return index;
   }
 
-  // First run: seed the admin hash only. Screen records are created lazily so
-  // the default 1234 is never written for a screen the household removed.
-  const admin = await makeHash(ADMIN_PASSWORD);
+  // First run: seed the admin hash only when the server has been configured
+  // with ADMIN_PASSWORD. Screen records are created lazily so the default 1234
+  // is never written for a screen the household removed.
+  const admin = ADMIN_PASSWORD ? await makeHash(ADMIN_PASSWORD) : null;
   const fresh: AuthIndex = {
     version: 1,
-    admin: { ...admin, updatedAt: Date.now() },
+    admin: admin ? { ...admin, updatedAt: Date.now() } : null,
     screens: {},
     tokens: {},
     updatedAt: Date.now(),
@@ -278,6 +285,38 @@ async function readIndex(store: BlobStore): Promise<AuthIndex> {
 async function writeIndex(store: BlobStore, index: AuthIndex): Promise<void> {
   index.updatedAt = Date.now();
   await store.setJSON(AUTH_KEY, index);
+}
+
+let syncedAdminPassword = "";
+let adminSyncPromise: Promise<void> | null = null;
+
+/**
+ * Keeps the Blobs admin hash aligned with the server-only ADMIN_PASSWORD env.
+ *
+ * - env set + existing hash does not match -> rehash (rotates on env change /
+ *   first request after deploy)
+ * - env set + no admin hash -> seed it
+ * - env missing -> leave an existing hash alone, so a site awaiting its env
+ *   configuration keeps working; a fresh store stays admin-disabled
+ *
+ * Runs once per cold start/value change; admin requests are rare, so the one
+ * scrypt verification is acceptable.
+ */
+async function ensureAdminPassword(store: BlobStore, index: AuthIndex): Promise<void> {
+  if (!ADMIN_PASSWORD || syncedAdminPassword === ADMIN_PASSWORD) return;
+  if (!adminSyncPromise) {
+    adminSyncPromise = (async () => {
+      if (!index.admin || !(await verifyHash(ADMIN_PASSWORD, index.admin))) {
+        const next = await makeHash(ADMIN_PASSWORD);
+        index.admin = { ...next, updatedAt: Date.now() };
+        await writeIndex(store, index);
+      }
+      syncedAdminPassword = ADMIN_PASSWORD;
+    })().finally(() => {
+      adminSyncPromise = null;
+    });
+  }
+  await adminSyncPromise;
 }
 
 /**
@@ -548,6 +587,7 @@ async function route(req: Request): Promise<Response> {
   const store = getStore({ name: STORE_NAME, consistency: "strong" });
   const index = await readIndex(store);
   await migrateLegacyTokens(store, index);
+  await ensureAdminPassword(store, index);
 
   switch (action) {
     case "status": {

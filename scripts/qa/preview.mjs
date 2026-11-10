@@ -42,7 +42,11 @@ const DEFAULT_CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.e
 const APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Keys / secrets the preview run relies on (see src/lib/auth.ts). */
-const ADMIN_PASSWORD = "light0552";
+if (!process.env.QA_ADMIN_KEY) {
+  console.error("Set QA_ADMIN_KEY to the admin password before running this suite.");
+  process.exit(64);
+}
+const ADMIN_PASSWORD = process.env.QA_ADMIN_KEY;
 const SCREEN_PASSWORD = "1234";
 
 const TITLE_PATH = "/title/movie/550";

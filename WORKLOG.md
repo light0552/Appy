@@ -455,7 +455,7 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 **User mandate:** make every screen password-protected with a 3-strike block; only admin can add/remove/unblock; raise the cap to 50 screens; remove the ad-free rip player entirely; improve the house notice; make the UI "impress me" across every surface.
 
 **Completed architecture:**
-- `src/lib/auth.ts` — local auth: admin password `light0552`, seeded screen passwords `1234`, 3-failed-attempt block, admin set/unblock/add/remove, credential listing.
+- `src/lib/auth.ts` — local auth: server-env admin password, seeded screen passwords `1234`, 3-failed-attempt block, admin set/unblock/add/remove, credential listing.
 - `src/lib/session.tsx` — admin session, auth map state, `adminAddProfile`/`adminDeleteProfile`/`adminSetProfilePassword`/`adminUnblockProfile`.
 - `src/lib/profiles.ts` + `netlify/functions/profiles.mts` — `MAX_PROFILES = 50`.
 - `src/pages/Admin.tsx` + `src/styles/admin.css` — control room: login, stats, add-screen form, filterable 50-screen list, copy password, bulk copy all, unblock/remove.
@@ -553,7 +553,23 @@ the rips' HLS masters declare `CLOSED-CAPTIONS=NONE`, but the provider embed pla
 
 **Deployment (2026-11-08):**
 - Netlify account moved to **LIGHTHOOK** (`sameerxp10180@gmail.com`). New site **`lighthook`** (`3266c450-5b47-40ad-aa45-0ce3ccce597e`, https://lighthook.netlify.app), freshly created under that account.
-- Fresh Blobs: the new site starts with the default admin (`light0552`) and the seeded **Sam / Mellu** profiles; GOAT/Sameer and their history are not migrated (old site remains untouched on the previous account at `backuplighthook.netlify.app`).
+- Fresh Blobs: the new site starts with the server-env admin password and the seeded **Sam / Mellu** profiles; GOAT/Sameer and their history are not migrated (old site remains untouched on the previous account at `backuplighthook.netlify.app`).
 - New site env set: `FAMILY_KEY`, `VITE_FAMILY_KEY`, `VITE_TMDB_TOKEN`, `VITE_TMDB_API_KEY`, `AUTH_SECRET`, `NODE_VERSION=20`.
 - `.github/workflows/deploy.yml` retired (deleted) so a Git push cannot deploy to the old account. Netlify's own Git integration on `lighthook` now builds and publishes every push to `main`.
 - This playback fix ships in one batched commit and one Netlify Git-integration deploy.
+
+---
+
+## 15. Admin password moved out of the public repo (2026-11-10)
+
+**Problem:** the admin password was hardcoded in `netlify/functions/auth.mts` and repeated in README/WORKLOG/QA scripts. The repo is public, so the value was public (and remains in Git history).
+
+**Fix:**
+- `ADMIN_PASSWORD` is now a server-only environment variable. There is no built-in default.
+- `readIndex` seeds a fresh store from the env value when present, otherwise leaves admin disabled.
+- `ensureAdminPassword` verifies the stored hash against the env value and rehashes on a mismatch. This rotates the password on the first request after deploy or after an env change, with no redeploy.
+- If the env is missing, an existing admin hash is left untouched — this keeps a not-yet-configured site (the backup) working until its env is set.
+- Current repo no longer contains the old password; QA suites require `QA_ADMIN_KEY` from the shell/local `.env`, with no fallback.
+- `.env.example` documents `ADMIN_PASSWORD=` with no value. Local `.env` and Netlify env hold the real value; neither is committed.
+- The new `lighthook` site has `ADMIN_PASSWORD` configured and rotates on first request. The backup site is intentionally left without the env for now: the same commit deploys there, but its existing admin hash remains until `ADMIN_PASSWORD` is set on that site; the next request will rotate it automatically.
+- Git history still contains the old value, but it is dead after rotation. History was not rewritten.

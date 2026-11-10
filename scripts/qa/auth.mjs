@@ -11,6 +11,11 @@ import puppeteer from "puppeteer-core";
 const BASE = process.env.QA_BASE || "http://localhost:8888";
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const ORIGIN = new URL(BASE).origin;
+if (!process.env.QA_ADMIN_KEY) {
+  console.error("Set QA_ADMIN_KEY to the admin password before running this suite.");
+  process.exit(64);
+}
+const ADMIN_KEY = process.env.QA_ADMIN_KEY;
 
 const results = [];
 function check(name, ok, detail = "") {
@@ -85,7 +90,7 @@ async function waitDashboard() {
 
 async function adminLogin() {
   await goto("/admin", ".admin-page--login");
-  await typeInto('input[aria-label="Admin password"]', "light0552");
+  await typeInto('input[aria-label="Admin password"]', ADMIN_KEY);
   await page.keyboard.press("Enter");
   await waitDashboard();
 }
@@ -144,7 +149,7 @@ async function resetServerScreen(profileId, password) {
     headers: {
       "content-type": "application/json",
       "x-family-key": process.env.QA_FAMILY_KEY || "samandmellu",
-      "x-admin-key": "light0552",
+      "x-admin-key": ADMIN_KEY,
     },
     body: JSON.stringify({ action: "adminSet", profileId, password }),
   });

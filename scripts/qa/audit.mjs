@@ -46,7 +46,11 @@ const DEFAULT_CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.e
 /** Keys / secrets the audit relies on (see src/lib/auth.ts). */
 const NOTICE_KEY = "lighthook.notice.acknowledged";
 const LEGACY_NOTICE_KEY = "lighthook.notice.dismissedOn";
-const ADMIN_PASSWORD = "light0552";
+if (!process.env.QA_ADMIN_KEY) {
+  console.error("Set QA_ADMIN_KEY to the admin password before running this suite.");
+  process.exit(64);
+}
+const ADMIN_PASSWORD = process.env.QA_ADMIN_KEY;
 const DEFAULT_SCREEN_PASSWORD = "1234";
 
 /** The disposable screen the admin phase provisions and then removes. */
@@ -357,9 +361,9 @@ async function resetServerAuth() {
         body: JSON.stringify(body),
       });
 
-    const login = await post({ action: "adminLogin", password: "light0552" });
+    const login = await post({ action: "adminLogin", password: ADMIN_PASSWORD });
     if (!login.ok) return false;
-    const admin = { "x-admin-key": "light0552" };
+    const admin = { "x-admin-key": ADMIN_PASSWORD };
 
     // Clean any leftover QA Test screens from an interrupted previous run.
     const listRes = await fetch(`${BASE}/api/profiles`, { headers });

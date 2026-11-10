@@ -21,7 +21,11 @@ const PROFILE_DIR =
   process.env.QA_PROFILE ||
   "C:\\Users\\LIGHTHOOK\\AppData\\Local\\Temp\\opencode\\lighthook-features";
 const FAMILY_KEY = process.env.QA_FAMILY_KEY || "samandmellu";
-const ADMIN_KEY = process.env.QA_ADMIN_KEY || "light0552";
+if (!process.env.QA_ADMIN_KEY) {
+  console.error("Set QA_ADMIN_KEY to the admin password before running this suite.");
+  process.exit(64);
+}
+const ADMIN_KEY = process.env.QA_ADMIN_KEY;
 const ORIGIN = new URL(BASE).origin;
 
 const A_NAME = "QA OTP";

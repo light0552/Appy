@@ -11,8 +11,9 @@ and Netlify Blobs for cross-device profile sync.
 - **Zero video bytes through Netlify.** The embed points straight at the playback provider.
 - **Every screen is password-locked.** Up to **50 screens** in the household. Each one has
   its own password; three wrong attempts lock that screen until the admin unblocks it.
-- **One admin.** The control room (`/admin`, admin password `light0552` by default) is the
-  only place to add a screen, remove one, set a password, or unblock a locked screen.
+- **One admin.** The control room (`/admin`, admin password configured with the server-only
+  `ADMIN_PASSWORD` environment variable) is the only place to add a screen, remove one, set a
+  password, or unblock a locked screen.
 
 The full build specification is in [`BUILD.md`](./BUILD.md). Read it first.
 
