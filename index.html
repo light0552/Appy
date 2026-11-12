@@ -5,20 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
     <!-- Brand ---------------------------------------------------------- -->
-    <title>LIGHTH00K</title>
+    <title>LIGHTH00K — Private Cinema</title>
     <meta
       name="description"
-      content="LIGHTH00K — the household's private streaming shelf. Installable, offline-ready, and built for the living room."
+      content="LIGHTH00K is the household's private cinema. A hand-built shelf of films and series, made for the living room."
     />
     <meta name="application-name" content="LIGHTH00K" />
 
-    <!-- Install identity: the app is dark-only, so the chrome bar and the
-         splash background are both the base surface colour. -->
+    <!-- Warm midnight shell; matches --bg so install splash and browser
+         chrome never flash a different colour. -->
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#050810" />
+    <meta name="theme-color" content="#0a0806" />
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="robots" content="noindex, nofollow" />
+
+    <!-- Link previews (the app is private, but a clean card costs nothing) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="LIGHTH00K — Private Cinema" />
+    <meta
+      property="og:description"
+      content="The household's own screening room. Films, series and a ginger cat on the door."
+    />
+    <meta property="og:image" content="https://lighthook.netlify.app/icons/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="LIGHTH00K — Private Cinema" />
+    <meta
+      name="twitter:description"
+      content="The household's own screening room. Films, series and a ginger cat on the door."
+    />
+    <meta name="twitter:image" content="https://lighthook.netlify.app/icons/icon-512.png" />
 
     <!-- iOS standalone launch ------------------------------------------ -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -29,10 +45,14 @@
     <!-- Manifest + icons (binaries live in public/icons) --------------- -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-    <link rel="mask-icon" href="/icons/favicon.svg" color="#4cc3ff" />
+    <link rel="mask-icon" href="/icons/favicon.svg" color="#e9a05a" />
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+
+    <!-- Type: self-hosted, so the shelf keeps its voice offline --------- -->
+    <link rel="preload" href="/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
 
     <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
     <link rel="preconnect" href="https://api.themoviedb.org" crossorigin />
@@ -41,23 +61,20 @@
 
     <style>
       /* Paint the shell before the bundle and stylesheet arrive so a cold start
-         (and the standalone launch) never flashes white. The app's own CSS
-         takes over as soon as it loads. */
+         (and the standalone launch) never flashes white. */
       :root {
         color-scheme: dark;
       }
       html,
       body {
         margin: 0;
-        background-color: #050810;
+        background-color: #0a0806;
       }
       html {
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
       }
       body {
-        /* No grey tap flash on iOS; the app's own pressed states are the
-           only feedback. */
         -webkit-tap-highlight-color: transparent;
       }
       body,
@@ -66,31 +83,30 @@
         min-height: 100dvh;
       }
 
-      /* Cold-start veil: one accent dot while React mounts. It disappears the
-         moment #root has children, and the noscript panel covers it. */
+      /* Cold-start veil: a warm lamp while React mounts. */
       #root:empty::after {
         content: "";
         position: fixed;
         left: 50%;
         top: 50%;
-        width: 10px;
-        height: 10px;
-        margin: -5px 0 0 -5px;
+        width: 9px;
+        height: 9px;
+        margin: -4.5px 0 0 -4.5px;
         border-radius: 50%;
-        background: #4cc3ff;
+        background: #e9a05a;
         animation: shell-pulse 1.6s ease-out infinite;
       }
       @keyframes shell-pulse {
         0% {
-          box-shadow: 0 0 0 0 rgba(76, 195, 255, 0.45);
+          box-shadow: 0 0 0 0 rgba(233, 160, 90, 0.5);
           opacity: 1;
         }
         70% {
-          box-shadow: 0 0 0 22px rgba(76, 195, 255, 0);
-          opacity: 0.55;
+          box-shadow: 0 0 0 24px rgba(233, 160, 90, 0);
+          opacity: 0.5;
         }
         100% {
-          box-shadow: 0 0 0 0 rgba(76, 195, 255, 0);
+          box-shadow: 0 0 0 0 rgba(233, 160, 90, 0);
           opacity: 1;
         }
       }
@@ -110,9 +126,9 @@
         padding: 24px;
         padding: max(24px, env(safe-area-inset-top)) 24px
           max(24px, env(safe-area-inset-bottom));
-        background: radial-gradient(120% 90% at 50% 0%, #0b1526 0%, #050810 62%);
-        color: #e8f4ff;
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        background: radial-gradient(120% 90% at 50% 0%, #1b130b 0%, #0a0806 64%);
+        color: #f6efe3;
+        font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
           sans-serif;
         text-align: center;
       }
@@ -124,16 +140,16 @@
         height: 2px;
         margin: 0 auto 20px;
         border-radius: 2px;
-        background: linear-gradient(90deg, transparent, #4cc3ff, transparent);
-        box-shadow: 0 0 18px rgba(76, 195, 255, 0.55);
+        background: linear-gradient(90deg, transparent, #e9a05a, transparent);
+        box-shadow: 0 0 20px rgba(233, 160, 90, 0.6);
       }
       .noscript-mark {
         margin: 0;
         font-size: 12px;
         font-weight: 700;
-        letter-spacing: 0.34em;
+        letter-spacing: 0.32em;
         text-transform: uppercase;
-        color: #4cc3ff;
+        color: #e9a05a;
       }
       .noscript-card h1 {
         margin: 14px 0 10px;
@@ -146,20 +162,20 @@
         margin: 0;
         font-size: 15px;
         line-height: 1.55;
-        color: #9fb1c7;
+        color: #b4a690;
       }
       .noscript-card p + p {
         margin-top: 12px;
         font-size: 13.5px;
-        color: #677287;
+        color: #7e7263;
       }
       .noscript-card a {
-        color: #4cc3ff;
+        color: #e9a05a;
         text-decoration: none;
-        border-bottom: 1px solid rgba(76, 195, 255, 0.42);
+        border-bottom: 1px solid rgba(233, 160, 90, 0.42);
       }
       .noscript-card a:hover {
-        color: #8ad9ff;
+        color: #ffc78e;
       }
     </style>
   </head>
@@ -172,9 +188,9 @@
           <p class="noscript-mark">LIGHTH00K</p>
           <h1>JavaScript is switched off</h1>
           <p>
-            This shelf renders in your browser, so it can't start without
+            This cinema renders in your browser, so it can't start without
             JavaScript. Enable it for this site, then
-            <a href="/">reload LIGHTH00K</a>.
+            <a href="/">open the doors again</a>.
           </p>
           <p>
             If you already installed LIGHTH00K to your home screen, launch it

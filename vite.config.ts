@@ -53,7 +53,7 @@ export default defineConfig({
       workbox: {
         // Covers the app bundle plus everything copied from public/ (manifest,
         // favicon, the full icon set), so the installed shell boots offline.
-        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest,ico,woff2}"],
+        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest,ico,woff2,jpg,jpeg,webp}"],
         navigateFallback: "/index.html",
         // Never answer an API call or a Netlify function with the SPA shell.
         // (Also covers the bare "/api" and "/.netlify" paths, no trailing slash.)

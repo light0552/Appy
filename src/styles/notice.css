@@ -1,14 +1,15 @@
 /* ==================================================================
-   House signal — the cinematic status band above the main content.
-   Tokens come from src/styles.css; nothing here reaches outside
-   the .notice subtree.
+   House rules — a small warm ticket above the shelf.
+   Cat seal, one line about ad blockers, three compact setup chips and
+   one amber dismissal. Phones get three icon tiles in a single row;
+   wide screens spread them across the foot of the card. Deliberately
+   short so the hero below still gets the first screen.
    ================================================================== */
 
 .notice {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1040px;
   margin: 0 auto;
-  /* Gutter + safe-area: never tuck the band under a notch. */
   padding:
     calc(env(safe-area-inset-top, 0px) + 12px)
     max(var(--page-x), env(safe-area-inset-right, 0px))
@@ -16,126 +17,71 @@
     max(var(--page-x), env(safe-area-inset-left, 0px));
 }
 
-/* Band ---------------------------------------------------------------- */
-
 .notice-card {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "beacon copy"
-    "chips  chips"
-    "actions actions";
-  gap: 12px;
-  padding: 15px 15px 14px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 68%, var(--border));
-  border-radius: var(--radius-lg);
+    "seal  copy copy"
+    "chips chips actions";
+  gap: 8px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
   background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--text) 4%, transparent) 0%,
-      transparent 30%
-    ),
     radial-gradient(
-      120% 170% at -10% 0%,
-      color-mix(in srgb, var(--accent) 15%, transparent) 0%,
-      transparent 46%
-    ),
-    radial-gradient(
-      85% 120% at 108% 118%,
-      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
-      transparent 58%
-    ),
-    radial-gradient(
-      70% 95% at 92% -30%,
-      var(--glow-secondary) 0%,
-      transparent 62%
+      110% 180% at 0% 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      transparent 52%
     ),
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--surface-2) 94%, transparent) 0%,
-      color-mix(in srgb, var(--surface) 96%, transparent) 100%
+      color-mix(in srgb, var(--surface-3) 50%, transparent) 0%,
+      var(--surface-2) 100%
     );
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent),
-    inset 0 -1px 0 rgba(2, 5, 11, 0.4),
-    0 1px 2px rgba(2, 5, 11, 0.5),
-    0 22px 54px -14px rgba(2, 5, 11, 0.66),
-    0 0 70px -30px var(--accent-glow);
-  backdrop-filter: blur(20px) saturate(1.35);
-  -webkit-backdrop-filter: blur(20px) saturate(1.35);
-  animation: notice-in 520ms var(--ease-out);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 26px rgba(0, 0, 0, 0.22);
+  animation: notice-in 420ms var(--ease-out);
 }
 
 /* Dismissal exit — matches EXIT_MS (240ms) in NoticeBoard.tsx.
    animation: none is essential: the entrance animation would otherwise
-   keep overriding the exit transform if the card is dismissed fast. */
+   keep overriding the exit transform if dismissed quickly. */
 .notice-card--closing {
   animation: none;
   pointer-events: none;
   opacity: 0;
-  transform: translateY(-6px) scale(0.988);
+  transform: translateY(-5px) scale(0.992);
   transition:
     opacity 200ms var(--ease),
     transform 220ms var(--ease);
 }
 
-/* Lit hairline along the top edge. */
+/* A thin lit rule along the ticket's top edge. */
 .notice-hairline {
   position: absolute;
   inset: 0 0 auto;
-  z-index: 4;
+  z-index: 3;
   height: 1px;
   pointer-events: none;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--accent) 34%, transparent) 16%,
-    color-mix(in srgb, var(--accent-bright) 80%, transparent) 50%,
-    color-mix(in srgb, var(--accent) 34%, transparent) 84%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 22%,
+    color-mix(in srgb, var(--accent-bright) 68%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 78%,
     transparent 100%
   );
-  opacity: 0.55;
-}
-
-/* A single soft pass of light across the glass on entry. */
-.notice-sheen {
-  position: absolute;
-  inset: -20% auto -20% 0;
-  z-index: 3;
-  width: 52%;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--accent-bright) 13%, transparent) 48%,
-    transparent 100%
-  );
-  filter: blur(14px);
-  opacity: 0;
-  animation: notice-sheen 1.6s var(--ease-out) 0.18s;
-}
-
-@keyframes notice-sheen {
-  0% {
-    transform: translateX(-105%);
-    opacity: 0;
-  }
-  22% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(310%);
-    opacity: 0;
-  }
+  opacity: 0.45;
 }
 
 @keyframes notice-in {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.994);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
@@ -143,171 +89,55 @@
   }
 }
 
-@keyframes notice-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+/* Seal ---------------------------------------------------------------- */
 
-/* Beacon medallion ---------------------------------------------------- */
-
-.notice-beacon {
-  grid-area: beacon;
+.notice-seal {
+  grid-area: seal;
   position: relative;
-  z-index: 2;
-  align-self: start;
-  display: grid;
-  place-items: center;
+  align-self: center;
   width: 44px;
   height: 44px;
+}
+
+.notice-seal img {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  color: var(--accent-bright);
-  border: 1px solid color-mix(in srgb, var(--accent-line) 58%, var(--border));
-  background:
-    radial-gradient(
-      120% 120% at 28% 18%,
-      color-mix(in srgb, var(--accent) 30%, transparent) 0%,
-      transparent 64%
-    ),
-    radial-gradient(
-      90% 90% at 72% 116%,
-      color-mix(in srgb, var(--accent) 10%, transparent) 0%,
-      transparent 72%
-    ),
-    color-mix(in srgb, var(--surface-3) 76%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text) 22%, transparent),
-    inset 0 -7px 16px rgba(2, 5, 11, 0.4),
-    inset 0 0 20px color-mix(in srgb, var(--accent) 16%, transparent),
-    0 8px 22px -6px color-mix(in srgb, var(--accent-glow) 62%, transparent),
-    0 0 0 4px color-mix(in srgb, var(--accent) 4%, transparent);
-  animation: notice-beacon-in 620ms var(--ease-out);
+  object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
-@keyframes notice-beacon-in {
-  from {
-    opacity: 0;
-    transform: scale(0.86);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* A point of light travels the rim, like a beacon turning. */
-@supports ((-webkit-mask: radial-gradient(#000, transparent)) or (mask: radial-gradient(#000, transparent))) {
-  .notice-beacon::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    z-index: 0;
-    border-radius: 50%;
-    pointer-events: none;
-    background: conic-gradient(
-      from 210deg,
-      transparent 0deg,
-      transparent 286deg,
-      color-mix(in srgb, var(--accent-bright) 46%, transparent) 330deg,
-      transparent 356deg
-    );
-    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
-    mask: radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
-    animation: notice-rim 9s linear infinite;
-  }
-}
-
-@keyframes notice-rim {
-  to {
-    transform: rotate(1turn);
-  }
-}
-
-.notice-mark {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 31px;
-  height: 31px;
-}
-
-.notice-beam {
-  opacity: 0.4;
-  animation: notice-beam 7s ease-in-out infinite;
-}
-
-.notice-beam--b {
-  animation-delay: 3.5s;
-}
-
-.notice-lamp {
-  fill: var(--text);
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent-bright) 90%, transparent));
-}
-
-/* Expanding signal rings — one slow heartbeat. */
-.notice-ring {
+.notice-seal::after {
+  content: "";
   position: absolute;
-  inset: -1px;
-  z-index: 0;
+  right: 1px;
+  bottom: 1px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
-  opacity: 0;
-  pointer-events: none;
-  animation: notice-ring 6s var(--ease-out) infinite;
-}
-
-.notice-ring--b {
-  animation-delay: 3s;
-}
-
-@keyframes notice-beam {
-  0%,
-  100% {
-    opacity: 0.24;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes notice-ring {
-  0% {
-    transform: scale(1);
-    opacity: 0.42;
-  }
-  70%,
-  100% {
-    transform: scale(1.6);
-    opacity: 0;
-  }
+  background: var(--accent-bright);
+  box-shadow: 0 0 0 2px var(--surface-2);
 }
 
 /* Copy ---------------------------------------------------------------- */
 
 .notice-copy {
   grid-area: copy;
-  position: relative;
-  z-index: 2;
+  align-self: center;
   min-width: 0;
-  animation: notice-rise 520ms var(--ease-out) 60ms both;
 }
 
 .notice-eyebrow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
+  color: var(--muted);
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 700;
   letter-spacing: 0.17em;
   text-transform: uppercase;
-  color: var(--muted);
 }
 
 .notice-eyebrow-text {
@@ -320,390 +150,459 @@
   height: 5px;
   border-radius: 50%;
   background: var(--accent-bright);
-  box-shadow: 0 0 9px var(--accent-glow);
-  animation: notice-blip 5.5s ease-in-out infinite;
-}
-
-@keyframes notice-blip {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
 }
 
 .notice-title {
-  margin-top: 6px;
-  font-size: clamp(21px, 18px + 0.85vw, 30px);
-  font-weight: 800;
-  line-height: 1.12;
-  letter-spacing: var(--tracking-tight);
+  margin-top: 3px;
   color: var(--text);
+  font-family: var(--font-display);
+  font-size: clamp(19px, 4.6vw, 27px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
-/* The one accented phrase — the beam catches it. */
 .notice-title-accent {
   color: var(--accent-bright);
-  text-shadow: 0 0 26px color-mix(in srgb, var(--accent-glow) 55%, transparent);
 }
 
 .notice-lede {
-  margin-top: 5px;
+  display: none;
+  margin-top: 4px;
   max-width: 46ch;
-  font-size: var(--text-sm);
-  line-height: 1.45;
   color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
   text-wrap: pretty;
 }
 
-/* Setup spec panel ----------------------------------------------------- */
+/* Setup chips + dismissal --------------------------------------------- */
 
+/* Phones: three equal mini-columns — icon on top, short label below.
+   The detail line returns from 640px up, where there is room for it. */
 .notice-chips {
   grid-area: chips;
-  position: relative;
-  z-index: 2;
+  align-self: stretch;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--text) 3%, transparent) 0%,
-      transparent 44%
-    ),
-    color-mix(in srgb, var(--surface-2) 46%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent),
-    0 1px 0 rgba(2, 5, 11, 0.22);
-  animation: notice-rise 560ms var(--ease-out) 140ms both;
 }
 
 .notice-chip {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
   min-width: 0;
-  padding: 9px 12px;
-}
-
-.notice-chip + .notice-chip {
-  border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  padding: 7px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  text-align: center;
 }
 
 .notice-chip-icon {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  border: 1px solid color-mix(in srgb, var(--accent-line) 42%, var(--border));
-  background:
-    radial-gradient(
-      130% 130% at 30% 20%,
-      color-mix(in srgb, var(--accent) 20%, transparent) 0%,
-      transparent 72%
-    ),
-    color-mix(in srgb, var(--surface-3) 62%, transparent);
-  color: var(--accent-bright);
+  width: 22px;
+  height: 22px;
+  color: var(--accent);
+}
+
+.notice-chip-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* The house app's own ginger-cat icon, treated as a small app tile. */
+.notice-chip-icon--app {
+  border-radius: 7px;
+  background: var(--surface-3);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent),
-    0 1px 3px rgba(2, 5, 11, 0.3);
+    0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.notice-chip-icon--app img {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  object-fit: cover;
+  object-position: 50% 38%;
+}
+
+.notice-chip--app {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
 }
 
 .notice-chip-body {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
   min-width: 0;
-  flex: 1 1 auto;
+  max-width: 100%;
 }
 
 .notice-chip-name {
-  font-size: var(--text-sm);
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: -0.012em;
   color: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .notice-chip-detail {
-  font-size: var(--text-xs);
-  line-height: 1.35;
+  display: none;
   color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
-/* Actions -------------------------------------------------------------- */
+/* Action -------------------------------------------------------------- */
 
 .notice-actions {
   grid-area: actions;
-  position: relative;
-  z-index: 2;
   display: flex;
-  align-items: center;
-  animation: notice-rise 560ms var(--ease-out) 200ms both;
+  align-items: stretch;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .notice-got {
-  position: relative;
-  z-index: 0;
-  overflow: hidden;
   display: inline-flex;
+  flex-direction: column-reverse;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  width: 100%;
+  gap: 4px;
   min-height: 44px;
-  padding: 0 19px;
-  border: 1px solid color-mix(in srgb, var(--accent-bright) 62%, transparent);
-  border-radius: var(--radius-pill);
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 50%, transparent);
+  border-radius: 14px;
   background: var(--beam-gradient);
   color: var(--accent-ink);
-  font-size: 14px;
-  font-weight: 750;
-  letter-spacing: -0.012em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -7px 14px rgba(4, 66, 104, 0.24),
-    0 10px 24px -8px var(--accent-glow),
-    0 2px 5px rgba(2, 5, 11, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 6px 16px color-mix(in srgb, var(--accent-glow) 55%, transparent);
   transition:
     transform var(--dur-fast) var(--ease),
     filter var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
 }
 
-.notice-got > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* Light passes over the beam on hover. */
-.notice-got::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    115deg,
-    transparent 34%,
-    rgba(255, 255, 255, 0.32) 50%,
-    transparent 66%
-  );
-  transform: translateX(-140%);
-  transition: transform 0.6s var(--ease);
-}
-
 .notice-got:active {
-  transform: scale(0.965);
-  box-shadow:
-    inset 0 2px 6px rgba(4, 46, 74, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 3px 10px -4px var(--accent-glow);
+  transform: scale(0.97);
 }
 
 .notice-got:focus-visible {
-  outline: 2px solid var(--text);
+  outline: 2px solid var(--accent-bright);
   outline-offset: 3px;
 }
 
 @media (hover: hover) {
   .notice-got:hover {
-    filter: brightness(1.06) saturate(1.04);
+    filter: brightness(1.06);
     transform: translateY(-1px);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
-      inset 0 -7px 14px rgba(4, 66, 104, 0.22),
-      0 14px 30px -8px var(--accent-glow),
-      0 2px 5px rgba(2, 5, 11, 0.35);
-  }
-
-  .notice-got:hover::after {
-    transform: translateX(140%);
+      inset 0 1px 0 rgba(255, 255, 255, 0.46),
+      0 10px 22px color-mix(in srgb, var(--accent-glow) 60%, transparent);
   }
 }
 
-/* Short screens: the chips become one compact line so the notice still
-   leaves room for the page's first action (360x640 phones, landscape). */
-.notice-compact {
-  display: none;
-  margin-top: 8px;
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  color: var(--muted);
-}
-
-.notice-compact strong {
-  color: var(--text);
-  font-weight: 700;
-}
-
-@media (max-height: 720px) {
-  .notice {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
-  }
-
-  .notice-card {
-    gap: 8px 10px;
-    padding: 11px 12px;
-  }
-
-  .notice-beacon {
-    width: 38px;
-    height: 38px;
-  }
-
-  .notice-mark {
-    width: 24px;
-    height: 24px;
-  }
-
-  .notice-title {
-    margin-top: 4px;
-    font-size: 18px;
-  }
-
-  .notice-lede,
-  .notice-chips {
-    display: none;
-  }
-
-  .notice-compact {
-    display: block;
-  }
-
-  .notice-got {
-    min-height: 44px;
-    padding: 0 16px;
-  }
-}
-
-/* Responsive ----------------------------------------------------------- */
-
-/* Two spec cells side by side, still one panel. */
+/* Larger phones and tablets: the lede returns, chips get their detail,
+   and the dismissal moves up beside the story. */
 @media (min-width: 640px) {
-  .notice-chips {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .notice-chip + .notice-chip {
-    border-top: 0;
-    border-left: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  }
-}
-
-/* Wide: a single editorial band — mark, story + spec panel, dismissal. */
-@media (min-width: 860px) {
   .notice {
     padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
   }
 
   .notice-card {
-    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "beacon copy actions"
-      "beacon chips actions";
-    align-items: center;
-    gap: 13px 22px;
-    padding: 20px 22px;
+      "seal  copy   actions"
+      "chips chips  chips";
+    gap: 10px 14px;
+    padding: 16px 18px;
+    border-radius: 22px;
   }
 
-  .notice-beacon {
-    align-self: center;
-    width: 58px;
-    height: 58px;
-  }
-
-  .notice-mark {
-    width: 37px;
-    height: 37px;
+  .notice-seal {
+    width: 52px;
+    height: 52px;
   }
 
   .notice-title {
-    margin-top: 7px;
-    font-size: clamp(24px, 1.4vw + 12px, 30px);
+    font-size: clamp(22px, 2.8vw, 27px);
   }
 
   .notice-lede {
-    margin-top: 5px;
-    font-size: 14px;
-  }
-
-  .notice-chips {
-    align-self: start;
+    display: block;
+    max-width: 72ch;
   }
 
   .notice-chip {
-    padding: 10px 13px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--radius-pill);
+    text-align: left;
+  }
+
+  .notice-chip-icon,
+  .notice-chip-icon svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .notice-chip-icon--app {
+    width: 22px;
+    height: 22px;
+  }
+
+  .notice-chip-name {
+    font-size: 12px;
+  }
+
+  .notice-chip-body {
+    align-items: flex-start;
+    gap: 1px;
+  }
+
+  .notice-chip-detail {
+    display: block;
   }
 
   .notice-actions {
-    justify-content: flex-end;
+    align-self: center;
+    align-items: center;
+    padding-left: 14px;
+    border-left: 1px dashed var(--border-strong);
   }
 
   .notice-got {
-    width: auto;
-    min-width: 122px;
+    flex-direction: row;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 17px;
+    border-radius: var(--radius-pill);
+    font-size: 13px;
   }
 }
 
-/* Very small phones: tighten the band, never overflow. */
-@media (max-width: 379px) {
+/* Wide: story and dismissal on one line, the three setups spread
+   across the foot of the card. */
+@media (min-width: 1024px) {
   .notice-card {
-    padding: 14px 13px 13px;
-    gap: 11px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "seal  copy    actions"
+      "chips chips   chips";
+    align-items: center;
+    gap: 16px 18px;
+    padding: 18px 22px;
   }
 
-  .notice-title {
-    font-size: 20px;
+  .notice-copy {
+    align-self: center;
+  }
+
+  .notice-chips {
+    gap: 8px;
   }
 
   .notice-chip {
-    padding: 8px 10px;
+    padding: 8px 12px;
   }
 
-  .notice-got {
-    padding: 0 16px;
+  .notice-actions {
+    align-self: center;
+    padding-left: 18px;
+    border-left: 1px dashed var(--border-strong);
   }
 }
 
-/* Reduced motion: appear at rest, no loops. */
+/* Phones: keep the three tiles compact, but the private-app tile still
+   spells out access. */
+@media (max-width: 639px) {
+  .notice-chip--app .notice-chip-detail {
+    display: block;
+    margin-top: 1px;
+    font-size: 9px;
+    line-height: 1.15;
+    color: var(--muted);
+  }
+}
+
+/* Very small phones: keep the three tiles and the amber action on one
+   row with a slimmer gutter. */
+@media (max-width: 379px) {
+  .notice-card {
+    gap: 8px 9px;
+    padding: 12px;
+  }
+
+  .notice-seal {
+    width: 40px;
+    height: 40px;
+  }
+
+  .notice-title {
+    font-size: 18px;
+  }
+
+  .notice-chips {
+    gap: 4px;
+  }
+
+  .notice-chip {
+    gap: 4px;
+    padding: 6px 3px 7px;
+  }
+
+  .notice-chip-name {
+    font-size: 10px;
+  }
+
+  .notice-got {
+    padding: 7px 8px;
+  }
+}
+
+/* Reduced motion: appear at rest, no entrance or exit movement. */
 @media (prefers-reduced-motion: reduce) {
-  .notice-card,
-  .notice-copy,
-  .notice-chips,
-  .notice-actions,
-  .notice-beacon {
+  .notice-card {
     animation: none;
-  }
-
-  .notice-beam {
-    opacity: 0.36;
-    animation: none;
-  }
-
-  .notice-ring,
-  .notice-sheen,
-  .notice-pip,
-  .notice-beacon::after {
-    display: none;
   }
 
   .notice-card--closing {
     transition: none;
   }
 
-  .notice-got,
-  .notice-got::after {
+  .notice-got {
     transition: none;
+  }
+}
+
+/* ==================================================================
+   Shared sheet chrome
+
+   The sheet shell lives in styles.css, which is frozen for the recode.
+   These scoped overrides give every Sheet instance (unlock, blocked,
+   library passcode) the same warm glass, cream display heading and
+   close affordance. Loaded globally because App mounts the notice.
+   ================================================================== */
+
+.sheet.sheet {
+  border-radius: 26px 26px 0 0;
+  border: 1px solid var(--border-strong);
+  background:
+    radial-gradient(
+      120% 88% at 50% -22%,
+      color-mix(in srgb, var(--accent) 13%, transparent) 0%,
+      transparent 62%
+    ),
+    color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(28px) saturate(1.25);
+  -webkit-backdrop-filter: blur(28px) saturate(1.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    var(--shadow-lg);
+}
+
+.sheet.sheet::before {
+  left: 10%;
+  right: 10%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 34%, transparent) 30%,
+    color-mix(in srgb, var(--accent-bright) 64%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 34%, transparent) 70%,
+    transparent 100%
+  );
+  opacity: 0.65;
+}
+
+.sheet.sheet h2 {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+}
+
+.sheet.sheet :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.sheet.sheet .field:focus-within {
+  border-color: var(--accent-line);
+  background: var(--surface-2);
+  box-shadow:
+    var(--focus-ring),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.sheet-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  color: var(--muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease);
+}
+
+.sheet-close:active {
+  transform: scale(0.94);
+}
+
+@media (hover: hover) {
+  .sheet-close:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+    background: var(--surface-3);
+  }
+}
+
+@media (min-width: 640px) {
+  .sheet.sheet {
+    border-radius: 26px;
+  }
+
+  .sheet-close {
+    top: 16px;
+    right: 16px;
   }
 }

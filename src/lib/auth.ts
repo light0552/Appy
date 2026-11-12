@@ -1,4 +1,5 @@
 import { kvGet, kvSet } from "./store";
+import type { ProfileAvatarId } from "../types";
 
 /**
  * Household access control for the shelf.
@@ -57,6 +58,8 @@ export interface AdminCredential {
   profileId: string;
   name: string;
   color: string;
+  avatar?: ProfileAvatarId;
+  avatarRing?: boolean;
   failedAttempts: number;
   blocked: boolean;
   hasPassword: boolean;
@@ -138,11 +141,6 @@ function markRemembered(profileId: string): void {
 
 function clearRemembered(profileId: string): void {
   localSet(REMEMBERED_PREFIX + profileId, null);
-}
-
-export function hasDeviceToken(profileId: string): boolean {
-  const token = localGet(deviceKey(profileId));
-  return typeof token === "string" && token.length >= 20;
 }
 
 export function clearDeviceToken(profileId: string): void {
@@ -770,7 +768,13 @@ export async function migrateLegacyAuth(): Promise<number> {
 /* ------------------------------------------------------------------ */
 
 export function credentialsFrom(
-  profiles: ReadonlyArray<{ id: string; name: string; color: string }>,
+  profiles: ReadonlyArray<{
+    id: string;
+    name: string;
+    color: string;
+    avatar?: ProfileAvatarId;
+    avatarRing?: boolean;
+  }>,
   map: ProfileAuthMap,
 ): AdminCredential[] {
   return profiles.map((profile) => {
@@ -779,6 +783,8 @@ export function credentialsFrom(
       profileId: profile.id,
       name: profile.name,
       color: profile.color,
+      avatar: profile.avatar,
+      avatarRing: profile.avatarRing,
       failedAttempts: record?.failedAttempts ?? 0,
       blocked: record?.blocked ?? false,
       hasPassword: record?.hasPassword ?? false,
@@ -800,19 +806,6 @@ export function isProfileUnlocked(profileId: string): boolean {
 
 export function setProfileUnlocked(profileId: string, unlocked: boolean): void {
   sessionSet(UNLOCK_PREFIX + profileId, unlocked ? "1" : null);
-}
-
-export function clearAllProfileUnlocks(): void {
-  try {
-    const keys: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i += 1) {
-      const key = sessionStorage.key(i);
-      if (key?.startsWith(UNLOCK_PREFIX)) keys.push(key);
-    }
-    for (const key of keys) sessionStorage.removeItem(key);
-  } catch {
-    /* ignore */
-  }
 }
 
 /**

@@ -1,9 +1,9 @@
 /* ==================================================================
-   Player surface + Watch page — imported by Player, ServerChips, Watch.
-   Tokens and shared primitives come from src/styles.css.
-   NOTE: styles.css loads AFTER this file in the cascade (App's import
-   chain), so rules overriding shared primitives (.chip, .btn, .icon-btn)
-   are scoped through parent classes to win on specificity.
+   Player surface + Watch page — a private screening room.
+   Near-black stage, quiet warm chrome, a single source console and a
+   low "now playing" deck. Tokens come from src/styles.css, which
+   loads AFTER this file; shared primitives are scoped through the
+   watch chrome so they win the cascade.
    ================================================================== */
 
 /* Iframe fills its container; borderless and black behind the video. */
@@ -27,10 +27,9 @@
 /* Watch page layout ------------------------------------------------- */
 
 /* The watch route owns the viewport: the shell keeps its slot (the sync
-   banner, when it appears) and the stage takes every remaining pixel. The
-   old `min-height: 100dvh` here ignored that slot, so on a phone with the
-   banner visible the transport row fell below the fold. `:has()` scopes
-   the shell fix to this route; without it the fallback below still works. */
+   banner, when it appears) and the stage takes every remaining pixel.
+   `:has()` scopes the shell fix to this route; the fallback below still
+   works. */
 
 .app:has(.watch) {
   height: 100dvh;
@@ -60,6 +59,8 @@
   overflow: hidden;
 }
 
+/* Stage ------------------------------------------------------------- */
+
 .watch-stage {
   position: relative;
   isolation: isolate;
@@ -69,9 +70,7 @@
   background: #000;
 }
 
-/* A cinematic vignette: the corners fall away so the eye lands in the
-   middle of the picture rather than on the frame of the frame. */
-
+/* Just enough corner falloff to settle the eye, nothing more. */
 .watch-stage::before {
   content: "";
   position: absolute;
@@ -79,33 +78,27 @@
   z-index: 1;
   pointer-events: none;
   background: radial-gradient(
-    122% 98% at 50% 44%,
-    transparent 54%,
-    rgba(0, 0, 0, 0.34) 86%,
-    rgba(0, 0, 0, 0.6) 100%
+    125% 100% at 50% 46%,
+    transparent 62%,
+    rgba(0, 0, 0, 0.26) 88%,
+    rgba(0, 0, 0, 0.44) 100%
   );
 }
 
-/* A quiet bottom blend so the deck feels attached to the frame. */
-
+/* The frame sinks into the deck rather than stopping at a hard seam. */
 .watch-stage::after {
   content: "";
   position: absolute;
   inset: auto 0 0;
   z-index: 2;
-  height: 132px;
+  height: 118px;
   pointer-events: none;
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--surface-2) 74%, transparent) 0%,
-    transparent 100%
-  );
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 100%);
 }
 
-/* Top chrome ------------------------------------------------------- */
-/* A luminous glass rail floating over the picture: back button, the
-   now-playing strapline, and the server chips. The strip lets touches
-   through to the player underneath. */
+/* Top chrome -------------------------------------------------------- */
+/* A whisper of shade for legibility, not a bar: back coin, the
+   now-playing strapline, and the source console. */
 
 .watch-top {
   position: absolute;
@@ -113,52 +106,44 @@
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding:
     calc(env(safe-area-inset-top) + 10px)
     max(var(--page-x), env(safe-area-inset-right))
-    24px
+    30px
     max(var(--page-x), env(safe-area-inset-left));
-  background:
-    radial-gradient(
-      116% 100% at 84% 0%,
-      color-mix(in srgb, var(--accent) 15%, transparent) 0%,
-      transparent 62%
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--bg) 90%, transparent) 0%,
-      color-mix(in srgb, var(--bg) 56%, transparent) 46%,
-      transparent 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.34) 48%,
+    transparent 100%
+  );
   pointer-events: none;
 }
 
 .watch-top-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
   pointer-events: auto;
 }
 
-/* Back button: a glass disc, brighter than the frame behind it. */
+/* Back coin: dark brass, no glow. */
 
 .watch-top-row .icon-btn.watch-back {
   flex: 0 0 auto;
   width: 44px;
   height: 44px;
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--surface-glass) 94%, transparent);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    0 10px 26px rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, var(--bg) 74%, transparent);
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.44);
   transition:
     transform var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) ease,
     border-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
+    background-color var(--dur-fast) ease;
 }
 
 .watch-top-row .icon-btn.watch-back:active {
@@ -167,17 +152,13 @@
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .watch-top-row .icon-btn.watch-back:hover {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     border-color: var(--accent-line);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.12),
-      0 14px 32px rgba(0, 0, 0, 0.55),
-      0 0 22px var(--accent-glow);
+    background: var(--surface-2);
   }
 }
 
-/* The strapline. Hidden on phones — the deck below already names the
-   title, and the picture is worth more room than a second heading. */
+/* The strapline. Hidden on phones — the deck names the title better. */
 
 .watch-top-copy {
   display: none;
@@ -189,49 +170,29 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: var(--accent-bright);
+  color: var(--muted);
   font-size: 9px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
 }
 
-/* A live pip before the label — the stream is on air. */
-
 .watch-top-kicker::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   flex: 0 0 auto;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .watch-top-kicker::before {
-    animation: watch-live 2.6s ease-in-out infinite;
-  }
-}
-
-@keyframes watch-live {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.45;
-    transform: scale(0.78);
-  }
 }
 
 .watch-top-title {
   margin-top: 3px;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--text);
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8);
   user-select: none;
@@ -241,10 +202,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 5px;
+  margin-top: 4px;
   color: var(--muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
@@ -254,7 +215,7 @@
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--accent-line);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-bright);
 }
 
@@ -265,21 +226,27 @@
   }
 
   .watch-top-title {
-    max-width: 320px;
+    max-width: 340px;
   }
 }
 
-/* Server chips ------------------------------------------------------ */
-/* The escape hatch when a server is stuck: glassy pills over the
-   picture, loud enough to spot instantly, full 44px targets. */
+/* Source console ---------------------------------------------------- */
+/* One warm pill track; the active server gets a brass edge, never a
+   neon halo. Scrolls horizontally on a phone. */
 
 .watch-top-row .server-chips {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
-  padding: 2px 2px 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
   flex-wrap: nowrap;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -288,9 +255,20 @@
   -ms-overflow-style: none;
 }
 
-/* From a tablet up the strapline keeps its width and the servers
-   slide hard right. An auto margin (not justify-content) keeps the
-   scroll origin reachable when the chips overflow. */
+.watch-top-row .server-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.server-chips__label {
+  display: none;
+  flex: 0 0 auto;
+  padding: 0 11px 0 12px;
+  color: var(--muted-2);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
 
 @media (min-width: 768px) {
   .watch-top-row .server-chips {
@@ -299,121 +277,107 @@
   }
 }
 
-.watch-top-row .server-chips::-webkit-scrollbar {
-  display: none;
+@media (min-width: 1024px) {
+  .server-chips__label {
+    display: block;
+  }
 }
 
 .watch-top-row .server-chips .chip {
   flex: 0 0 auto;
   min-height: 44px;
-  padding: 0 16px;
-  gap: 8px;
-  border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--surface-glass) 90%, transparent);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  color: var(--text);
-  font-size: 13.5px;
-  font-weight: 650;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 10px 24px rgba(0, 0, 0, 0.45);
+  padding: 0 14px;
+  gap: 7px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
   transition:
-    transform var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) ease,
-    border-color var(--dur-fast) ease,
     color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
 }
 
-/* Higher specificity than styles.css's .chip--active / [aria-pressed]
-   so the glow survives the cascade. */
+/* Higher specificity than styles.css's .chip--active / [aria-pressed]. */
 
 .watch-top-row .server-chips .chip.chip--active,
 .watch-top-row .server-chips .chip[aria-pressed="true"] {
   border-color: var(--accent-line);
   color: var(--accent-bright);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--accent) 30%, transparent) 0%,
-      color-mix(in srgb, var(--accent) 12%, transparent) 100%
-    ),
-    color-mix(in srgb, var(--surface-glass) 88%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 0 0 1px color-mix(in srgb, var(--accent-line) 55%, transparent),
-    0 0 28px var(--accent-glow),
-    0 12px 26px rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface-2));
+  box-shadow: none;
 }
-
-/* The live pip on the server that is currently feeding the frame. */
 
 .watch-top-row .server-chips .chip[aria-pressed="true"]::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   flex: 0 0 auto;
   border-radius: var(--radius-pill);
   background: var(--accent-bright);
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .watch-top-row .server-chips .chip[aria-pressed="true"]::before {
-    animation: watch-live 2.4s ease-in-out infinite;
-  }
 }
 
 .watch-top-row .server-chips .chip:active {
-  transform: scale(0.95);
+  transform: scale(0.97);
 }
 
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+@media (hover: hover) {
   .watch-top-row .server-chips .chip:hover {
-    transform: translateY(-2px);
-    border-color: var(--accent-line);
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 6%, transparent);
   }
 
   .watch-top-row .server-chips .chip.chip--active:hover,
   .watch-top-row .server-chips .chip[aria-pressed="true"]:hover {
-    transform: translateY(-2px) scale(1.03);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
-      0 0 0 1px color-mix(in srgb, var(--accent-line) 70%, transparent),
-      0 0 34px var(--accent-glow),
-      0 12px 26px rgba(0, 0, 0, 0.5);
+    color: var(--accent-bright);
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
   }
 }
 
-/* The provider's own note ("plays most reliably") — a quiet tag
-   inside the active chip. Too wide for a phone, so phones drop it. */
-
+/* The provider's own note ("plays most reliably") — a quiet tag. */
 .server-chip-hint {
   padding-left: 9px;
-  border-left: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
+  border-left: 1px solid color-mix(in srgb, var(--accent-line) 65%, transparent);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--muted-2);
-}
-
-.watch-top-row .server-chips .chip.chip--active .server-chip-hint,
-.watch-top-row .server-chips .chip[aria-pressed="true"] .server-chip-hint {
   color: var(--accent-bright);
-  border-left-color: var(--accent-line);
 }
 
 @media (max-width: 767px) {
+  .watch-top-row .server-chips {
+    gap: 1px;
+  }
+
+  .watch-top-row .server-chips .chip {
+    gap: 5px;
+    padding: 0 9px;
+    font-size: 12px;
+  }
+
+  .watch-top-row .server-chips .chip[aria-pressed="true"]::before {
+    width: 4px;
+    height: 4px;
+  }
+
   .watch-top-row .server-chips .server-chip-hint {
     display: none;
   }
 }
 
+@media (max-width: 400px) {
+  .watch-top-row .server-chips .chip {
+    gap: 4px;
+    padding: 0 7px;
+    font-size: 11.5px;
+  }
+}
+
 /* Watchdog bar ------------------------------------------------------ */
-/* "Stream not starting?" — a friendly lifeline, not an error: soft
-   glass, a beacon pulsing at the edge, and a springy entrance. */
+/* "Stream not starting?" — a warm note from the house, not an alarm. */
 
 .watchdog-bar {
   pointer-events: auto;
@@ -421,29 +385,23 @@
   display: flex;
   align-items: center;
   gap: 13px;
-  max-width: 660px;
-  padding: 13px 13px 13px 15px;
+  max-width: 700px;
+  padding: 14px 14px 14px 16px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--accent-line);
-  background:
-    radial-gradient(
-      120% 150% at 0% 0%,
-      color-mix(in srgb, var(--accent) 18%, transparent) 0%,
-      transparent 58%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
-      transparent 64%
-    ),
-    color-mix(in srgb, var(--surface-glass) 92%, transparent);
-  backdrop-filter: blur(22px) saturate(1.5);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  background: var(--surface);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    0 0 44px color-mix(in srgb, var(--accent-glow) 60%, transparent),
-    var(--shadow);
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    0 22px 54px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+}
+
+.watchdog-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--accent-bright), transparent);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -454,59 +412,51 @@
 
 @keyframes watchdog-in {
   from {
-    transform: translateY(-12px) scale(0.985);
+    transform: translateY(-10px);
     opacity: 0;
   }
 }
-
-/* The beacon: a lit core inside a ring that keeps pinging outward. */
 
 .watchdog-beacon {
   position: relative;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-pill);
-  background: radial-gradient(
-    circle at 50% 50%,
-    color-mix(in srgb, var(--accent) 28%, transparent) 0%,
-    transparent 70%
-  );
-}
-
-.watchdog-beacon::before,
-.watchdog-beacon::after {
-  content: "";
-  position: absolute;
-  inset: 0;
+  width: 30px;
+  height: 30px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--accent-line);
 }
 
+.watchdog-beacon::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .watchdog-beacon-core {
-  width: 10px;
-  height: 10px;
+  position: relative;
+  width: 7px;
+  height: 7px;
   border-radius: var(--radius-pill);
   background: var(--accent-bright);
-  box-shadow: 0 0 16px var(--accent-glow);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .watchdog-beacon::after {
-    animation: watchdog-ping 2.2s ease-out infinite;
+  .watchdog-beacon::before {
+    animation: watchdog-pulse 2.6s ease-in-out infinite;
   }
 }
 
-@keyframes watchdog-ping {
-  0% {
-    transform: scale(0.5);
-    opacity: 0.9;
-  }
+@keyframes watchdog-pulse {
+  0%,
   100% {
-    transform: scale(1.35);
-    opacity: 0;
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 
@@ -519,15 +469,15 @@
 }
 
 .watchdog-kicker {
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -0.015em;
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
   color: var(--text);
 }
 
 .watchdog-text {
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.45;
   color: var(--muted);
 }
@@ -535,7 +485,7 @@
 .watchdog-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 
@@ -547,8 +497,6 @@
   flex: 0 0 auto;
 }
 
-/* 44px dismiss target — scopes past styles.css's .icon-btn sizing. */
-
 .watchdog-actions .watchdog-close {
   width: 44px;
   height: 44px;
@@ -558,20 +506,16 @@
   border-color: transparent;
 }
 
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .watchdog-actions .btn:hover {
-    transform: translateY(-2px) scale(1.03);
-  }
-
+@media (hover: hover) {
   .watchdog-actions .watchdog-close:hover {
     color: var(--text);
-    background: color-mix(in srgb, var(--surface-3) 70%, transparent);
+    background: var(--surface-2);
   }
 }
 
 /* Bottom deck ------------------------------------------------------- */
-/* A console, not a footer: the now-playing readout on the left, the
-   transport keys on the right, and a beam of light along the seam. */
+/* Not a dashboard: a low, warm plinth with the film's identity on the
+   left and the transport keys on the right. */
 
 .watch-bar {
   position: relative;
@@ -579,76 +523,35 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 12px;
   padding:
     13px
     max(var(--page-x), env(safe-area-inset-right))
     calc(13px + env(safe-area-inset-bottom))
     max(var(--page-x), env(safe-area-inset-left));
   border-top: 1px solid var(--border);
-  background:
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--surface-2) 94%, transparent) 0%,
-      var(--surface) 100%
-    ),
-    var(--surface);
-  box-shadow: 0 -24px 52px rgba(0, 0, 0, 0.55);
+  background: var(--surface);
+  box-shadow: 0 -20px 52px rgba(0, 0, 0, 0.55);
 }
 
-/* A thin beam of light along the top edge of the deck. */
-
+/* A single lit hairline along the seam. */
 .watch-bar::before {
   content: "";
   position: absolute;
   top: -1px;
-  left: 4%;
-  right: 4%;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--accent-line) 22%,
-    var(--accent-bright) 50%,
-    var(--accent-line) 78%,
-    transparent 100%
-  );
-  opacity: 0.85;
-}
-
-/* Light spilling up out of the deck onto the frame. */
-
-.watch-bar::after {
-  content: "";
-  position: absolute;
-  top: -40px;
   left: 0;
   right: 0;
-  height: 40px;
+  height: 1px;
   pointer-events: none;
-  background: radial-gradient(
-    52% 100% at 50% 100%,
-    color-mix(in srgb, var(--accent) 18%, transparent) 0%,
-    transparent 72%
+  background: linear-gradient(
+    90deg,
+    transparent 4%,
+    var(--accent-line) 24%,
+    color-mix(in srgb, var(--accent-bright) 60%, transparent) 50%,
+    var(--accent-line) 76%,
+    transparent 96%
   );
-  opacity: 0.7;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .watch-bar::after {
-    animation: deck-breathe 11s ease-in-out infinite alternate;
-  }
-}
-
-@keyframes deck-breathe {
-  from {
-    transform: translateX(-14%);
-    opacity: 0.45;
-  }
-  to {
-    transform: translateX(14%);
-    opacity: 0.8;
-  }
+  opacity: 0.6;
 }
 
 /* Now playing ------------------------------------------------------- */
@@ -656,41 +559,28 @@
 .watch-now {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
   min-width: 0;
   flex: 1 1 auto;
 }
 
 .watch-poster {
-  width: 42px;
-  height: 58px;
+  width: 40px;
+  height: 56px;
   flex: 0 0 auto;
   object-fit: cover;
-  border-radius: var(--radius-xs);
+  border-radius: 6px;
   border: 1px solid var(--border-strong);
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.5),
-    0 0 26px color-mix(in srgb, var(--accent) 16%, transparent);
-  transition:
-    transform var(--dur-med) var(--ease),
-    box-shadow var(--dur-med) ease;
-}
-
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .watch-poster:hover {
-    transform: translateY(-2px) scale(1.03);
-    box-shadow:
-      0 14px 30px rgba(0, 0, 0, 0.55),
-      0 0 32px color-mix(in srgb, var(--accent) 30%, transparent);
-  }
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.46);
 }
 
 /* Missing artwork: a lit monogram tile instead of a hole in the deck. */
 .watch-poster--fallback {
   display: grid;
   place-items: center;
-  font-size: 18px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.04em;
   color: var(--accent-bright);
@@ -699,10 +589,10 @@
   background:
     radial-gradient(
       120% 100% at 30% 0%,
-      color-mix(in srgb, var(--accent) 26%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 22%, transparent) 0%,
       transparent 68%
     ),
-    var(--surface-3);
+    var(--surface-2);
 }
 
 .watch-now-copy {
@@ -718,15 +608,26 @@
   align-items: center;
   gap: 7px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
+.watch-now-kicker::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
 .watch-now-title {
-  font-size: 16px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.1;
   letter-spacing: -0.025em;
   color: var(--text);
 }
@@ -734,13 +635,13 @@
 .watch-now-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   flex-wrap: wrap;
   min-width: 0;
   margin-top: 1px;
   color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 650;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .watch-meta-year {
@@ -748,14 +649,10 @@
 }
 
 .watch-provider {
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-3) 70%, transparent);
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 750;
-  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -767,40 +664,38 @@
   border: 1px solid var(--accent-line);
   color: var(--accent-bright);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent-glow) 55%, transparent);
 }
 
 .watch-now-sub {
   color: var(--muted);
 }
 
-/* The episode name hangs off a short gradient tick. */
+/* The episode name hangs off a short brass tick. */
 
 .watch-now-episode {
   display: flex;
   align-items: center;
   gap: 9px;
   min-width: 0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .watch-now-episode::before {
   content: "";
-  width: 2px;
-  height: 15px;
+  width: 1px;
+  height: 13px;
   flex: 0 0 auto;
-  border-radius: var(--radius-pill);
   background: linear-gradient(to bottom, var(--accent), transparent);
 }
 
 .watch-episode-name {
   min-width: 0;
   color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .watch-now-sk {
@@ -809,21 +704,20 @@
 
 /* Transport keys ---------------------------------------------------- */
 
-/* The keys sit in a recessed well — a mixing desk, not a button row. */
-
 .watch-actions {
   display: flex;
-  gap: 8px;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap;
 }
 
+/* No recessed hardware well — the keys sit directly on the plinth. */
 .watch-actions--episodes {
-  padding: 5px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 58%, transparent);
-  box-shadow:
-    inset 0 1px 3px rgba(0, 0, 0, 0.55),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
 }
 
 .watch-actions .watch-episode-btn {
@@ -833,29 +727,13 @@
   gap: 8px;
   flex: 1 1 0;
   min-width: 0;
-  min-height: 44px;
-  padding: 0 14px;
+  min-height: 46px;
+  padding: 0 13px;
   border-radius: var(--radius-pill);
-  font-size: 13.5px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
-}
-
-/* Long labels are the default; the short ones take over on narrow
-   phones so all three controls fit on one row. */
-
-.watch-episode-btn__short {
-  display: none;
-}
-
-.watch-actions .watch-episode-btn.btn-primary {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 10px 28px var(--accent-glow);
-}
-
-.watch-actions .btn {
   transition:
     transform var(--dur-fast) var(--ease),
     background-color var(--dur-fast) ease,
@@ -863,48 +741,66 @@
     box-shadow var(--dur-fast) ease;
 }
 
-.watch-actions .btn:active {
-  transform: scale(0.96);
+/* Quiet secondary keys: warm outline on the dark plinth. */
+.watch-actions .watch-episode-btn.btn-secondary {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+  box-shadow: none;
 }
 
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .watch-actions .btn:hover {
-    transform: translateY(-2px) scale(1.02);
+.watch-actions .watch-episode-btn.btn-primary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 10px 24px color-mix(in srgb, var(--accent-glow) 65%, transparent);
+}
+
+/* Long labels are the default; the short ones take over on phones. */
+.watch-episode-btn__short {
+  display: none;
+}
+
+.watch-actions .btn:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) {
+  .watch-actions .watch-episode-btn.btn-secondary:hover {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+    color: var(--text);
   }
 
-  .watch-actions .btn-primary:hover {
+  .watch-actions .watch-episode-btn.btn-primary:hover {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.34),
-      0 14px 38px var(--accent-glow);
+      inset 0 1px 0 rgba(255, 255, 255, 0.36),
+      0 14px 30px color-mix(in srgb, var(--accent-glow) 72%, transparent);
   }
 }
 
 /* Source readout ---------------------------------------------------- */
-/* A movie deck has no transport, so it gets a hardware module instead:
-   which server is feeding the frame. */
+/* A movie deck has no transport, so it reads out the source like a
+   small output module on the plinth. */
 
 .watch-source {
   display: none;
   align-items: center;
   gap: 11px;
-  max-width: 240px;
-  padding: 8px 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 46%, transparent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+  max-width: 260px;
+  padding: 4px 0 4px 16px;
+  border-left: 1px solid var(--border);
 }
 
 .watch-source-icon {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
   border-radius: var(--radius-pill);
-  color: var(--accent-bright);
+  color: var(--accent);
   background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
+  border: 1px solid color-mix(in srgb, var(--accent-line) 70%, transparent);
 }
 
 .watch-source-copy {
@@ -915,17 +811,17 @@
 }
 
 .watch-source-label {
-  font-size: 8.5px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 
 .watch-source-name {
   overflow: hidden;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
   white-space: nowrap;
@@ -944,7 +840,7 @@
   background:
     radial-gradient(
       80% 70% at 50% 18%,
-      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
       transparent 66%
     ),
     #000;
@@ -952,38 +848,41 @@
 
 .watch-empty-card {
   width: min(100%, 430px);
-  padding: 26px;
+  padding: 30px 28px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  background: var(--surface);
   box-shadow: var(--shadow-lg);
   text-align: center;
 }
 
+.watch-empty-card .eyebrow {
+  color: var(--accent);
+}
+
 .watch-empty-card h3 {
-  margin-top: 8px;
-  font-size: 21px;
-  font-weight: 800;
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.05;
   letter-spacing: -0.03em;
 }
 
 .watch-empty-card p {
-  margin-top: 8px;
+  margin-top: 9px;
   font-size: 13.5px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .watch-empty-card .btn {
-  margin-top: 18px;
+  margin-top: 20px;
   min-height: 44px;
 }
 
 /* Phones ----------------------------------------------------------- */
-
 /* Short labels so Previous / Reload / Next share one row even on a
-   narrow phone, and a tighter well so the picture keeps the height. */
+   narrow phone, and a compact deck so the picture keeps the height. */
 
 @media (max-width: 560px) {
   .watch-episode-btn__long {
@@ -994,61 +893,73 @@
     display: inline;
   }
 
-  /* Tighten the deck so the picture keeps the height on a phone. */
   .watch-bar {
-    gap: 9px;
+    gap: 10px;
     padding-top: 11px;
     padding-bottom: calc(11px + env(safe-area-inset-bottom));
   }
 
   .watch-now {
-    gap: 10px;
+    gap: 11px;
   }
 
   .watch-now-copy {
     gap: 2px;
   }
 
-  .watch-now-kicker {
-    font-size: 11px;
-    letter-spacing: 0.13em;
-  }
-
   .watch-now-title {
-    font-size: 15.5px;
+    font-size: 17.5px;
   }
 
   .watch-now-meta {
-    gap: 6px;
+    gap: 7px;
     margin-top: 0;
   }
 
   .watch-poster {
     width: 38px;
-    height: 52px;
+    height: 53px;
   }
 
-  .watch-poster--fallback {
-    font-size: 16px;
+  .watch-now-episode {
+    margin-top: 0;
   }
 
-  .watch-actions--episodes {
-    padding: 4px;
+  .watch-actions {
     gap: 6px;
   }
 
   .watch-actions .watch-episode-btn {
     flex: 1 1 0;
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 9px;
     gap: 6px;
-    font-size: 13px;
+    font-size: 12.5px;
   }
 
   .watch-actions .watch-episode-btn svg {
     width: 16px;
     height: 16px;
     flex: 0 0 auto;
+  }
+
+  .watchdog-bar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 9px 11px;
+    padding: 12px;
+  }
+
+  .watchdog-copy {
+    flex: 1 1 0;
+  }
+
+  .watchdog-actions {
+    width: 100%;
+  }
+
+  .watchdog-actions .watchdog-switch {
+    flex: 1 1 auto;
   }
 }
 
@@ -1065,45 +976,19 @@
   }
 
   .watch-now-title {
-    font-size: 15px;
+    font-size: 16.5px;
   }
 }
 
-/* The watchdog stacks on a phone: the lifeline reads first, the
-   button sits under it at full width. */
-
-@media (max-width: 560px) {
-  .watchdog-bar {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 9px 11px;
-    padding: 12px;
-  }
-
-  .watchdog-copy {
-    /* A zero basis keeps the beacon on the same line as the headline
-       instead of letting the long text push it onto its own row. */
-    flex: 1 1 0;
-  }
-
-  .watchdog-actions {
-    width: 100%;
-  }
-
-  .watchdog-actions .watchdog-switch {
-    flex: 1 1 auto;
-  }
-}
-
-/* Tablet and up (>= 720px) ------------------------------------------ */
+/* Tablet and up ----------------------------------------------------- */
 
 @media (min-width: 720px) {
   .watch-bar {
     flex-direction: row;
     align-items: center;
-    gap: 22px;
-    padding-top: 16px;
-    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    gap: 24px;
+    padding-top: 15px;
+    padding-bottom: calc(15px + env(safe-area-inset-bottom));
   }
 
   .watch-now {
@@ -1111,11 +996,10 @@
   }
 
   .watch-poster {
-    width: 50px;
-    height: 70px;
+    width: 48px;
+    height: 67px;
+    border-radius: 7px;
   }
-
-  /* The transport is a module: it holds its own width. */
 
   .watch-actions {
     flex: 0 0 auto;
@@ -1125,8 +1009,6 @@
     flex: 0 0 auto;
     min-width: 148px;
   }
-
-  /* A movie deck reads out its source in the same slot. */
 
   .watch-source {
     display: flex;
@@ -1138,20 +1020,26 @@
   }
 }
 
-/* Desktop (>= 1024px) ----------------------------------------------- */
+/* Desktop ----------------------------------------------------------- */
 
 @media (min-width: 1024px) {
   .watch-bar {
-    padding-left: max(var(--page-x), env(safe-area-inset-left));
-    padding-right: max(var(--page-x), env(safe-area-inset-right));
+    gap: 32px;
+    padding-top: 17px;
+    padding-bottom: calc(17px + env(safe-area-inset-bottom));
+  }
+
+  .watch-poster {
+    width: 52px;
+    height: 72px;
   }
 
   .watch-now-title {
-    font-size: 18px;
+    font-size: 22px;
   }
 
   .watch-now-episode {
-    margin-top: 4px;
+    margin-top: 3px;
   }
 
   .watch-episode-name {
@@ -1161,13 +1049,13 @@
   .watch-actions .watch-episode-btn {
     min-width: 158px;
     padding: 0 18px;
+    font-size: 13.5px;
   }
 }
 
 /* Landscape phones -------------------------------------------------- */
 /* A 375–430px-tall viewport has no room for a stacked deck. Fold the
-   console into a single row and use the short transport labels so the
-   picture keeps the height. */
+   plinth into one row and use the short transport labels. */
 
 @media (orientation: landscape) and (max-height: 540px) {
   .watch-bar {
@@ -1187,12 +1075,12 @@
   }
 
   .watch-poster {
-    width: 36px;
-    height: 50px;
+    width: 34px;
+    height: 48px;
   }
 
   .watch-poster--fallback {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .watch-episode-btn__long {
@@ -1205,11 +1093,6 @@
 
   .watch-actions {
     flex: 0 0 auto;
-  }
-
-  .watch-actions--episodes {
-    padding: 4px;
-    gap: 5px;
   }
 
   .watch-actions .watch-episode-btn {

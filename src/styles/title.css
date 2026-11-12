@@ -1,48 +1,53 @@
 /* ==================================================================
-   Title page (/title/:type/:id) — imported by pages/Title.tsx
-   Tokens and shared primitives come from src/styles.css.
-   NOTE: styles.css loads AFTER this file in the cascade (App's import
-   chain), so any rule that overrides a shared primitive needs equal
-   or higher specificity — everything here is scoped through
-   .title-page / .title-body so it wins the specificity tie.
+   Title page (/title/:type/:id) — the house print.
+   A large framed backdrop, an oversized Bricolage title, warm meta
+   pills, amber Play, an editorial episode index and a cast strip.
+
+   Tokens and shared primitives come from src/styles.css, which loads
+   AFTER this file. Anything that overrides a shared primitive is
+   scoped through .title-page / .title-body so it wins the cascade.
    ================================================================== */
 
 /* Page frame --------------------------------------------------------- */
 
 .title-page {
-  --title-max: 1280px;
+  --title-max: 1240px;
   position: relative;
   width: 100%;
   max-width: var(--title-max);
   margin: 0 auto;
-  padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  padding:
+    calc(env(safe-area-inset-top) + 8px)
+    max(var(--page-x), env(safe-area-inset-right))
+    calc(64px + env(safe-area-inset-bottom))
+    max(var(--page-x), env(safe-area-inset-left));
 }
 
 /* The failure state renders .page and .title-page on the same node;
-   the shared .page padding shorthand would otherwise zero the bottom
-   gutter, so restate it with the extra specificity. */
+   the shared .page padding shorthand would otherwise zero the frame. */
 .page.title-page {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  padding-top: calc(env(safe-area-inset-top) + 8px);
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 
-/* Fixed back button, clear of the iOS status bar on every axis —
-   the env() left inset keeps it off the notch in landscape. */
+/* Fixed back control — a dark brass-rimmed coin, clear of the notch. */
 
 .title-page .title-back {
   position: fixed;
-  top: calc(env(safe-area-inset-top) + 10px);
+  top: calc(env(safe-area-inset-top) + 14px);
   left: calc(env(safe-area-inset-left) + 14px);
   z-index: 60;
+  width: 44px;
+  height: 44px;
   border-color: var(--border-strong);
-  background: var(--surface-glass);
-  backdrop-filter: blur(14px) saturate(1.3);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.48);
   transition:
     transform var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) ease,
     border-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
+    background-color var(--dur-fast) ease;
 }
 
 .title-page .title-back:active {
@@ -51,24 +56,19 @@
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .title-page .title-back:hover {
-    transform: translateY(-2px) scale(1.04);
+    transform: translateY(-1px);
     border-color: var(--accent-line);
-    box-shadow:
-      0 12px 30px rgba(0, 0, 0, 0.55),
-      0 0 20px var(--accent-glow);
+    background: var(--surface-2);
   }
 }
 
-/* The error state has no hero; let its empty-state span the whole
-   desktop grid instead of the first column only. */
+/* The error state has no hero; let its empty-state span the frame. */
 .title-page > .empty-state {
   grid-column: 1 / -1;
 }
 
-/* Hero --------------------------------------------------------------- */
+/* Hero print -------------------------------------------------------- */
 
-/* Full-bleed cinematic stage, echoing Home's hero: the art sits behind
-   a layered scrim that fades into --bg, with a soft beam glow up top. */
 .title-art {
   position: relative;
   z-index: 0;
@@ -78,10 +78,14 @@
   position: relative;
   isolation: isolate;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  max-height: 56dvh;
+  height: clamp(300px, 58vh, 470px);
   overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 24px;
   background: radial-gradient(120% 90% at 50% 0%, var(--surface-3) 0%, var(--bg) 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 26px 70px rgba(0, 0, 0, 0.5);
 }
 
 .title-hero__art {
@@ -94,92 +98,73 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 18%;
+  object-position: center 22%;
 }
 
-/* No backdrop: blow the poster up, blur it, let the scrim do the rest. */
+/* No backdrop: blow the poster up, blur it, let the scrim carry it. */
 .title-hero--poster .title-hero__art img {
-  filter: blur(24px) saturate(1.25);
-  transform: scale(1.3);
+  filter: blur(22px) saturate(1.1);
+  transform: scale(1.24);
 }
 
-/* The beam: one soft shaft of light drifting down the frame.
-   Transform/opacity only, and never under prefers-reduced-motion. */
+/* One soft warm shaft of light down the right side of the frame. */
 .title-hero__beam {
   position: absolute;
-  top: -34%;
-  left: 50%;
+  top: -32%;
+  right: 2%;
   z-index: -2;
-  width: 60vmax;
-  height: 150vmax;
-  transform: translateX(-50%) rotate(13deg);
+  width: 52vmax;
+  height: 130vmax;
+  transform: rotate(15deg);
   transform-origin: 50% 0;
   border-radius: 50% 50% 46% 46% / 10% 10% 90% 90%;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--accent-bright) 20%, transparent) 0%,
-    color-mix(in srgb, var(--accent) 7%, transparent) 46%,
-    transparent 76%
+    color-mix(in srgb, var(--accent-bright) 16%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 5%, transparent) 48%,
+    transparent 74%
   );
-  filter: blur(34px);
-  opacity: 0.42;
+  filter: blur(46px);
+  opacity: 0.4;
   pointer-events: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .title-hero__beam {
-    animation: title-beam-drift 26s ease-in-out infinite alternate;
-  }
-}
-
-@keyframes title-beam-drift {
-  from {
-    transform: translateX(-53%) rotate(11deg);
-    opacity: 0.3;
-  }
-  to {
-    transform: translateX(-47%) rotate(17deg);
-    opacity: 0.5;
-  }
-}
-
-/* Layered scrim: a deep fade into the page at the bottom, a left-to-
-   right wash so the copy stays legible over any backdrop, and a quiet
-   accent bloom low in the frame. */
+/* Narrative scrim: a long fade into the page, a left wash for the type,
+   and the faintest ember low in the frame. */
 .title-hero__scrim {
   position: absolute;
   inset: 0;
   z-index: -1;
   background:
     radial-gradient(
-      76% 52% at 18% 84%,
-      color-mix(in srgb, var(--accent) 13%, transparent) 0%,
-      transparent 70%
+      54% 44% at 20% 92%,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      transparent 74%
     ),
     linear-gradient(
       to top,
-      var(--bg) 8%,
-      color-mix(in srgb, var(--bg) 94%, transparent) 34%,
-      color-mix(in srgb, var(--bg) 46%, transparent) 62%,
-      color-mix(in srgb, var(--bg) 40%, transparent) 100%
+      var(--bg) 4%,
+      color-mix(in srgb, var(--bg) 90%, transparent) 28%,
+      color-mix(in srgb, var(--bg) 34%, transparent) 62%,
+      color-mix(in srgb, var(--bg) 20%, transparent) 100%
     ),
     linear-gradient(
-      to right,
-      color-mix(in srgb, var(--bg) 52%, transparent) 0%,
-      transparent 62%
+      100deg,
+      color-mix(in srgb, var(--bg) 72%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 20%, transparent) 56%,
+      transparent 78%
     );
 }
 
 .title-hero--empty {
-  aspect-ratio: 16 / 7;
-  max-height: 220px;
+  height: 200px;
 }
 
-/* Glass plate in the corner of the art: the external id, if we have one. */
+/* A letterpress plate in the corner of the print. */
 .title-hero__plate {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 14px;
+  right: 14px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -187,11 +172,8 @@
   margin: 0;
   padding: 6px 12px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-strong);
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: color-mix(in srgb, var(--bg) 74%, transparent);
   font-size: var(--text-2xs);
   font-weight: 700;
   letter-spacing: var(--tracking-caps);
@@ -207,86 +189,74 @@
   color: var(--text);
 }
 
-/* Body --------------------------------------------------------------- */
+/* Body -------------------------------------------------------------- */
 
 .title-body {
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  padding: 0 var(--page-x);
-  margin-top: -68px;
+  margin-top: calc(-1 * clamp(54px, 11vw, 150px));
 }
 
-/* Eyebrow: a glowing pip before the caps label. */
+.title-intro {
+  max-width: 980px;
+}
+
+/* Eyebrow: a short amber rule, then the caps label. */
 .title-body .title-eyebrow {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: 9px;
+  gap: 10px;
   margin-top: 0;
   color: var(--accent);
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.6);
 }
 
 .title-body .title-eyebrow::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 26px;
+  height: 1px;
   flex: 0 0 auto;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
+  background: linear-gradient(90deg, transparent, var(--accent));
 }
 
-/* Big, confident title treatment with a beam-washed gradient. Scoped
-   through .title-body so it outranks styles.css's shared .display. */
+/* Oversized display title in the house voice. */
 .title-body .title-heading {
-  margin-top: 8px;
-  font-size: clamp(30px, 8.2vw, 54px);
-  line-height: 1.03;
-  letter-spacing: -0.042em;
-  font-weight: 800;
+  margin-top: 12px;
+  max-width: 16ch;
+  font-family: var(--font-display);
+  font-size: clamp(44px, 8.4vw, 92px);
+  font-weight: 600;
+  line-height: 0.96;
+  letter-spacing: -0.04em;
   text-wrap: balance;
-  background: linear-gradient(
-    112deg,
-    var(--text) 26%,
-    color-mix(in srgb, var(--accent-bright) 60%, var(--text)) 72%,
-    var(--accent) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 16px 38px rgba(0, 0, 0, 0.42));
+  filter: drop-shadow(0 18px 42px rgba(0, 0, 0, 0.38));
 }
 
-/* Badge row ---------------------------------------------------------- */
+/* Meta pills -------------------------------------------------------- */
 
-/* Year · runtime · rating · status, as quiet glass pills rather than
-   a plain dot-separated line. */
 .title-pills {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .title-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
+  min-height: 30px;
   padding: 0 12px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-2) 74%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.015em;
   color: var(--muted);
   white-space: nowrap;
@@ -296,9 +266,6 @@
   color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 55%, transparent),
-    0 0 18px var(--accent-glow);
 }
 
 .title-pill--quiet {
@@ -306,79 +273,78 @@
   background: transparent;
   border-style: dashed;
   border-color: var(--border-strong);
-  box-shadow: none;
 }
 
 .title-pill__star {
   flex: 0 0 auto;
-  filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
-/* Tagline ------------------------------------------------------------ */
+/* Tagline ----------------------------------------------------------- */
 
 .title-tagline {
-  margin-top: 16px;
-  padding-left: 14px;
-  border-left: 2px solid var(--accent-line);
-  max-width: 46ch;
-  font-size: clamp(15px, 3.4vw, 18px);
+  margin-top: 24px;
+  padding-left: 15px;
+  border-left: 1px solid var(--accent-line);
+  max-width: 44ch;
+  font-size: clamp(16px, 3.6vw, 19px);
   font-style: italic;
-  font-weight: 500;
-  line-height: 1.4;
-  color: color-mix(in srgb, var(--accent) 30%, var(--text));
+  font-weight: 450;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--accent) 24%, var(--text));
 }
 
-/* Genres ------------------------------------------------------------- */
+/* Genres ------------------------------------------------------------ */
 
 .title-genres {
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
-/* Genre pills read as quiet glass labels, not buttons. */
+/* Genre pills read as quiet print labels, not buttons. */
 .title-page .title-genres .chip {
-  min-height: 34px;
-  padding: 0 14px;
+  min-height: 32px;
+  padding: 0 13px;
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--muted);
-  background: var(--surface-glass);
+  background: transparent;
   border-color: var(--border);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
 }
 
-/* Actions ------------------------------------------------------------ */
+/* Actions ----------------------------------------------------------- */
 
-/* Action pair — mirrors Home's hero-actions: a bold glowing Play plus
-   a translucent glass My List that lights up when pressed. */
 .cluster.title-actions {
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 26px;
 }
 
 .title-page .title-actions .btn {
-  min-height: 48px;
-  padding: 0 22px;
-  font-size: 15.5px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  min-height: 52px;
+  padding: 0 26px;
+  font-size: 15px;
+  letter-spacing: -0.005em;
   transition:
     transform var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) ease,
     border-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease,
-    color var(--dur-fast) ease;
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
 .title-page .title-actions .btn-primary {
   flex: 1 1 auto;
-  min-width: 148px;
-  box-shadow: 0 14px 40px var(--accent-glow);
+  min-width: 158px;
+  max-width: 300px;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -8px 18px rgba(89, 45, 10, 0.18),
+    0 16px 38px color-mix(in srgb, var(--accent-glow) 70%, transparent);
 }
 
 .title-page .title-actions .btn-secondary {
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 54%, transparent);
   border-color: var(--border-strong);
   color: var(--text);
 }
@@ -387,14 +353,12 @@
   color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
-  box-shadow:
-    inset 0 0 0 1px var(--accent-line),
-    0 0 20px var(--accent-glow);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
 @media (hover: hover) {
   .title-page .title-actions .btn-secondary:hover {
-    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    background: var(--surface-3);
     border-color: var(--border-strong);
   }
 
@@ -405,21 +369,17 @@
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .title-page .title-actions .btn:hover {
-    transform: translateY(-2px) scale(1.02);
-  }
-
-  .title-page .title-actions .btn-primary:hover {
-    box-shadow: 0 18px 48px var(--accent-glow);
+    transform: translateY(-2px);
   }
 }
 
-/* Overview ----------------------------------------------------------- */
+/* Overview ---------------------------------------------------------- */
 
 .title-overview {
-  margin-top: 18px;
-  max-width: 62ch;
+  margin-top: 28px;
+  max-width: 68ch;
   font-size: 15px;
-  line-height: 1.62;
+  line-height: 1.7;
   color: var(--muted);
 }
 
@@ -429,12 +389,12 @@
   justify-content: center;
   min-width: 44px;
   min-height: 44px;
-  padding: 0 6px;
+  padding: 0 4px;
   margin-top: 2px;
   border: 0;
   background: none;
-  color: var(--accent);
-  font-size: 13.5px;
+  color: var(--accent-bright);
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.01em;
 }
@@ -445,153 +405,169 @@
   }
 }
 
-/* Sections ----------------------------------------------------------- */
+/* Sections ---------------------------------------------------------- */
 
 .title-section {
-  margin-top: 38px;
+  margin-top: clamp(46px, 6vw, 68px);
 }
 
-/* Section head: title, a quiet count, then a fading beam rule. */
+/* Section head: index, display title, quiet count, then a fading rule. */
 .title-section-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .title-section-title {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: var(--tracking-tight);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 11px;
+  font-family: var(--font-display);
+  font-size: clamp(23px, 2.8vw, 29px);
+  font-weight: 600;
+  letter-spacing: -0.028em;
+  line-height: 1;
   color: var(--text);
   white-space: nowrap;
 }
 
+.title-section-index {
+  display: inline-block;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  color: var(--accent);
+  transform: translateY(-0.75em);
+}
+
 .title-section-count {
   flex: 0 0 auto;
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted-2);
+  color: var(--muted);
   white-space: nowrap;
 }
 
 .title-section-rule {
   flex: 1 1 auto;
   height: 1px;
-  background: linear-gradient(90deg, var(--accent-line), transparent);
-  opacity: 0.75;
+  margin-left: 4px;
+  background: linear-gradient(90deg, var(--accent-line), transparent 82%);
+  opacity: 0.7;
 }
 
-/* Season chips are the main interaction here — give them a 44px target
-   plus a springy lift and an active glow. */
+/* Season chips: quiet brass tabs with a clear active state. */
+.title-page .title-seasons {
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
 .title-page .title-seasons .chip {
   min-height: 44px;
+  padding: 0 16px;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
   transition:
-    transform var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) ease,
-    border-color var(--dur-fast) ease,
     color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
 }
 
 .title-page .title-seasons .chip:active {
-  transform: scale(0.94);
+  transform: scale(0.97);
 }
 
-/* Higher specificity than styles.css's .chip--active so the glow sticks. */
+/* Higher specificity than styles.css's .chip--active. */
 .title-page .title-seasons .chip--active {
-  background: var(--accent-soft);
+  background: var(--surface-3);
   border-color: var(--accent-line);
   color: var(--accent-bright);
-  box-shadow:
-    inset 0 0 0 1px var(--accent-line),
-    0 0 18px var(--accent-glow);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 46%, transparent);
 }
 
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+@media (hover: hover) {
   .title-page .title-seasons .chip:not(.chip--active):hover {
-    transform: translateY(-2px);
     border-color: var(--border-strong);
+    background: var(--surface-2);
     color: var(--text);
   }
-
-  .title-page .title-seasons .chip--active:hover {
-    transform: translateY(-2px) scale(1.04);
-    box-shadow:
-      inset 0 0 0 1px var(--accent-line),
-      0 0 24px var(--accent-glow);
-  }
 }
 
-/* Episodes ----------------------------------------------------------- */
+/* Episodes ---------------------------------------------------------- */
 
 .episode-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
+  margin-top: 8px;
+}
+
+.episode-list > li {
+  border-bottom: 1px solid var(--border);
+}
+
+.episode-list > li:last-child {
+  border-bottom: 0;
 }
 
 .episode-empty {
-  padding: 22px 4px;
+  padding: 26px 4px;
   font-size: var(--text-sm);
   color: var(--muted);
 }
 
-/* Scoped at .title-page so styles.css's generic .episode-row:hover
-   (loaded later) can't win the cascade. */
+/* An index row, not a dashboard card: number, still, copy, chevron. */
 .title-page .episode-row {
   display: grid;
-  grid-template-columns: 118px minmax(0, 1fr) auto;
+  grid-template-columns: 104px minmax(0, 1fr);
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  padding: 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-2) 72%, transparent) 0%,
-    color-mix(in srgb, var(--surface) 62%, transparent) 100%
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 14px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
   text-align: left;
   transition:
-    transform var(--dur-fast) var(--ease),
     background-color var(--dur-fast) ease,
-    border-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
+    padding var(--dur-fast) var(--ease);
 }
 
 .title-page .episode-row:active {
-  transform: scale(0.985);
+  background: var(--surface-2);
 }
 
-/* The episode that history points at wears a lit edge. */
+/* The episode history points at wears a lit brass edge. */
 .title-page .episode-row--resume {
-  border-color: var(--accent-line);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 10%, var(--surface-2)) 0%,
-    color-mix(in srgb, var(--surface) 62%, transparent) 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 0 22px color-mix(in srgb, var(--accent-glow) 60%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  padding-left: 14px;
+}
+
+.episode-ordinal {
+  display: none;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-2);
 }
 
 .episode-thumb {
   position: relative;
   display: block;
-  width: 118px;
+  width: 104px;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-sm);
+  border-radius: 9px;
   overflow: hidden;
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--border);
@@ -602,46 +578,6 @@
   height: 100%;
   object-fit: cover;
   transition: transform var(--dur-med) var(--ease);
-}
-
-/* A little glass play badge in the corner of every still. */
-.episode-thumb::before {
-  content: "";
-  position: absolute;
-  right: 7px;
-  bottom: 7px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  z-index: 1;
-  background: color-mix(in srgb, var(--bg) 52%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow:
-    inset 0 0 0 1px var(--border-strong),
-    0 4px 14px rgba(0, 0, 0, 0.45);
-  transition:
-    transform var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) ease;
-}
-
-.episode-thumb::after {
-  content: "";
-  position: absolute;
-  right: 17px;
-  bottom: 16px;
-  z-index: 2;
-  border-style: solid;
-  border-width: 5px 0 5px 8px;
-  border-color: transparent transparent transparent var(--text);
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.6));
-}
-
-/* The fallback tile is already a placeholder — the badge would only
-   crowd it. */
-.episode-thumb:has(.episode-thumb-fallback)::before,
-.episode-thumb:has(.episode-thumb-fallback)::after {
-  display: none;
 }
 
 .episode-thumb-fallback {
@@ -657,22 +593,26 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .episode-kicker {
-  font-size: var(--text-2xs);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--muted-2);
+  color: var(--muted);
+}
+
+.episode-row--resume .episode-kicker {
+  color: var(--accent);
 }
 
 .episode-title {
   font-size: 14.5px;
-  font-weight: 700;
-  letter-spacing: -0.012em;
-  line-height: 1.32;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
   color: var(--text);
 }
 
@@ -680,9 +620,15 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
-  font-size: var(--text-xs);
+  gap: 3px 8px;
+  font-size: 12px;
   color: var(--muted);
+}
+
+.episode-meta > span + span::before {
+  content: "·";
+  margin-right: 7px;
+  color: var(--muted-2);
 }
 
 /* The pick-up marker on the episode history points at. */
@@ -694,68 +640,67 @@
   border: 1px solid var(--accent-line);
   background: var(--accent-soft);
   color: var(--accent-bright);
-  font-size: var(--text-2xs);
-  font-weight: 750;
-  letter-spacing: 0.06em;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.episode-flag::before {
+  display: none;
+}
+
+.episode-meta > .episode-flag::before {
+  display: none;
 }
 
 /* The trailing chevron: a quiet "open this" affordance. */
 .episode-go {
-  display: grid;
+  display: none;
   place-items: center;
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
   border-radius: 50%;
+  border: 1px solid var(--border);
   color: var(--muted-2);
-  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  background: transparent;
   transition:
     transform var(--dur-fast) var(--ease),
     color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease;
+    border-color var(--dur-fast) ease;
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .title-page .episode-row:hover {
-    transform: translateY(-2px);
-    border-color: var(--accent-line);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-3) 82%, transparent) 0%,
-      color-mix(in srgb, var(--surface-2) 70%, transparent) 100%
-    );
-    box-shadow:
-      0 12px 28px rgba(0, 0, 0, 0.45),
-      0 0 20px var(--accent-glow);
+    background: var(--surface-2);
+    padding-left: 12px;
+  }
+
+  .title-page .episode-row--resume:hover {
+    background: color-mix(in srgb, var(--accent) 9%, var(--surface-2));
   }
 
   .title-page .episode-row:hover .episode-thumb img {
-    transform: scale(1.07);
-  }
-
-  .title-page .episode-row:hover .episode-thumb::before {
-    transform: scale(1.15);
-    background: color-mix(in srgb, var(--accent) 26%, var(--bg) 52%, transparent);
+    transform: scale(1.05);
   }
 
   .title-page .episode-row:hover .episode-go {
-    transform: translateX(3px);
+    transform: translateX(2px);
     color: var(--accent-bright);
-    background: var(--accent-soft);
+    border-color: var(--accent-line);
   }
 }
 
-/* Cast --------------------------------------------------------------- */
+/* Cast -------------------------------------------------------------- */
 
 .cast-row {
   display: flex;
-  gap: 16px;
-  padding: 6px 0 8px;
+  gap: 18px;
+  padding: 4px 0 10px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
-  scroll-padding-left: var(--page-x);
 }
 
 .cast-card {
@@ -771,9 +716,9 @@
 }
 
 .cast-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 26%;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -784,12 +729,11 @@
     var(--surface-2) 68%
   );
   color: var(--accent-bright);
-  font-weight: 800;
-  font-size: 22px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
   letter-spacing: -0.03em;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 10px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
   transition:
     border-color var(--dur-fast) ease,
     box-shadow var(--dur-fast) ease;
@@ -803,7 +747,7 @@
 
 .cast-name {
   font-size: 12.5px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
   max-width: 100%;
   color: var(--text);
@@ -818,123 +762,128 @@
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .cast-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
 
   .cast-card:hover .cast-avatar {
     border-color: var(--accent-line);
     box-shadow:
-      0 12px 28px rgba(0, 0, 0, 0.45),
-      0 0 20px var(--accent-glow);
+      0 14px 30px rgba(0, 0, 0, 0.4),
+      0 0 0 3px color-mix(in srgb, var(--accent) 8%, transparent);
   }
 }
 
-/* Empty + failure states --------------------------------------------- */
+/* Empty + failure states -------------------------------------------- */
 
 .title-page .title-empty {
-  margin: 0 var(--page-x);
-  padding: 56px 24px 60px;
+  margin: 22px auto 0;
+  padding: 58px 24px 62px;
+  max-width: 620px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: linear-gradient(
-    170deg,
-    color-mix(in srgb, var(--surface-2) 62%, transparent) 0%,
-    color-mix(in srgb, var(--surface) 38%, transparent) 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    var(--shadow-soft);
+  background:
+    radial-gradient(
+      70% 80% at 50% 0%,
+      color-mix(in srgb, var(--accent) 7%, transparent) 0%,
+      transparent 72%
+    ),
+    var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .title-page .title-empty--inline {
-  margin: 16px 0 0;
-  padding: 30px 20px;
+  margin: 18px 0 0;
+  max-width: none;
+  padding: 30px 22px;
+  border-radius: var(--radius);
+}
+
+.title-page .title-empty h3 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
 }
 
 .title-empty__icon {
   display: grid;
   place-items: center;
-  width: 66px;
-  height: 66px;
-  margin-bottom: 4px;
-  border-radius: 22px;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border-radius: 50%;
   color: var(--accent-bright);
-  background:
-    radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 62%),
-    var(--surface-2);
+  background: radial-gradient(
+    120% 120% at 30% 18%,
+    var(--accent-soft),
+    transparent 64%
+  );
   border: 1px solid var(--accent-line);
-  box-shadow: 0 0 34px var(--accent-glow);
 }
 
 /* Loading skeleton -------------------------------------------------- */
 
-/* The skeleton mirrors the finished page: hero, eyebrow, title, badge
-   row, tagline, genres, actions and the opening lines of the copy. */
-
-/* Slightly lifted fill so the blocks still read where they sit on top
-   of the dark hero stage on phones. */
 .title-page .skeleton {
   background: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 100%);
 }
 
 .title-page .sk-hero {
-  aspect-ratio: 16 / 9;
-  max-height: 56dvh;
-  border-radius: 0;
+  height: clamp(300px, 58vh, 470px);
+  border-radius: 24px;
   background: radial-gradient(120% 90% at 50% 0%, var(--surface-3) 0%, var(--bg) 70%);
 }
 
 .title-page .sk-eyebrow {
-  width: 96px;
-  height: 11px;
+  width: 88px;
+  height: 10px;
   border-radius: var(--radius-pill);
 }
 
 .title-page .sk-title {
-  width: 68%;
-  height: 40px;
-  margin-top: 10px;
+  width: 72%;
+  height: 52px;
+  margin-top: 14px;
   border-radius: 12px;
 }
 
 .title-page .sk-pills {
   display: flex;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .title-page .sk-pill {
   width: 78px;
-  height: 28px;
+  height: 30px;
   border-radius: var(--radius-pill);
 }
 
 .title-page .sk-tagline {
-  width: 58%;
+  width: 54%;
   height: 14px;
-  margin-top: 16px;
+  margin-top: 24px;
   border-radius: var(--radius-pill);
 }
 
 .title-page .sk-genres {
   display: flex;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
 .title-page .sk-pill--genre {
-  width: 66px;
-  height: 34px;
+  width: 68px;
+  height: 32px;
 }
 
 .title-page .sk-actions {
   display: flex;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 26px;
 }
 
 .title-page .sk-btn {
-  height: 48px;
+  height: 52px;
   flex: 1 1 auto;
   border-radius: var(--radius-pill);
 }
@@ -962,9 +911,9 @@
 }
 
 .title-page .sk-episode-thumb {
-  width: 118px;
+  width: 104px;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-sm);
+  border-radius: 9px;
 }
 
 .title-page .sk-episode-kicker {
@@ -987,116 +936,216 @@
   border-radius: var(--radius-pill);
 }
 
-/* Tablet and up (>= 640px) ------------------------------------------- */
+/* The loading layout uses the same body offset, so keep the skeleton
+   intro clear of the placeholder print. */
+.title-page[aria-busy="true"] .title-body {
+  margin-top: calc(-1 * clamp(32px, 6vw, 62px));
+}
 
-@media (min-width: 640px) {
-  .title-page .episode-row {
-    grid-template-columns: 158px minmax(0, 1fr) auto;
-    gap: 16px;
-    padding: 12px;
+/* Tablet and portrait: the print's bottom edge stays clear of the
+   display title, so the frame reads as a card and the house type sits
+   beneath it. The cinematic overlap is reserved for the desktop print. */
+@media (max-width: 1023px) {
+  .title-body {
+    margin-top: 18px;
   }
 
-  .episode-thumb {
-    width: 158px;
-    border-radius: var(--radius);
-  }
-
-  .title-page .sk-episode-thumb {
-    width: 158px;
-    border-radius: var(--radius);
-  }
-
-  .episode-title {
-    font-size: 15px;
+  .title-page[aria-busy="true"] .title-body {
+    margin-top: 18px;
   }
 }
 
-/* Desktop (>= 1024px) ------------------------------------------------ */
+/* Phones ------------------------------------------------------------- */
+
+@media (max-width: 639px) {
+  .title-hero {
+    height: clamp(300px, 52vh, 430px);
+  }
+
+  .title-body {
+    margin-top: 18px;
+  }
+
+  .title-page .sk-hero {
+    height: clamp(300px, 52vh, 430px);
+  }
+
+  .title-page[aria-busy="true"] .title-body {
+    margin-top: 18px;
+  }
+}
+
+/* Short phones: a smaller print and tighter rhythm keep Play inside
+   the first screen on a 360x640 device. */
+@media (max-width: 639px) and (max-height: 700px) {
+  .title-hero {
+    height: clamp(250px, 44vh, 330px);
+  }
+
+  .title-body {
+    margin-top: 14px;
+  }
+
+  .title-body .title-heading {
+    margin-top: 10px;
+    font-size: clamp(38px, 11vw, 48px);
+  }
+
+  .title-pills {
+    margin-top: 14px;
+  }
+
+  .title-tagline {
+    margin-top: 16px;
+  }
+
+  .title-genres {
+    margin-top: 14px;
+  }
+
+  .cluster.title-actions {
+    margin-top: 20px;
+  }
+
+  .title-page .sk-hero {
+    height: clamp(250px, 44vh, 330px);
+  }
+
+  .title-page[aria-busy="true"] .title-body {
+    margin-top: 14px;
+  }
+}
+
+/* Tablet and up ------------------------------------------------------ */
+
+@media (min-width: 640px) {
+  .title-hero {
+    border-radius: 26px;
+  }
+
+  .title-page .episode-row {
+    grid-template-columns: 34px 132px minmax(0, 1fr) 34px;
+    gap: 16px;
+    padding: 15px 8px;
+  }
+
+  .episode-ordinal,
+  .episode-go {
+    display: grid;
+  }
+
+  .episode-ordinal {
+    display: block;
+  }
+
+  .episode-thumb {
+    width: 132px;
+    border-radius: 10px;
+  }
+
+  .title-page .sk-episode-thumb {
+    width: 132px;
+    border-radius: 10px;
+  }
+
+  .episode-title {
+    font-size: 15.5px;
+  }
+
+  .title-page .sk-title {
+    height: 64px;
+  }
+
+  .title-page .sk-hero {
+    border-radius: 26px;
+  }
+}
+
+/* Desktop ------------------------------------------------------------ */
 
 @media (min-width: 1024px) {
   .title-page {
-    --title-max: 1180px;
-    display: grid;
-    grid-template-columns: minmax(0, 44fr) minmax(0, 56fr);
-    column-gap: clamp(32px, 3.2vw, 48px);
-    align-items: start;
-    padding-left: max(var(--page-x), env(safe-area-inset-left));
-    padding-right: max(var(--page-x), env(safe-area-inset-right));
+    padding-top: calc(env(safe-area-inset-top) + 18px);
   }
 
-  /* Align the fixed back button with the centered content column as the
-     viewport grows, keeping it inside the safe area. */
+  .page.title-page {
+    padding-top: calc(env(safe-area-inset-top) + 18px);
+  }
+
+  /* Align the fixed back button with the centered print column. */
   .title-page .title-back {
     left: calc(
-      max(0px, (100% - var(--title-max)) / 2) + max(var(--page-x), env(safe-area-inset-left))
+      max(0px, (100vw - var(--title-max)) / 2) + max(var(--page-x), env(safe-area-inset-left))
     );
-  }
-
-  /* The art becomes a tall sticky panel; the info column scrolls beside
-     it. The DOM has exactly two flow children (art, body), so this is
-     pure auto-placement — the loading skeleton falls into the same
-     slots. */
-  .title-art {
-    position: sticky;
     top: calc(env(safe-area-inset-top) + 18px);
   }
 
   .title-hero {
-    aspect-ratio: auto;
-    height: clamp(340px, 72dvh, 600px);
-    max-height: none;
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-lg);
-  }
-
-  /* Standalone art card: keep the picture bright and only vignette the
-     edges, instead of fading the whole frame into the page. */
-  .title-hero__scrim {
-    background:
-      radial-gradient(
-        70% 50% at 20% 88%,
-        color-mix(in srgb, var(--accent) 12%, transparent) 0%,
-        transparent 72%
-      ),
-      linear-gradient(
-        to top,
-        color-mix(in srgb, var(--bg) 62%, transparent) 0%,
-        color-mix(in srgb, var(--bg) 12%, transparent) 34%,
-        color-mix(in srgb, var(--bg) 22%, transparent) 100%
-      );
+    height: clamp(430px, 64vh, 620px);
+    border-radius: 28px;
   }
 
   .title-hero__art img {
-    object-position: center 22%;
+    object-position: center 24%;
   }
 
-  .title-page .sk-hero {
-    aspect-ratio: auto;
-    height: clamp(340px, 72dvh, 600px);
-    max-height: none;
-    border-radius: var(--radius-lg);
+  .title-hero__plate {
+    top: 18px;
+    right: 18px;
   }
 
-  /* No hero overlap up here — the body sits in its own column. */
   .title-body {
-    margin-top: 0;
-    padding: 0;
+    margin-top: calc(-1 * clamp(110px, 14vh, 168px));
   }
 
   .title-body .title-heading {
-    font-size: clamp(38px, 4.2vw, 54px);
+    font-size: clamp(58px, 6.6vw, 96px);
+    max-width: 15ch;
   }
 
-  /* Actions sit inline here, sized to their labels. */
+  .title-intro {
+    max-width: 1060px;
+  }
+
   .title-page .title-actions .btn-primary {
     flex: 0 0 auto;
     min-width: 0;
   }
 
   .title-page .title-actions .btn {
-    padding: 0 24px;
-    font-size: 16px;
+    padding: 0 30px;
+  }
+
+  .title-overview {
+    margin-top: 24px;
+    font-size: 15.5px;
+  }
+
+  .title-page .episode-row {
+    grid-template-columns: 42px 158px minmax(0, 1fr) 36px;
+    gap: 20px;
+    padding: 17px 10px;
+  }
+
+  .episode-thumb {
+    width: 158px;
+    border-radius: 11px;
+  }
+
+  .title-page .sk-episode-thumb {
+    width: 158px;
+  }
+
+  .episode-ordinal {
+    font-size: 19px;
+  }
+
+  .episode-title {
+    font-size: 16.5px;
+  }
+
+  .episode-kicker {
+    font-size: 10px;
   }
 
   .cast-card {
@@ -1104,8 +1153,20 @@
   }
 
   .cast-avatar {
-    width: 84px;
-    height: 84px;
-    border-radius: 24%;
+    width: 88px;
+    height: 88px;
+  }
+
+  .cast-row {
+    gap: 22px;
+  }
+
+  .title-page .sk-hero {
+    height: clamp(430px, 64vh, 620px);
+    border-radius: 28px;
+  }
+
+  .title-page .sk-title {
+    height: 76px;
   }
 }

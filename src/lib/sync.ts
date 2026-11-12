@@ -1,5 +1,5 @@
 import { kvGet, kvSet } from "./store";
-import type { ProfileMeta, ProfileState } from "../types";
+import type { ProfileAvatarId, ProfileMeta, ProfileState } from "../types";
 
 const FAMILY_KEY =
   (import.meta.env.VITE_FAMILY_KEY as string | undefined)?.trim() || "samandmellu";
@@ -192,11 +192,16 @@ function requireProfile(value: unknown): ProfileMeta {
   return value;
 }
 
-export async function createProfileRemote(name: string, color?: string): Promise<ProfileMeta> {
+export async function createProfileRemote(
+  name: string,
+  color?: string,
+  avatar?: ProfileAvatarId,
+  avatarRing?: boolean,
+): Promise<ProfileMeta> {
   try {
     const data = await request<{ profile?: unknown }>("", {
       method: "POST",
-      body: JSON.stringify({ name, color }),
+      body: JSON.stringify({ name, color, avatar, avatarRing }),
     });
     setStatus({ online: true, error: null });
     return requireProfile(data?.profile);
@@ -208,7 +213,12 @@ export async function createProfileRemote(name: string, color?: string): Promise
 
 export async function updateProfileRemote(
   id: string,
-  patch: { name?: string; color?: string },
+  patch: {
+    name?: string;
+    color?: string;
+    avatar?: ProfileAvatarId | null;
+    avatarRing?: boolean;
+  },
 ): Promise<ProfileMeta> {
   try {
     const data = await request<{ profile?: unknown }>(`?id=${encodeURIComponent(id)}`, {
@@ -392,15 +402,6 @@ export async function flushPush(): Promise<void> {
     handleError(firstError);
     setStatus({ syncing: false });
   }
-}
-
-export function cancelPush(): void {
-  if (pushTimer !== null) {
-    window.clearTimeout(pushTimer);
-    pushTimer = null;
-  }
-  pendingByProfile.clear();
-  persistPending();
 }
 
 /**

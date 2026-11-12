@@ -5,6 +5,40 @@ import { getTrending, searchMulti } from "../lib/tmdb";
 import type { Media } from "../types";
 import "../styles/search.css";
 
+const SearchGlyph = (
+  <svg
+    width="30"
+    height="30"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m16 16 4.5 4.5" />
+  </svg>
+);
+
+const FaultIcon = (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 4.4 21 19.6H3L12 4.4Z" />
+    <path d="M12 10.2v3.9" />
+    <path d="M12 16.9v.5" />
+  </svg>
+);
+
 export default function Search() {
   // `input` mirrors the field; `query` is what actually runs the search.
   const [input, setInput] = useState("");
@@ -87,7 +121,9 @@ export default function Search() {
           <span className="search-eyebrow-dot" aria-hidden="true" />
           Search
         </p>
-        <h1 className="search-title">Search the whole shelf</h1>
+        <h1 className="search-title">
+          Search the whole <span className="search-title-accent">shelf</span>
+        </h1>
         <p className="search-lede">
           Movies and series from the house catalogue — results arrive as you type.
         </p>
@@ -110,19 +146,27 @@ export default function Search() {
                 "Search didn’t finish."
               ) : results ? (
                 <>
-                  <span className={count > 0 ? "search-meta__count" : undefined}>{count}</span>{" "}
-                  {count === 1 ? "result" : "results"} for “{trimmed}”.
+                  <span className="search-meta__count">{count}</span>{" "}
+                  <span className="search-meta__label">
+                    {count === 1 ? "title" : "titles"} for “{trimmed}”.
+                  </span>
                 </>
               ) : null}
             </p>
 
             {error && (
               <div className="empty-state search-empty">
-                <h3>Search hit a snag.</h3>
-                <p>{error}</p>
+                <span className="search-empty__icon" aria-hidden="true">
+                  {FaultIcon}
+                </span>
+                <div className="search-empty__copy">
+                  <p className="eyebrow search-empty__eyebrow">The line went quiet</p>
+                  <h3>Search hit a snag.</h3>
+                  <p>{error}</p>
+                </div>
                 <button
                   type="button"
-                  className="btn btn-sm"
+                  className="btn btn-sm search-empty__cta"
                   onClick={() => setAttempt((a) => a + 1)}
                 >
                   Try again
@@ -140,8 +184,21 @@ export default function Search() {
 
             {!error && !loading && results && results.length === 0 && (
               <div className="empty-state search-empty">
-                <h3>No matches for “{trimmed}”.</h3>
-                <p>Check the spelling, or try the title’s original name.</p>
+                <span className="search-empty__icon" aria-hidden="true">
+                  {SearchGlyph}
+                </span>
+                <div className="search-empty__copy">
+                  <p className="eyebrow search-empty__eyebrow">Nothing in the stacks</p>
+                  <h3>No matches for “{trimmed}”.</h3>
+                  <p>Check the spelling, or try the title’s original name.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm search-empty__cta"
+                  onClick={() => commit("")}
+                >
+                  Clear search
+                </button>
               </div>
             )}
 
@@ -166,22 +223,15 @@ export default function Search() {
           <>
             <div className="search-idle">
               <span className="search-idle__icon" aria-hidden="true">
-                <svg
-                  width="30"
-                  height="30"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                >
-                  <circle cx="11" cy="11" r="6.5" />
-                  <path d="m16 16 4.5 4.5" strokeLinecap="round" />
-                </svg>
+                {SearchGlyph}
               </span>
-              <p className="search-idle__title">Start typing to find something fun</p>
-              <p className="search-idle__sub muted">
-                Movies, TV, hidden gems — the search runs as you type.
-              </p>
+              <div className="search-idle__copy">
+                <p className="eyebrow search-idle__eyebrow">The house shelf</p>
+                <p className="search-idle__title">The whole shelf, one line away.</p>
+                <p className="search-idle__sub muted">
+                  Titles, series and the people in them — results arrive as you type.
+                </p>
+              </div>
             </div>
 
             <section className="section search-section">

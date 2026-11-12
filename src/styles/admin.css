@@ -1,63 +1,62 @@
 /* ==================================================================
-   Admin — the household control room.
-   "Mission control": dark, focused, glowing accent data.
+   Admin — the household control room (RECODE skin)
 
-   Tokens and shared primitives come from src/styles.css. This file
-   only consumes those tokens (surfaces / accent / type scale / radius
-   / elevation / motion / layout). No web fonts, no external assets:
-   the mono data face is a system font stack.
+   A private office, not a mission deck: an editorial masthead, a calm
+   ledger of house numbers, and screen records that read like warm
+   index cards. Tokens come from src/styles.css; nothing here invents
+   a colour outside the palette.
 
-   Mobile-first. All interactive controls are >=44px. Fixed edges and
-   page gutters account for env(safe-area-inset-*).
+   Mobile-first. Every interactive control keeps a >=44px target.
    ================================================================== */
 
 .page.admin-page {
   --admin-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --hud-line: color-mix(in srgb, var(--accent) 8%, transparent);
   position: relative;
   isolation: isolate;
-  padding-top: calc(env(safe-area-inset-top) + 28px);
-  padding-bottom: calc(env(safe-area-inset-bottom) + 64px);
+  max-width: 1200px;
+  padding-top: calc(env(safe-area-inset-top) + 32px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 72px);
   padding-left: calc(var(--page-x) + env(safe-area-inset-left));
   padding-right: calc(var(--page-x) + env(safe-area-inset-right));
 }
 
-.admin-mono {
-  font-family: var(--admin-mono);
-}
-
-/* A soft beam wash from the top corners, shared by both views. */
+/* One soft lamp from above. No grid, no scan lines. */
 .page.admin-page::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: min(60dvh, 580px);
   z-index: -2;
+  height: min(56dvh, 540px);
   pointer-events: none;
   background:
     radial-gradient(
-      60% 100% at 84% -16%,
-      color-mix(in srgb, var(--accent) 16%, transparent) 0%,
-      transparent 64%
+      54% 100% at 82% -18%,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      transparent 68%
     ),
     radial-gradient(
-      46% 82% at 4% -12%,
-      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      42% 76% at 4% -16%,
+      color-mix(in srgb, var(--accent) 5%, transparent) 0%,
       transparent 72%
     );
 }
 
-/* Shared sheet error, scoped so the admin page never depends on
-   another page's stylesheet for its alert styling. */
+.admin-mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+/* Alerts scoped to the room, so /admin never relies on another page. */
 .admin-page .sheet-error {
   margin-top: 12px;
   color: var(--danger);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 /* ==================================================================
-   Login — a vault.
+   The gate — quiet, warm, one clear way in.
    ================================================================== */
 
 .page.admin-page--login {
@@ -66,8 +65,6 @@
   min-height: 100dvh;
 }
 
-/* Ambient vault chamber: a faint grid, a core glow, a scanning beam
-   and a horizon line. All decorative and pointer-transparent. */
 .admin-vault {
   position: absolute;
   inset: 0;
@@ -76,78 +73,48 @@
   pointer-events: none;
 }
 
-.admin-vault__grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(to right, var(--hud-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--hud-line) 1px, transparent 1px);
-  background-size: 40px 40px;
-  -webkit-mask-image: radial-gradient(78% 78% at 50% 42%, black 0%, transparent 78%);
-  mask-image: radial-gradient(78% 78% at 50% 42%, black 0%, transparent 78%);
-  opacity: 0.7;
+/* The old chamber effects are retired; only a soft lamp remains. */
+.admin-vault__grid,
+.admin-vault__scan,
+.admin-vault__horizon {
+  display: none;
 }
 
 .admin-vault__glow {
   position: absolute;
-  top: 40%;
+  top: 8%;
   left: 50%;
-  width: min(92vw, 760px);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  width: min(120vw, 980px);
+  aspect-ratio: 1.5;
+  transform: translateX(-50%);
   border-radius: 50%;
   background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--accent) 15%, transparent) 0%,
-    transparent 62%
+    ellipse at 50% 42%,
+    color-mix(in srgb, var(--accent) 9%, transparent) 0%,
+    transparent 66%
   );
-  filter: blur(12px);
-}
-
-.admin-vault__scan {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 42%;
-  opacity: 0.55;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    color-mix(in srgb, var(--accent) 8%, transparent) 55%,
-    transparent 100%
-  );
-}
-
-.admin-vault__horizon {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 17%;
-  height: 1px;
-  opacity: 0.55;
-  background: linear-gradient(90deg, transparent, var(--accent-line), transparent);
-  box-shadow: 0 0 26px var(--accent-glow);
 }
 
 .admin-console {
   position: relative;
-  width: min(100%, 500px);
-  padding: 26px;
+  width: min(100%, 480px);
+  padding: 28px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
+  border-radius: 26px;
   background:
-    linear-gradient(
-      165deg,
-      color-mix(in srgb, var(--surface-3) 78%, transparent) 0%,
-      color-mix(in srgb, var(--surface) 95%, transparent) 56%
+    radial-gradient(
+      120% 90% at 50% -16%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      transparent 58%
     ),
-    var(--surface);
-  backdrop-filter: blur(26px) saturate(1.35);
-  -webkit-backdrop-filter: blur(26px) saturate(1.35);
-  box-shadow:
-    var(--shadow-lg),
-    0 0 70px color-mix(in srgb, var(--accent) 10%, transparent);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 36%, transparent) 0%,
+      var(--surface) 58%
+    );
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .admin-console::before {
@@ -159,13 +126,13 @@
   pointer-events: none;
   background: linear-gradient(
     90deg,
-    transparent 4%,
-    var(--accent-line) 28%,
-    var(--accent-bright) 50%,
-    var(--accent-line) 72%,
-    transparent 96%
+    transparent 8%,
+    color-mix(in srgb, var(--accent) 42%, transparent) 34%,
+    color-mix(in srgb, var(--accent-bright) 70%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 42%, transparent) 66%,
+    transparent 92%
   );
-  opacity: 0.85;
+  opacity: 0.55;
 }
 
 .admin-console-top {
@@ -180,27 +147,27 @@
 .admin-console-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 11px;
   min-width: 0;
 }
 
 .admin-console-brand-text {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.25;
   min-width: 0;
 }
 
 .admin-console-brand-text strong {
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
 }
 
 .admin-console-brand-text small {
   color: var(--muted);
-  font-family: var(--admin-mono);
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 650;
   letter-spacing: 0.18em;
 }
 
@@ -208,41 +175,35 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-strong);
+  padding: 7px 11px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
   color: var(--muted);
-  font-family: var(--admin-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.14em;
   white-space: nowrap;
 }
 
 .admin-status-dot {
-  position: relative;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--accent-bright);
-  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 12px var(--accent-glow);
+  background: var(--accent);
 }
 
 .admin-status-dot--locked {
-  background: var(--warn);
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--warn) 16%, transparent),
-    0 0 12px color-mix(in srgb, var(--warn) 40%, transparent);
+  background: var(--accent-bright);
 }
 
-/* Vault seal — concentric rings with a slowly turning dashed ring. */
+/* The house seal above the title. */
 .admin-vault-seal {
   position: relative;
-  width: 132px;
-  height: 132px;
-  margin: 26px auto 22px;
+  width: 116px;
+  height: 116px;
+  margin: 28px auto 22px;
   display: grid;
   place-items: center;
 }
@@ -250,45 +211,42 @@
 .admin-seal-ring {
   position: absolute;
   border-radius: 50%;
+  pointer-events: none;
 }
 
 .admin-seal-ring--outer {
   inset: 0;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   background: radial-gradient(
-    circle at 50% 44%,
-    color-mix(in srgb, var(--accent) 11%, transparent),
-    transparent 70%
+    circle at 50% 42%,
+    color-mix(in srgb, var(--accent) 9%, transparent) 0%,
+    transparent 68%
   );
-  box-shadow: inset 0 0 30px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .admin-seal-ring--dash {
-  inset: 12px;
-  border: 1px dashed color-mix(in srgb, var(--accent) 48%, transparent);
+  inset: 9px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-.admin-seal-ring--inner {
-  inset: 30px;
-  border: 1px solid var(--accent-line);
-}
-
-.admin-seal-core {
+.admin-seal-cat {
   position: relative;
-  width: 54px;
-  height: 54px;
-  display: grid;
-  place-items: center;
-  border-radius: 16px;
-  color: var(--accent-bright);
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
-  border: 1px solid var(--accent-line);
-  box-shadow: 0 0 26px var(--accent-glow);
+  z-index: 1;
+  display: block;
+  width: 84px;
+  height: 84px;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--accent) 7%, transparent),
+    0 16px 38px rgba(0, 0, 0, 0.42);
 }
 
-.admin-seal-core svg {
-  width: 26px;
-  height: 26px;
+.admin-seal-cat img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .admin-console-intro {
@@ -296,19 +254,20 @@
 }
 
 .admin-console-intro .eyebrow {
-  color: var(--accent-bright);
+  color: var(--accent);
 }
 
 .admin-login-title {
-  margin-top: 10px;
-  font-size: clamp(32px, 8vw, 46px);
-  line-height: 1.03;
+  margin-top: 12px;
+  font-size: clamp(36px, 8vw, 50px);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
 }
 
 .admin-login-sub {
   margin: 12px auto 0;
-  max-width: 40ch;
-  font-size: 14.5px;
+  max-width: 38ch;
+  font-size: 14px;
   line-height: 1.55;
 }
 
@@ -316,67 +275,74 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-top: 22px;
+  margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-family: var(--admin-mono);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
 }
 
-/* Brand mark (shared by login console + dashboard masthead). */
+/* Brand mark (shared by the gate and the masthead). */
 .admin-brand-mark {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
-  border-radius: 13px;
+  overflow: hidden;
+  border-radius: 50%;
   color: var(--accent-ink);
-  font-size: 21px;
-  font-weight: 800;
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 6%, transparent);
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.04em;
-  background: linear-gradient(155deg, var(--accent-bright), var(--accent));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.38),
-    0 10px 26px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.admin-brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .admin-brand-mark--sm {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  font-size: 19px;
+  width: 52px;
+  height: 52px;
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--accent) 6%, transparent),
+    0 12px 28px rgba(0, 0, 0, 0.34);
 }
 
 .admin-brand-mark--console {
   width: 38px;
   height: 38px;
-  border-radius: 11px;
-  font-size: 17px;
 }
 
 /* ==================================================================
-   Fields + inputs (shared by login + add form).
+   Fields — brass hairlines, amber focus.
    ================================================================== */
 
 .admin-field-label {
   display: block;
   margin-bottom: 8px;
   color: var(--muted);
-  font-family: var(--admin-mono);
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-.admin-login-field {
+.admin-page--login form > .admin-field-label {
   margin-top: 22px;
+}
+
+.admin-login-field {
+  margin-top: 0;
 }
 
 .admin-input-wrap {
@@ -391,17 +357,17 @@
   min-height: 50px;
   padding: 0 14px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--bg) 40%, var(--surface-2));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
   color: var(--text);
   font-size: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   transition:
     border-color var(--dur-fast) ease,
     box-shadow var(--dur-fast) ease,
     background-color var(--dur-fast) ease;
 }
 
-/* The wrap reserves room for the 44px show/hide control. */
 .admin-input-wrap input {
   padding-right: 52px;
 }
@@ -416,34 +382,16 @@
   outline: none;
   border-color: var(--accent-line);
   background: var(--surface-2);
-  box-shadow:
-    0 0 0 3px var(--accent-soft),
-    0 0 26px color-mix(in srgb, var(--accent-glow) 45%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
-/* Login passcode reads like a terminal prompt. */
 .admin-login-field input {
-  padding-left: 34px;
-  font-family: var(--admin-mono);
-  letter-spacing: 0.06em;
-}
-
-.admin-prompt {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--accent-bright);
-  font-family: var(--admin-mono);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  pointer-events: none;
+  letter-spacing: 0.04em;
 }
 
 .admin-input-action {
   position: absolute;
-  right: 4px;
+  right: 3px;
   top: 50%;
   transform: translateY(-50%);
   display: grid;
@@ -451,7 +399,7 @@
   width: 44px;
   height: 44px;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
   transition:
@@ -476,33 +424,25 @@
 }
 
 /* ==================================================================
-   Dashboard — masthead, telemetry, modules.
+   Dashboard — masthead.
    ================================================================== */
 
 .admin-dash-bg {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(to right, var(--hud-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--hud-line) 1px, transparent 1px);
-  background-size: 48px 48px;
-  -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 58%);
-  mask-image: linear-gradient(to bottom, black 0%, transparent 58%);
-  opacity: 0.6;
+  display: none;
 }
 
 .admin-masthead {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--border);
 }
 
 .admin-masthead-id {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 15px;
   min-width: 0;
 }
 
@@ -512,13 +452,15 @@
 
 .admin-title {
   margin-top: 8px;
-  font-size: clamp(30px, 7vw, 48px);
-  line-height: 1.02;
+  font-size: clamp(40px, 7vw, 64px);
+  font-weight: 600;
+  line-height: 0.94;
+  letter-spacing: -0.045em;
 }
 
 .admin-sub {
-  margin-top: 10px;
-  max-width: 56ch;
+  margin-top: 12px;
+  max-width: 54ch;
   font-size: 14.5px;
   line-height: 1.55;
 }
@@ -527,110 +469,95 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 14px;
+  gap: 13px;
 }
 
 .admin-system-status {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 14px;
-  border: 1px solid var(--accent-line);
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent-bright);
-  font-family: var(--admin-mono);
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  color: var(--muted);
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.13em;
   white-space: nowrap;
-  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-glow) 40%, transparent);
 }
 
 .admin-system-status.is-fault {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 38%, transparent);
   background: var(--danger-soft);
   color: var(--danger);
 }
 
 .admin-system-status.is-fault .admin-status-dot {
   background: var(--danger);
-  box-shadow: 0 0 0 3px var(--danger-soft);
 }
 
 .admin-system-status.is-offline {
-  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
-  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 38%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
   color: var(--warn);
 }
 
 .admin-system-status.is-offline .admin-status-dot {
   background: var(--warn);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 16%, transparent);
 }
 
 .admin-head-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   flex-wrap: wrap;
 }
 
 .admin-head-actions .btn {
   gap: 8px;
+  font-size: 13.5px;
 }
 
 .admin-sync-error {
   margin-top: 14px;
   color: var(--danger);
-  font-weight: 650;
+  font-weight: 600;
 }
 
-/* Telemetry band -------------------------------------------------- */
+/* ==================================================================
+   House numbers — a calm ledger.
+   ================================================================== */
 
 .admin-telemetry {
   position: relative;
-  margin-top: 26px;
+  margin-top: 28px;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(
-      165deg,
-      color-mix(in srgb, var(--surface-2) 88%, transparent) 0%,
-      color-mix(in srgb, var(--surface) 92%, transparent) 100%
-    ),
-    var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.admin-telemetry::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--accent-line), var(--accent-bright), transparent);
-  opacity: 0.7;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .admin-telemetry-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
+  gap: 14px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border);
 }
 
 .admin-telemetry-head .eyebrow {
-  color: var(--accent-bright);
+  color: var(--muted);
 }
 
 .admin-telemetry-code {
-  color: var(--muted-2);
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
   letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 .admin-gauges {
@@ -639,12 +566,11 @@
 }
 
 .admin-gauge {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  padding: 16px 12px 14px;
+  padding: 18px 16px 16px;
   border-right: 1px solid var(--border);
 }
 
@@ -652,82 +578,59 @@
   border-right: 0;
 }
 
-.admin-gauge::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  background: linear-gradient(90deg, var(--accent-line), transparent);
-  opacity: 0.55;
-}
-
-.admin-gauge--active::before {
-  background: linear-gradient(90deg, var(--accent-bright), transparent);
-  opacity: 0.95;
-}
-
-.admin-gauge--blocked::before {
-  background: linear-gradient(90deg, var(--danger), transparent);
-  opacity: 0.95;
-}
-
 .admin-gauge-kicker {
   color: var(--muted);
-  font-family: var(--admin-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 
 .admin-gauge-value {
-  font-size: clamp(28px, 6vw, 40px);
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 6vw, 50px);
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.045em;
   font-variant-numeric: tabular-nums;
   color: var(--text);
-  text-shadow: 0 0 24px color-mix(in srgb, var(--accent-glow) 55%, transparent);
 }
 
 .admin-gauge--active .admin-gauge-value {
   color: var(--accent-bright);
-  text-shadow: 0 0 28px var(--accent-glow);
 }
 
 .admin-gauge--blocked .admin-gauge-value {
   color: var(--danger);
-  text-shadow: 0 0 28px color-mix(in srgb, var(--danger) 30%, transparent);
 }
 
 .admin-gauge-meta {
   color: var(--muted);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .admin-capacity {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 18px;
+  padding: 13px 20px;
   border-top: 1px solid var(--border);
 }
 
 .admin-capacity-label {
   color: var(--muted);
-  font-family: var(--admin-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.13em;
 }
 
 .admin-capacity-track {
   position: relative;
   flex: 1 1 auto;
-  height: 6px;
+  height: 4px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-3) 80%, transparent);
+  background: var(--surface-3);
   overflow: hidden;
 }
 
@@ -736,15 +639,13 @@
   inset: 0 auto 0 0;
   border-radius: inherit;
   background: var(--beam-gradient);
-  box-shadow: 0 0 14px var(--accent-glow);
   transition: width var(--dur-med) var(--ease);
 }
 
 .admin-capacity-num {
-  color: var(--accent-bright);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -752,50 +653,34 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 18px;
+  padding: 11px 20px;
   border-top: 1px solid var(--border);
-  color: var(--muted-2);
-  font-family: var(--admin-mono);
-  font-size: 9.5px;
+  color: var(--muted);
+  font-size: 10.5px;
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: 0.08em;
 }
 
 .admin-posture svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   flex: 0 0 auto;
   color: var(--accent);
 }
 
-/* Module cards ---------------------------------------------------- */
+/* ==================================================================
+   Cards — warm paper on the desk.
+   ================================================================== */
 
 .admin-card {
   position: relative;
-  margin-top: 22px;
-  padding: 20px;
+  margin-top: 24px;
+  padding: 22px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(
-      162deg,
-      color-mix(in srgb, var(--surface-2) 84%, transparent) 0%,
-      color-mix(in srgb, var(--surface) 94%, transparent) 62%
-    ),
-    var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.admin-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--accent-line), transparent);
-  opacity: 0.6;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .admin-add-card {
@@ -803,14 +688,20 @@
 }
 
 .admin-add-card::before {
-  background: linear-gradient(90deg, var(--accent-line), var(--accent-bright), transparent);
-  opacity: 0.85;
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  width: 64px;
+  height: 1px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--accent-bright), transparent);
 }
 
 .admin-card-head {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .admin-card-title-wrap {
@@ -818,47 +709,58 @@
 }
 
 .admin-module-tag {
-  display: inline-block;
-  color: var(--accent-bright);
-  font-family: var(--admin-mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--accent);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
+}
+
+.admin-module-tag::before {
+  content: "";
+  width: 15px;
+  height: 1px;
+  flex: 0 0 auto;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .admin-card-title {
-  margin-top: 6px;
-  font-size: 21px;
-  font-weight: 800;
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.05;
   letter-spacing: -0.03em;
 }
 
 .admin-card-sub {
-  margin-top: 4px;
-  line-height: 1.45;
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 .admin-capacity-pill {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 8px 13px;
-  border: 1px solid var(--accent-line);
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent-bright);
-  font-family: var(--admin-mono);
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+  color: var(--text);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   white-space: nowrap;
 }
 
 .admin-capacity-pill small {
   color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 0.16em;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
 }
 
 /* Add form -------------------------------------------------------- */
@@ -866,8 +768,8 @@
 .admin-add-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
-  margin-top: 20px;
+  gap: 16px;
+  margin-top: 22px;
 }
 
 .admin-field {
@@ -876,29 +778,47 @@
 }
 
 .admin-swatch-label {
-  margin-top: 20px;
-  color: var(--muted);
+  margin-top: 22px;
+  color: var(--muted-2);
 }
 
 .admin-swatches {
-  margin-top: 12px;
-  max-width: 460px;
+  margin-top: 10px;
+  max-width: 620px;
 }
 
-/* A lit accent ring around the chosen colour. */
+.admin-swatches.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-swatches .swatch {
+  width: 100%;
+  min-height: 40px;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: var(--swatch-color, var(--surface-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
 .admin-swatches .swatch--active {
-  border-color: var(--accent-bright);
+  border-color: var(--text);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
     0 0 0 2px var(--bg),
-    0 0 0 4px var(--accent-line),
-    0 0 24px color-mix(in srgb, var(--swatch-color) 50%, transparent);
+    0 0 0 3px var(--accent);
 }
 
 .admin-success {
   margin-top: 14px;
   color: var(--accent-bright);
-  font-weight: 750;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .admin-form-foot {
@@ -907,7 +827,9 @@
   justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
-  margin-top: 20px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
 }
 
 .admin-form-foot .btn {
@@ -928,7 +850,7 @@
   min-height: 44px;
   gap: 7px;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .admin-copy-names.is-copied {
@@ -957,9 +879,9 @@
   width: 100%;
   min-height: 44px;
   padding: 0 14px 0 40px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 66%, transparent);
   color: var(--text);
   font-size: 14px;
 }
@@ -971,14 +893,14 @@
 .admin-filter:focus {
   outline: none;
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 .admin-filter-chip {
   min-height: 44px;
   padding: 0 15px;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .admin-registry-meta {
@@ -986,149 +908,234 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 20px;
   padding: 0 2px 12px;
   border-bottom: 1px solid var(--border);
-  color: var(--muted-2);
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
   letter-spacing: 0.12em;
 }
 
 .admin-filter-flag.is-active {
-  color: var(--accent-bright);
+  color: var(--accent);
 }
 
-/* Empty / filtered states ----------------------------------------- */
+/* Selection + kick ------------------------------------------------ */
+
+.admin-kick-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-2) 52%, transparent);
+}
+
+.admin-kick-note {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.admin-select-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-select-toolbar .btn {
+  min-height: 44px;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Empty / filtered states ---------------------------------------- */
 
 .admin-empty {
-  padding: 48px 20px;
+  padding: 46px 20px;
   gap: 12px;
 }
 
 .admin-empty h3 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
+/* A quiet stack of blank index cards. */
 .admin-empty-radar {
   position: relative;
-  width: 72px;
-  height: 72px;
-  margin-bottom: 6px;
-  display: grid;
-  place-items: center;
+  width: 62px;
+  height: 50px;
+  margin-bottom: 8px;
 }
 
 .admin-empty-radar span {
   position: absolute;
-  border-radius: 50%;
-  border: 1px solid var(--accent-line);
+  inset: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
 }
 
 .admin-empty-radar span:nth-child(1) {
-  inset: 0;
-  opacity: 0.35;
+  transform: translate(-6px, 4px) rotate(-7deg);
+  opacity: 0.45;
 }
 
 .admin-empty-radar span:nth-child(2) {
-  inset: 14px;
-  opacity: 0.55;
+  transform: translate(5px, 2px) rotate(5deg);
+  opacity: 0.7;
 }
 
 .admin-empty-radar span:nth-child(3) {
-  inset: 28px;
-  background: var(--accent-soft);
-  border-color: var(--accent-bright);
-  box-shadow: 0 0 18px var(--accent-glow);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.admin-empty-radar span:nth-child(3)::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 14px;
+  height: 1px;
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+  box-shadow:
+    0 8px 0 var(--border),
+    0 16px 0 var(--border);
 }
 
 .admin-empty .btn {
   margin-top: 12px;
 }
 
-/* Screen rows ----------------------------------------------------- */
+/* ==================================================================
+   Registry cards — one screen per index card.
+   ================================================================== */
 
 .admin-screen-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .admin-screen {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 18px;
   background:
     linear-gradient(
-      160deg,
-      color-mix(in srgb, var(--surface-3) 40%, transparent) 0%,
-      color-mix(in srgb, var(--surface-2) 70%, transparent) 100%
+      180deg,
+      color-mix(in srgb, var(--surface-3) 30%, transparent) 0%,
+      transparent 34%
     ),
     var(--surface-2);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 22px rgba(0, 0, 0, 0.18);
   transition:
     border-color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease,
-    transform var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) ease;
+    box-shadow var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease);
 }
 
+/* The little tab along the card's top edge. */
 .admin-screen::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 14px;
-  bottom: 14px;
-  width: 2px;
-  border-radius: var(--radius-pill);
-  background: var(--beam-gradient);
-  opacity: 0.55;
+  left: 16px;
+  top: 0;
+  width: 46px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
 .admin-screen--blocked {
-  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
   background:
     linear-gradient(
-      160deg,
-      color-mix(in srgb, var(--danger-soft) 55%, transparent) 0%,
-      color-mix(in srgb, var(--surface-3) 50%, transparent) 100%
+      180deg,
+      color-mix(in srgb, var(--danger-soft) 42%, transparent) 0%,
+      transparent 46%
     ),
-    var(--surface-3);
+    var(--surface-2);
 }
 
 .admin-screen--blocked::before {
-  background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 30%, transparent));
-  opacity: 0.9;
+  background: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+
+.admin-screen.is-selected {
+  border-color: var(--accent-line);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 55%, transparent) 0%,
+      transparent 52%
+    ),
+    var(--surface-2);
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    0 10px 26px rgba(0, 0, 0, 0.22);
 }
 
 .admin-screen-identity {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
+}
+
+.admin-select-box {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  margin-left: -9px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.admin-select-box input {
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .admin-screen-index {
   flex: 0 0 auto;
-  width: 30px;
-  color: var(--muted-2);
-  font-family: var(--admin-mono);
+  width: 26px;
+  padding-top: 12px;
+  color: var(--muted);
+  font-family: var(--font-display);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   text-align: center;
 }
 
 .admin-avatar {
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   flex: 0 0 auto;
-  font-size: 16px;
+  font-size: 15px;
+  border-radius: 12px;
   background:
-    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.42), transparent 46%),
+    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.36), transparent 46%),
     linear-gradient(
       160deg,
       color-mix(in srgb, var(--profile-color, var(--accent)) 74%, white) 0%,
@@ -1136,9 +1143,8 @@
       color-mix(in srgb, var(--profile-color, var(--accent)) 84%, black) 100%
     );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.34),
-    inset 0 0 0 1px var(--border-strong),
-    0 8px 20px color-mix(in srgb, var(--profile-color, var(--accent)) 30%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px var(--border-strong);
 }
 
 .admin-screen-id {
@@ -1154,85 +1160,79 @@
 }
 
 .admin-screen-name {
-  font-size: 16px;
-  font-weight: 750;
+  font-size: 16.5px;
+  font-weight: 600;
   letter-spacing: -0.015em;
 }
 
 .admin-screen-hint {
-  margin-top: 3px;
-  line-height: 1.4;
+  margin-top: 4px;
+  line-height: 1.45;
 }
 
 .admin-status {
   flex: 0 0 auto;
-  padding: 4px 9px;
+  padding: 3px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-3) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-3) 68%, transparent);
   color: var(--muted);
-  font-family: var(--admin-mono);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
 .admin-status--active {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
   color: var(--accent-bright);
 }
 
 .admin-status--warn {
-  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
-  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 36%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
   color: var(--warn);
 }
 
 .admin-status--blocked {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   background: var(--danger-soft);
   color: var(--danger);
 }
 
-/* 3-strike meter — reinforces the auto-lock model at a glance. */
 .admin-strikes {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   margin-top: 9px;
 }
 
 .admin-strike {
-  width: 22px;
-  height: 4px;
+  width: 18px;
+  height: 3px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-3) 90%, transparent);
+  background: var(--surface-3);
   border: 1px solid var(--border);
 }
 
 .admin-strike.is-on {
   background: var(--warn);
   border-color: transparent;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--warn) 45%, transparent);
 }
 
 .admin-strike.is-blocked {
   background: var(--danger);
   border-color: transparent;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--danger) 50%, transparent);
 }
 
-/* Passcode readout ------------------------------------------------ */
-
+/* Passcode readout — a small stamped strip. */
 .admin-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-family: var(--admin-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1251,8 +1251,8 @@
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface-3) 30%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 24%, var(--surface-2));
 }
 
 .admin-password-line {
@@ -1264,50 +1264,25 @@
 }
 
 .admin-password-value {
-  padding: 6px 12px;
-  border-radius: var(--radius-xs);
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
-  color: var(--accent-bright);
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  color: var(--text);
   font-family: var(--admin-mono);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   word-break: break-all;
-  text-shadow: 0 0 14px color-mix(in srgb, var(--accent-glow) 70%, transparent);
 }
 
-/* The passcode cannot be read back — the mask is the point, so it is
-   rendered as a deliberate sealed value rather than a blank. */
-.admin-password-value--masked {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  min-width: 96px;
-  padding: 6px 10px 6px 14px;
-  letter-spacing: 0.32em;
-  background:
-    linear-gradient(
-      150deg,
-      color-mix(in srgb, var(--accent) 18%, transparent) 0%,
-      var(--accent-soft) 100%
-    ),
-    var(--surface-2);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 0 18px color-mix(in srgb, var(--accent-glow) 32%, transparent);
-}
-
-.admin-password-value--masked.is-unset {
+.admin-password-value.is-unset {
   border-style: dashed;
   border-color: var(--border-strong);
   background: transparent;
   color: var(--muted-2);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  box-shadow: none;
-  text-shadow: none;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
 }
 
 .admin-password-note {
@@ -1315,15 +1290,10 @@
   align-items: center;
   gap: 7px;
   color: var(--muted);
-  font-family: var(--admin-mono);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10.5px;
+  font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-}
-
-.admin-password-note.is-unset {
-  color: var(--muted);
 }
 
 .admin-password-note-dot {
@@ -1332,24 +1302,21 @@
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .admin-password-note.is-unset .admin-password-note-dot {
   background: var(--muted-2);
-  box-shadow: none;
 }
 
-/* Copy affordance for a readable server-stored passcode. */
 .admin-copy-btn {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
   color: var(--muted);
   transition:
     color var(--dur-fast) ease,
@@ -1358,30 +1325,10 @@
     transform var(--dur-fast) var(--ease);
 }
 
-.admin-copy-btn:hover {
-  color: var(--accent-bright);
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-}
-
-.admin-copy-btn:active {
-  transform: scale(0.94);
-}
-
 .admin-copy-btn.is-copied {
   color: var(--accent-bright);
   border-color: var(--accent-line);
   background: var(--accent-soft);
-}
-
-.admin-password-value.is-unset {
-  border-style: dashed;
-  border-color: var(--border-strong);
-  background: transparent;
-  color: var(--muted-2);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  box-shadow: none;
 }
 
 /* Row actions ----------------------------------------------------- */
@@ -1413,8 +1360,8 @@
   min-height: 44px;
   padding: 0 13px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--bg) 40%, var(--surface-2));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 30%, var(--surface-2));
   color: var(--text);
   font-size: 16px;
   font-family: var(--admin-mono);
@@ -1427,13 +1374,13 @@
 .admin-password-row input:focus {
   outline: none;
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 .admin-password-row .btn {
   flex: 0 0 auto;
   min-height: 44px;
-  min-width: 84px;
+  min-width: 80px;
 }
 
 .admin-save-btn {
@@ -1444,103 +1391,29 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.admin-remove {
-  color: var(--danger);
-}
-
-/* Session selection + kick ---------------------------------------- */
-
-.admin-select-box {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  margin-left: -10px;
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-}
-
-.admin-select-box input {
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.admin-screen.is-selected {
-  border-color: var(--accent-line);
-  box-shadow:
-    inset 0 0 0 1px var(--accent-line),
-    0 0 22px color-mix(in srgb, var(--accent-glow) 26%, transparent);
-}
-
-.admin-onetime-badge {
-  flex: 0 0 auto;
-  padding: 4px 9px;
-  border: 1px solid color-mix(in srgb, var(--warn) 42%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--warn) 12%, transparent);
-  color: var(--warn);
-  font-family: var(--admin-mono);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.admin-ref {
-  margin-top: 4px;
-  color: var(--muted-2);
-  font-family: var(--admin-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.admin-kick-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.admin-kick-note {
-  line-height: 1.45;
-}
-
-.admin-select-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-select-toolbar .btn {
-  min-height: 44px;
-  gap: 7px;
-  font-size: 12.5px;
-  font-weight: 700;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .admin-row-buttons .btn {
   min-height: 44px;
+  font-size: 12.5px;
 }
 
-.admin-kick {
+/* Destructive actions stay legible, never shouty. */
+.admin-row-buttons .admin-remove,
+.admin-row-buttons .admin-kick {
   color: var(--danger);
 }
 
-.admin-kick:hover {
+.admin-row-buttons .admin-kick:hover {
   color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
   background: var(--danger-soft);
 }
 
-/* Checkbox rows: add-form option and per-row one-time toggle. */
+/* Checkbox rows --------------------------------------------------- */
+
 .admin-check {
   display: inline-flex;
   align-items: center;
@@ -1550,8 +1423,8 @@
 }
 
 .admin-check input {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
   margin: 0;
   accent-color: var(--accent);
@@ -1561,11 +1434,11 @@
 .admin-check--add {
   align-items: flex-start;
   width: 100%;
-  margin-top: 16px;
-  padding: 10px 12px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface-3) 26%, transparent);
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
 }
 
 .admin-check-text {
@@ -1573,29 +1446,74 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .admin-check-title {
-  font-size: 13px;
-  font-weight: 750;
+  font-size: 13.5px;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .admin-check--one-time {
+  align-items: flex-start;
   margin-top: 8px;
   max-width: 100%;
   color: var(--muted);
-  font-family: var(--admin-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  line-height: 1.4;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .admin-check--one-time > span {
   min-width: 0;
+}
+
+/* Inline identity editor ------------------------------------------ */
+
+.admin-inline-link {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
+}
+
+.admin-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+}
+
+.admin-rename-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.admin-rename-input:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: var(--focus-ring);
 }
 
 .admin-rename-ref {
@@ -1603,8 +1521,53 @@
   letter-spacing: 0.03em;
 }
 
+.admin-rename-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-onetime-badge {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--warn) 36%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  color: var(--warn);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-ref {
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: var(--admin-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+/* Compact swatches inside the row editor. */
+.admin-rename .admin-swatches.swatch-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 0;
+  max-width: none;
+}
+
+.admin-rename .swatch {
+  min-height: 34px;
+  aspect-ratio: auto;
+  height: 34px;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
 /* ==================================================================
-   Responsive enhancements (mobile-first).
+   Responsive layers.
    ================================================================== */
 
 @media (min-width: 480px) {
@@ -1626,7 +1589,7 @@
 
 @media (min-width: 600px) {
   .admin-gauge {
-    padding: 20px 18px 18px;
+    padding: 20px;
   }
 }
 
@@ -1635,11 +1598,39 @@
     flex-direction: row;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 18px;
+    gap: 22px;
   }
 
   .admin-list-tools {
     justify-content: flex-end;
+  }
+
+  .admin-kick-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+
+  .admin-kick-note {
+    flex: 1 1 auto;
+    max-width: 44ch;
+  }
+
+  .admin-swatches.swatch-grid {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .admin-rename .admin-swatches.swatch-grid {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-rename .swatch {
+    min-height: 28px;
+    height: 28px;
+    border-radius: 7px;
   }
 }
 
@@ -1648,218 +1639,102 @@
     flex-direction: row;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 24px;
+    gap: 28px;
   }
 
   .admin-masthead-right {
     align-items: flex-end;
+    padding-top: 6px;
   }
 }
 
 @media (min-width: 900px) {
+  .admin-add-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .admin-screen {
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(180px, 0.62fr) minmax(0, 1.4fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
     align-items: start;
-    gap: 18px;
+    gap: 16px 26px;
     padding: 18px 20px;
   }
 
-  .admin-screen-identity,
-  .admin-screen-password {
-    margin-top: 2px;
+  .admin-screen::before {
+    left: 20px;
   }
 
-  .admin-row-buttons {
-    justify-content: flex-end;
+  .admin-screen-identity {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .admin-screen-password {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .admin-screen-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    padding-left: 26px;
+    border-left: 1px solid var(--border);
   }
 }
 
 /* ==================================================================
-   Motion + pointer hover (desktop mice only). Global
-   prefers-reduced-motion handling in styles.css kills all of this.
+   Pointer enhancements. Global reduced-motion handling in
+   styles.css disables every transition.
    ================================================================== */
-
-@media (prefers-reduced-motion: no-preference) {
-  .admin-vault__scan {
-    animation: admin-scan 7s linear infinite;
-  }
-
-  .admin-seal-ring--dash {
-    animation: admin-spin 26s linear infinite;
-  }
-
-  .admin-status-dot {
-    animation: admin-blink 2.8s ease-in-out infinite;
-  }
-}
-
-@keyframes admin-scan {
-  0% {
-    transform: translateY(-120%);
-  }
-  100% {
-    transform: translateY(360%);
-  }
-}
-
-@keyframes admin-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes admin-blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.42;
-  }
-}
 
 @media (hover: hover) {
   .admin-screen:hover {
     border-color: var(--border-strong);
-    transform: translateY(-2px);
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
+    transform: translateY(-1px);
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.03),
+      0 14px 32px rgba(0, 0, 0, 0.28);
   }
 
   .admin-screen--blocked:hover {
-    border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+    border-color: color-mix(in srgb, var(--danger) 48%, var(--border));
   }
 
   .admin-input-action:hover {
     color: var(--text);
-    background: color-mix(in srgb, var(--surface-3) 80%, transparent);
+    background: color-mix(in srgb, var(--surface-3) 76%, transparent);
   }
 
   .admin-filter-wrap:focus-within .admin-filter-icon {
     color: var(--accent);
   }
-}
 
-/* Inline identity editor -------------------------------------------- */
-/* Admin can rename/recolour a screen in place; the passcode controls
-   below stay untouched while this is open. */
-
-.admin-inline-link {
-  min-height: 28px;
-  padding: 0 9px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--accent);
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  transition:
-    color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease,
-    border-color var(--dur-fast) ease;
-}
-
-.admin-inline-link:hover {
-  color: var(--accent-bright);
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
-}
-
-.admin-rename {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--bg) 34%, transparent);
-}
-
-.admin-rename-input {
-  width: 100%;
-  min-height: 42px;
-  padding: 0 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 16px;
-}
-
-.admin-rename-input:focus {
-  outline: none;
-  border-color: var(--accent-line);
-  box-shadow: var(--focus-ring);
-}
-
-.admin-rename-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* Compact swatches inside the row editor (the add form keeps the large
-   ones). Self-contained so /admin never depends on another page's CSS. */
-.admin-swatches.swatch-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.admin-swatches .swatch {
-  width: 100%;
-  min-height: 44px;
-  aspect-ratio: 1;
-  border-radius: 14px;
-  border: 2px solid transparent;
-  background: var(--swatch-color, var(--surface-2));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    inset 0 -8px 16px rgba(0, 0, 0, 0.18);
-  transition:
-    transform var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) ease;
-}
-
-.admin-rename .admin-swatches {
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 0;
-  max-width: none;
-}
-
-.admin-rename .swatch {
-  min-height: 26px;
-  aspect-ratio: auto;
-  height: 26px;
-  border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-}
-
-/* Wide screens: one tidy row of ten instead of a 5x2 block of oversized
-   tiles in the middle of the provision card. */
-@media (min-width: 700px) {
-  .admin-swatches.swatch-grid {
-    grid-template-columns: repeat(10, minmax(0, 1fr));
-    gap: 8px;
-    max-width: 620px;
+  .admin-inline-link:hover {
+    color: var(--accent-bright);
+    background: var(--accent-soft);
+    border-color: var(--accent-line);
   }
 
-  .admin-swatches .swatch {
-    min-height: 40px;
-    border-radius: 11px;
+  .admin-copy-btn:hover {
+    color: var(--accent-bright);
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
   }
 
-  .admin-rename .admin-swatches.swatch-grid {
-    grid-template-columns: repeat(10, minmax(0, 1fr));
-    gap: 6px;
+  .admin-swatches .swatch:hover {
+    transform: translateY(-1px);
+  }
+
+  .admin-row-buttons .admin-remove:hover {
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+    background: var(--danger-soft);
   }
 }
 
-/* Narrow phones: give the passcode field and Save their own rows. */
+/* Narrow phones: let the passcode field and Save take their own rows. */
 @media (max-width: 520px) {
   .admin-password-row {
     flex-wrap: wrap;
@@ -1868,5 +1743,58 @@
   .admin-password-row input,
   .admin-password-row .btn {
     flex: 1 1 100%;
+  }
+
+  .admin-telemetry-code {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-console {
+    padding: 22px;
+    border-radius: 24px;
+  }
+
+  .admin-vault-seal {
+    width: 104px;
+    height: 104px;
+    margin-top: 24px;
+  }
+
+  .admin-seal-cat {
+    width: 76px;
+    height: 76px;
+  }
+
+  .admin-login-title {
+    font-size: 36px;
+  }
+
+  .admin-gauge {
+    padding: 16px 12px 14px;
+  }
+
+  .admin-gauge-value {
+    font-size: 32px;
+  }
+
+  .admin-gauge-meta {
+    font-size: 11px;
+  }
+
+  .admin-capacity {
+    gap: 9px;
+    padding: 12px 14px;
+  }
+
+  .admin-posture {
+    padding: 11px 14px;
+    font-size: 9.5px;
+  }
+
+  .admin-card {
+    padding: 18px;
+    border-radius: 20px;
   }
 }

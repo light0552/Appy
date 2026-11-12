@@ -1,6 +1,9 @@
-# LIGHTH00K
+# LIGHTH00K — Private Cinema
 
-The family's own streaming shelf — an iOS-first, installable PWA. TMDB for the catalogue,
+<img src="public/brand/lighthook-cat.jpg" alt="The LIGHTH00K cat seal" width="120" align="right" />
+
+The family's own screening room — an installable PWA with a warm midnight palette,
+Bricolage display type, and the ginger cat as the house seal. TMDB for the catalogue,
 a cross-origin iframe for playback (no `sandbox` — it breaks every provider, see below),
 and Netlify Blobs for cross-device profile sync.
 
@@ -21,22 +24,28 @@ The full build specification is in [`BUILD.md`](./BUILD.md). Read it first.
 
 ```bash
 npm install
-npm run dev              # http://localhost:5173  (local-only; /api/profiles will 404)
-npx netlify dev          # with functions + Blobs emulation, needs `netlify login` + a linked site
-npm run build            # tsc --noEmit && vite build -> dist/
-npx netlify deploy --prod --dir=dist
+npm run dev:live        # full stack: Vite + Netlify Functions + Blobs on :8888
+npm run dev             # UI only on :5173 (local-only; /api/profiles will 404)
+npm run build           # tsc --noEmit && vite build -> dist/
 ```
 
-`npm run dev` serves the whole app against local storage only; the sync layer detects the
-missing `/api/profiles` and degrades to "Offline — changes saved on this device" without
-losing a click. Netlify deploy is the only path where sync across two devices is real.
+`npm run dev:live` is the preview the household should use: it starts
+`netlify dev`, which detects Vite, boots the app on `http://localhost:8888`, and
+serves `netlify/functions/{auth,profiles}.mts` with the local Blobs sandbox. It
+works offline after the first `npx netlify` run; no login or linked site is
+needed for local data.
+
+`npm run dev` serves the whole app against local storage only; the sync layer
+detects the missing `/api/profiles` and degrades to "Offline — changes saved on
+this device" without losing a click. On a phone on the same Wi-Fi, use
+`http://<lan-ip>:8888` (or `:5173` with the Vite proxy).
 
 ## Deploy to Netlify
 
 1. Push the repo to GitHub / GitLab / Bitbucket, then **Add new site → Import an existing
    project** and pick the repository.
 2. Build settings (already encoded in [`netlify.toml`](./netlify.toml)):
-   - **Base directory:** `Appy` (only if this folder is not the repository root)
+   - **Base directory:** repository root (leave blank)
    - **Build command:** `npm run build`
    - **Publish directory:** `dist`
    - **Functions directory:** `netlify/functions`
@@ -73,6 +82,31 @@ values are baked into the bundle at build time.
 Locally these live in `.env` (gitignored); `.env.example` is the template. `.env` is never
 uploaded — on Netlify the same keys must be set under **Site configuration → Environment
 variables**.
+
+## Design system
+
+The RECODE skin lives in `src/styles.css` as tokens and shared primitives:
+
+- **Room:** `--bg #0a0806`, cocoa panels, cream `--text #f6efe3`, parchment
+  `--muted #b3a58f`, marigold `--accent #e9a05a`.
+- **Type:** Bricolage Grotesque (`--font-display`) for titles, Inter (`--font`) for
+  UI. Both are self-hosted in `public/fonts` so the installed app keeps its voice
+  offline.
+- **Shape:** 16px cards, 26px panels, warm hairlines, soft warm-black shadows.
+- **Brand:** the supplied ginger-cat photograph is the seal everywhere — app icons,
+  boot splash, desktop nav, profiles lobby and the admin/notice cards
+  (`public/brand/lighthook-cat.jpg`; icons regenerate with
+  `node scripts/make-icons.mjs`).
+- **Profiles:** the house lobby — seal and promise on the left, screens as warm
+  tickets on the right, full-width on desktop and a tight editorial stack on phones.
+- **Screen looks:** the admin can give each screen the ginger cat, the black cat, or
+  coloured initials with any custom colour. A per-screen switch removes the colour
+  ring and glow for a completely clean photo. Existing screens keep their initials
+  until changed.
+- **House notice:** three ways to watch clean — Brave, uBlock Origin Lite, or the
+  private LIGHTH00K Android app (request access from the admin).
+- **Page CSS:** each page imports its own stylesheet; the new `*-recode.css` files
+  hold page-scoped overrides where the original skin needed replacing.
 
 ## How it is put together
 

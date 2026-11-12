@@ -70,21 +70,17 @@
   border-radius: var(--radius-sm);
 }
 
-/* The gradient tile, matching the desktop nav mark. */
+/* The cat seal, matching the desktop nav mark. */
 .home-brand__mark {
   flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 15px;
-  letter-spacing: -0.04em;
-  color: var(--accent-ink);
-  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: block;
+  object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 3px color-mix(in srgb, var(--accent) 7%, transparent),
     0 4px 18px var(--accent-glow);
 }
 

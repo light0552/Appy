@@ -11,6 +11,7 @@ import {
 import type {
   HistoryItem,
   Media,
+  ProfileAvatarId,
   ProfileMeta,
   ProfilePrefs,
   ProfileState,
@@ -46,8 +47,16 @@ const KEY_PENDING_CREATES = "pendingProfiles";
 const KEY_PENDING_DELETES = "pendingDeletes";
 const KEY_PENDING_META = "pendingProfileMeta";
 
-/** Rename/recolour patches that have not reached the server yet, by profile id. */
-type PendingMeta = Record<string, { name?: string; color?: string }>;
+/** Rename/recolour/re-face patches that have not reached the server yet, by profile id. */
+type PendingMeta = Record<
+  string,
+  {
+    name?: string;
+    color?: string;
+    avatar?: ProfileAvatarId | null;
+    avatarRing?: boolean;
+  }
+>;
 
 type AddProfileResult =
   | { ok: true; profile: ProfileMeta }
@@ -96,13 +105,24 @@ export interface SessionValue {
   adminUnblockProfile: (id: string) => Promise<void>;
   adminRenameProfile: (
     id: string,
-    patch: { name?: string; color?: string; adminName?: string },
+    patch: {
+      name?: string;
+      color?: string;
+      avatar?: ProfileAvatarId | null;
+      avatarRing?: boolean;
+      adminName?: string;
+    },
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   adminAddProfile: (
     name: string,
     color: string | undefined,
     password: string,
-    options?: { adminName?: string; temporary?: boolean },
+    options?: {
+      adminName?: string;
+      temporary?: boolean;
+      avatar?: ProfileAvatarId;
+      avatarRing?: boolean;
+    },
   ) => Promise<AddProfileResult>;
   adminDeleteProfile: (id: string) => Promise<void>;
   /** Rotates the server session epoch for one or many screens. */
@@ -184,11 +204,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (index === -1) continue; // profile removed — nothing left to apply or sync
 
         const profile = next[index];
-        next[index] = {
+        const merged: ProfileMeta = {
           ...profile,
           name: patch.name?.trim() ? patch.name.trim().slice(0, 24) : profile.name,
           color: patch.color ?? profile.color,
         };
+        if (patch.avatar !== undefined) {
+          if (patch.avatar === null) delete merged.avatar;
+          else merged.avatar = patch.avatar;
+        }
+        if (patch.avatarRing !== undefined) {
+          if (patch.avatarRing) delete merged.avatarRing;
+          else merged.avatarRing = false;
+        }
+        next[index] = merged;
 
         if (pendingCreates.current.has(id)) continue; // adoption pushes the meta
 
@@ -238,7 +267,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         for (const profile of local) {
           if (remoteIds.has(profile.id) || !pendingCreates.current.has(profile.id)) continue;
           try {
-            const created = await sync.createProfileRemote(profile.name, profile.color);
+            const created = await sync.createProfileRemote(
+              profile.name,
+              profile.color,
+              profile.avatar,
+              profile.avatarRing,
+            );
             await auth.migrateAuthRecord(profile.id, created.id);
             // The profile's id changed — carry its active slot over, or the user
             // is silently bounced to the picker on every launch (Finding 13).
@@ -366,7 +400,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (working.some((candidate) => candidate.id === profile.id)) continue;
         if (!pendingCreates.current.has(profile.id)) continue;
         try {
-          const created = await sync.createProfileRemote(profile.name, profile.color);
+          const created = await sync.createProfileRemote(
+            profile.name,
+            profile.color,
+            profile.avatar,
+            profile.avatarRing,
+          );
           await auth.migrateAuthRecord(profile.id, created.id);
           // Carry the active slot across the id migration, or the user bounces
           // to the picker on every launch (Finding 13).
@@ -501,7 +540,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [activeId]);
 
   const addProfile = useCallback(
-    async (name: string, color?: string): Promise<AddProfileResult> => {
+    async (
+      name: string,
+      color?: string,
+      avatar?: ProfileAvatarId,
+      avatarRing?: boolean,
+    ): Promise<AddProfileResult> => {
       const trimmed = name.trim();
       if (!trimmed) return { ok: false, error: "Enter a name first." };
       if (profilesRef.current.length >= MAX_PROFILES) {
@@ -509,7 +553,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const profile = await sync.createProfileRemote(trimmed, color);
+        const profile = await sync.createProfileRemote(trimmed, color, avatar, avatarRing);
         await applyProfiles([...profilesRef.current, profile]);
         return { ok: true, profile };
       } catch (err) {
@@ -521,7 +565,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
 
         // Offline: create locally and adopt it on the server next time we connect.
-        const profile = makeLocalProfile(trimmed, color);
+        const profile = makeLocalProfile(trimmed, color, avatar, avatarRing);
         pendingCreates.current.add(profile.id);
         await kvSet(KEY_PENDING_CREATES, [...pendingCreates.current]);
         await applyProfiles([...profilesRef.current, profile]);
@@ -532,11 +576,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const updateProfile = useCallback(
-    async (id: string, patch: { name?: string; color?: string }) => {
+    async (
+      id: string,
+      patch: {
+        name?: string;
+        color?: string;
+        avatar?: ProfileAvatarId | null;
+        avatarRing?: boolean;
+      },
+    ) => {
       // Any patch that failed to sync earlier must go up together with this one,
       // or the server would keep the stale half of the edit.
       const queued = (await kvGet<PendingMeta>(KEY_PENDING_META)) ?? {};
-      const merged: { name?: string; color?: string } = { ...queued[id], ...patch };
+      const merged: {
+        name?: string;
+        color?: string;
+        avatar?: ProfileAvatarId | null;
+        avatarRing?: boolean;
+      } = {
+        ...queued[id],
+        ...patch,
+      };
       // A blank name is rejected by the server — never queue it, or it would be
       // retried (and fail) on every boot and refresh forever.
       if (merged.name !== undefined && merged.name.trim().length === 0) delete merged.name;
@@ -554,8 +614,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       } catch {
         // Offline: keep the edit locally AND queue it — without the queue the
         // next boot or online refresh would rebuild the index from the remote
-        // copy (old name/colour) and silently discard the edit.
-        if (merged.name !== undefined || merged.color !== undefined) {
+        // copy (old name/colour/face) and silently discard the edit.
+        if (
+          merged.name !== undefined ||
+          merged.color !== undefined ||
+          merged.avatar !== undefined ||
+          merged.avatarRing !== undefined
+        ) {
           const nextQueue: PendingMeta = { ...queued, [id]: merged };
           await kvSet(KEY_PENDING_META, nextQueue);
         }
@@ -652,7 +717,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const adminRenameProfile = useCallback(
     async (
       id: string,
-      patch: { name?: string; color?: string; adminName?: string },
+      patch: {
+        name?: string;
+        color?: string;
+        avatar?: ProfileAvatarId | null;
+        avatarRing?: boolean;
+        adminName?: string;
+      },
     ): Promise<{ ok: true } | { ok: false; error: string }> => {
       const trimmedName = patch.name?.trim();
       if (trimmedName !== undefined && trimmedName.length === 0) {
@@ -666,10 +737,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        if (trimmedName !== undefined || patch.color !== undefined) {
+        if (
+          trimmedName !== undefined ||
+          patch.color !== undefined ||
+          patch.avatar !== undefined ||
+          patch.avatarRing !== undefined
+        ) {
           await updateProfile(id, {
             ...(trimmedName !== undefined ? { name: trimmedName } : {}),
             ...(patch.color !== undefined ? { color: patch.color } : {}),
+            ...(patch.avatar !== undefined ? { avatar: patch.avatar } : {}),
+            ...(patch.avatarRing !== undefined ? { avatarRing: patch.avatarRing } : {}),
           });
         }
         if (patch.adminName !== undefined) {
@@ -689,13 +767,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       name: string,
       color: string | undefined,
       password: string,
-      options: { adminName?: string; temporary?: boolean } = {},
+      options: {
+        adminName?: string;
+        temporary?: boolean;
+        avatar?: ProfileAvatarId;
+        avatarRing?: boolean;
+      } = {},
     ): Promise<AddProfileResult> => {
       // Check before creating anything: the screen would otherwise be left on
       // the server with no password the admin asked for.
       if (!auth.hasAdminSession()) throw adminRequiredError();
 
-      const result = await addProfile(name, color);
+      const result = await addProfile(name, color, options.avatar, options.avatarRing);
       if (result.ok) {
         await auth.adminAddRecord(
           result.profile.id,

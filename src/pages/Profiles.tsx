@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import ProfileAvatar from "../components/ProfileAvatar";
 import Sheet from "../components/Sheet";
 import { KICKED_NOTICE_KEY } from "../components/SessionGuard";
 import { useSession } from "../lib/session";
@@ -16,9 +17,8 @@ import {
   revokeDeviceToken,
 } from "../lib/auth";
 import type { ProfileAuthError, ProfileAuthResult } from "../lib/auth";
-import { initials } from "../lib/profiles";
-import type { ProfileMeta } from "../types";
-import "../styles/profiles.css";
+import type { ProfileMeta } from "../types";import "../styles/profiles.css";
+import "../styles/profiles-recode.css";
 
 /**
  * The unlock result gains these two fields when the screen still holds a
@@ -485,7 +485,7 @@ export default function Profiles() {
     return (
       <div className="boot">
         <div className="boot-mark" aria-label="Loading profiles">
-          L
+          <img src="/brand/lighthook-cat.jpg" alt="" />
         </div>
       </div>
     );
@@ -505,12 +505,15 @@ export default function Profiles() {
 
       <header className="profiles-masthead">
         <div className="profiles-brand">
-          <span className="profiles-brand-mark" aria-hidden="true">
-            L
-          </span>
+          <img
+            className="profiles-brand-mark"
+            src="/brand/lighthook-cat.jpg"
+            alt=""
+            aria-hidden="true"
+          />
           <span className="profiles-brand-copy">
             <span className="profiles-brand-name">LIGHTH00K</span>
-            <span className="profiles-brand-kicker">Private shelf</span>
+            <span className="profiles-brand-kicker">House cinema</span>
           </span>
         </div>
         <button
@@ -544,23 +547,46 @@ export default function Profiles() {
       )}
 
       <section className="profiles-hero" aria-labelledby="profiles-title">
+        <div className="profiles-seal" aria-hidden="true">
+          <img src="/brand/lighthook-cat.jpg" alt="" />
+          <span className="profiles-seal__ring" />
+        </div>
         <p className="profiles-eyebrow">
           <span className="profiles-beacon" aria-hidden="true" />
           <span>
             {profiles.length} {profiles.length === 1 ? "screen" : "screens"}
           </span>
           <span className="profiles-eyebrow-sep" aria-hidden="true" />
-          <span className="profiles-eyebrow-soft">A private shelf</span>
+          <span className="profiles-eyebrow-soft">House cinema</span>
         </p>
         <h1 id="profiles-title" className="display profiles-title">
-          Who&apos;s watching?
+          Who&apos;s <span className="profiles-title-accent">watching?</span>
         </h1>
         <p className="profiles-sub">
           Every screen is here. Choose yours and enter its password.
         </p>
+        <p className="profiles-house-note">
+          <span className="profiles-house-line" aria-hidden="true" />
+          A private cinema, kept by the household.
+        </p>
       </section>
 
       <section className="profiles-shelf" aria-label="Choose a screen">
+        <div className="profiles-shelf-head">
+          <div>
+            <p className="eyebrow">The house</p>
+            <h2 className="profiles-shelf-title">
+              {profiles.length === 0
+                ? "No screens yet"
+                : `${profiles.length} ${profiles.length === 1 ? "screen" : "screens"}`}
+            </h2>
+          </div>
+          <span className="profiles-shelf-status">
+            <span className="profiles-shelf-dot" aria-hidden="true" />
+            Ready
+          </span>
+        </div>
+
         {profiles.length === 0 ? (
           <div className="profiles-empty">
             <span className="profiles-empty__beacon" aria-hidden="true">
@@ -665,13 +691,21 @@ export default function Profiles() {
                         }
                       >
                         <span
-                          className="profile-avatar-wrap"
+                          className={`profile-avatar-wrap${
+                            profile.avatar && profile.avatarRing === false
+                              ? " profile-avatar-wrap--plain"
+                              : ""
+                          }`}
                           style={{ "--profile-color": profile.color } as CSSProperties}
                         >
                           <span className="profile-halo" aria-hidden="true" />
-                          <span className="avatar profile-avatar">
-                            {initials(profile.name)}
-                          </span>
+                          <ProfileAvatar
+                            name={profile.name}
+                            color={profile.color}
+                            avatar={profile.avatar}
+                            ring={profile.avatarRing !== false}
+                            className="profile-avatar"
+                          />
                           <span
                             className={`profile-badge${
                               active
@@ -697,7 +731,9 @@ export default function Profiles() {
                               </>
                             ) : isBlocked ? (
                               "Blocked"
-                            ) : null}
+                            ) : (
+                              "Enter passcode"
+                            )}
                           </span>
                         </span>
                       </button>
@@ -708,6 +744,10 @@ export default function Profiles() {
             )}
           </>
         )}
+        <p className="profiles-shelf-note">
+          <LockGlyph size={12} />
+          Passcodes are checked by the house server.
+        </p>
       </section>
 
       <footer className="profiles-foot">
@@ -760,13 +800,21 @@ export default function Profiles() {
             }`}
           >
             <span
-              className="unlock-avatar-wrap"
+              className={`unlock-avatar-wrap${
+                sheet.profile.avatar && sheet.profile.avatarRing === false
+                  ? " unlock-avatar-wrap--plain"
+                  : ""
+              }`}
               style={{ "--profile-color": sheet.profile.color } as CSSProperties}
             >
               <span className="unlock-halo" aria-hidden="true" />
-              <span className="avatar unlock-avatar">
-                {initials(sheet.profile.name)}
-              </span>
+              <ProfileAvatar
+                name={sheet.profile.name}
+                color={sheet.profile.color}
+                avatar={sheet.profile.avatar}
+                ring={sheet.profile.avatarRing !== false}
+                className="unlock-avatar"
+              />
               {blocked && sheet.step === "unlock" && (
                 <span className="unlock-avatar-badge" aria-hidden="true">
                   <LockGlyph size={13} />

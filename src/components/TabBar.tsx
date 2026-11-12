@@ -52,9 +52,12 @@ export default function TabBar() {
       {/* Decorative on mobile (hidden by CSS); the wordmark for the
           desktop top nav at >= 1024px. */}
       <span className="tab-brand">
-        <span className="tab-brand-mark" aria-hidden="true">
-          L
-        </span>
+        <img
+          className="tab-brand-mark"
+          src="/brand/lighthook-cat.jpg"
+          alt=""
+          aria-hidden="true"
+        />
         <span className="tab-brand-name">
           LIGHTH<span className="tab-brand-zeros">00</span>K
         </span>

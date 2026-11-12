@@ -181,18 +181,45 @@ export default function Browse() {
 
   if (!kind) return <Navigate to="/" replace />;
 
+  // Split the shelf name so the second half can catch the marigold light.
+  const [titleLead, ...titleRestWords] = KIND_TITLES[kind].split(" ");
+  const titleRest = titleRestWords.join(" ");
+
+  const shelfCount = loading
+    ? "Reading the shelf"
+    : items.length === 0
+      ? error
+        ? "Shelf unavailable"
+        : "Shelf empty"
+      : `${items.length} ${items.length === 1 ? "title" : "titles"}${
+          page > 1 ? ` · page ${page}` : ""
+        }`;
+
   const header = (
     <header className="browse-head">
-      <button type="button" className="icon-btn browse-back" onClick={goBack} aria-label="Back">
-        {BackIcon}
-      </button>
-      <div className="browse-head-text">
+      <div className="browse-head-top">
+        <button type="button" className="browse-back" onClick={goBack} aria-label="Back">
+          {BackIcon}
+          <span className="browse-back-label">Back</span>
+        </button>
         <p className="eyebrow browse-eyebrow">
           <span className="browse-eyebrow-dot" aria-hidden="true" />
           Browse
         </p>
-        <h1 className="browse-title">{KIND_TITLES[kind]}</h1>
-        <p className="browse-lede">{KIND_BLURBS[kind]}</p>
+      </div>
+
+      <div className="browse-head-main">
+        <div className="browse-head-text">
+          <h1 className="browse-title">
+            {titleLead} <span className="browse-title-accent">{titleRest}</span>
+          </h1>
+          <p className="browse-lede">{KIND_BLURBS[kind]}</p>
+        </div>
+
+        <p className="browse-status">
+          <span className="browse-status__pip" aria-hidden="true" />
+          <span className="browse-status__text">{shelfCount}</span>
+        </p>
       </div>
     </header>
   );
@@ -226,9 +253,12 @@ export default function Browse() {
           <span className="browse-empty__icon" aria-hidden="true">
             {error ? FaultIcon : ShelfIcon}
           </span>
-          <h3>{error ? "Couldn't load this catalogue" : "Nothing came back"}</h3>
-          <p>{error ?? "The shelf is bare for a moment. Give it another go."}</p>
-          <button type="button" className="btn btn-primary" onClick={retry}>
+          <div className="browse-empty__copy">
+            <p className="eyebrow browse-empty__eyebrow">The catalogue</p>
+            <h3>{error ? "Couldn't load this catalogue" : "Nothing came back"}</h3>
+            <p>{error ?? "The shelf is bare for a moment. Give it another go."}</p>
+          </div>
+          <button type="button" className="btn btn-primary browse-empty__cta" onClick={retry}>
             Try again
           </button>
         </div>
@@ -241,12 +271,6 @@ export default function Browse() {
   return (
     <div className="page browse-page">
       {header}
-
-      <p className="browse-status">
-        <span className="browse-status__pip" aria-hidden="true" />
-        {items.length} {items.length === 1 ? "title" : "titles"}
-        {page > 1 ? ` · page ${page}` : ""}
-      </p>
 
       <div className="browse-grid">
         {items.map((media) => (

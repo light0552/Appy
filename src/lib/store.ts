@@ -11,7 +11,6 @@ const IDB_OP_TIMEOUT_MS = 1500;
 
 export const KEY_PROFILES = "profiles";
 export const KEY_ACTIVE = "activeProfile";
-export const KEY_PENDING = "pendingProfiles";
 
 export function stateKey(profileId: string): string {
   return `state:${profileId}`;

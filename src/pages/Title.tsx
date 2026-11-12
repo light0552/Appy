@@ -429,39 +429,41 @@ export default function Title() {
       </div>
 
       <div className="title-body">
-        <p className="eyebrow title-eyebrow">
-          {detail.type === "tv" ? "Series" : "Movie"}
-        </p>
-        <h1 className="display title-heading">{detail.title}</h1>
+        <div className="title-intro">
+          <p className="eyebrow title-eyebrow">
+            {detail.type === "tv" ? "Series" : "Movie"}
+          </p>
+          <h1 className="display title-heading">{detail.title}</h1>
 
-        <MetaPills pills={pills} />
+          <MetaPills pills={pills} />
 
-        {detail.tagline && <p className="title-tagline">{detail.tagline}</p>}
+          {detail.tagline && <p className="title-tagline">{detail.tagline}</p>}
 
-        {detail.genres.length > 0 && (
-          <div className="chip-row title-genres" role="group" aria-label="Genres">
-            {detail.genres.map((genre) => (
-              <span key={genre} className="chip">
-                {genre}
-              </span>
-            ))}
+          {detail.genres.length > 0 && (
+            <div className="chip-row title-genres" role="group" aria-label="Genres">
+              {detail.genres.map((genre) => (
+                <span key={genre} className="chip">
+                  {genre}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="cluster title-actions">
+            <Link className="btn btn-primary" to={playHref}>
+              {PlayIcon}
+              Play
+            </Link>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-pressed={inList}
+              onClick={toggleList}
+            >
+              {inList ? CheckIcon : PlusIcon}
+              {inList ? "In My List" : "My List"}
+            </button>
           </div>
-        )}
-
-        <div className="cluster title-actions">
-          <Link className="btn btn-primary" to={playHref}>
-            {PlayIcon}
-            Play
-          </Link>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-pressed={inList}
-            onClick={toggleList}
-          >
-            {inList ? CheckIcon : PlusIcon}
-            {inList ? "In My List" : "My List"}
-          </button>
         </div>
 
         {detail.overview && (
@@ -483,7 +485,12 @@ export default function Title() {
         {detail.type === "tv" && visibleSeasons.length > 0 && (
           <section className="title-section">
             <div className="title-section-head">
-              <h2 className="title-section-title">Episodes</h2>
+              <h2 className="title-section-title">
+                <span className="title-section-index" aria-hidden="true">
+                  01
+                </span>
+                Episodes
+              </h2>
               {seasonDetail && !seasonError && (
                 <span className="title-section-count">
                   {seasonDetail.episodes.length} episodes
@@ -542,6 +549,9 @@ export default function Title() {
                         className={`episode-row${isResume ? " episode-row--resume" : ""}`}
                         to={`/watch/tv/${detail.tmdbId}?s=${seasonDetail.seasonNumber}&e=${ep.episodeNumber}`}
                       >
+                        <span className="episode-ordinal" aria-hidden="true">
+                          {String(ep.episodeNumber).padStart(2, "0")}
+                        </span>
                         <span className="episode-thumb">
                           {still ? (
                             <img src={still} alt="" loading="lazy" decoding="async" />
@@ -579,7 +589,12 @@ export default function Title() {
         {detail.cast.length > 0 && (
           <section className="title-section">
             <div className="title-section-head">
-              <h2 className="title-section-title">Cast</h2>
+              <h2 className="title-section-title">
+                <span className="title-section-index" aria-hidden="true">
+                  {detail.type === "tv" ? "02" : "01"}
+                </span>
+                Cast
+              </h2>
               <span className="title-section-count">{detail.cast.length} credited</span>
               <span className="title-section-rule" aria-hidden="true" />
             </div>

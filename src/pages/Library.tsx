@@ -1,12 +1,12 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import PosterCard from "../components/PosterCard";
+import ProfileAvatar from "../components/ProfileAvatar";
 import Sheet from "../components/Sheet";
 import {
   MAX_SCREEN_PASSWORD_LENGTH,
   MIN_SCREEN_PASSWORD_LENGTH,
 } from "../lib/auth";
-import { initials } from "../lib/profiles";
 import { useSession } from "../lib/session";
 import { liveHistory, liveWatchlist } from "../lib/store";
 import type { HistoryItem } from "../types";
@@ -384,9 +384,13 @@ export default function Library() {
       style={{ "--library-color": activeProfile.color } as CSSProperties}
     >
       <header className="library-head">
-        <span className="avatar library-avatar" aria-hidden="true">
-          {initials(activeProfile.name)}
-        </span>
+        <ProfileAvatar
+          name={activeProfile.name}
+          color={activeProfile.color}
+          avatar={activeProfile.avatar}
+          ring={activeProfile.avatarRing !== false}
+          className="library-avatar"
+        />
         <div className="library-head-text">
           <p className="eyebrow library-eyebrow">
             <span className="library-eyebrow-dot" aria-hidden="true" />
@@ -536,9 +540,12 @@ export default function Library() {
                   <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z" />
                 </svg>
               </span>
-              <h3>Nothing saved yet</h3>
-              <p>Titles you save from a title page land here, on this profile only.</p>
-              <Link className="btn btn-primary" to="/search">
+              <div className="library-empty__copy">
+                <p className="eyebrow library-empty__eyebrow">The watchlist</p>
+                <h3>Nothing saved yet</h3>
+                <p>Titles you save from a title page land here, on this profile only.</p>
+              </div>
+              <Link className="btn btn-primary library-empty__cta" to="/search">
                 Find something
               </Link>
             </div>
@@ -576,12 +583,15 @@ export default function Library() {
                     <path d="M12 7.5V12l3 2" />
                   </svg>
                 </span>
-                <h3>No history yet</h3>
-                <p>
-                  Open an episode or a movie and it is saved here automatically — this is where
-                  you pick it back up.
-                </p>
-                <Link className="btn btn-primary" to="/search">
+                <div className="library-empty__copy">
+                  <p className="eyebrow library-empty__eyebrow">The reel</p>
+                  <h3>No history yet</h3>
+                  <p>
+                    Open an episode or a movie and it is saved here automatically — this is where
+                    you pick it back up.
+                  </p>
+                </div>
+                <Link className="btn btn-primary library-empty__cta" to="/search">
                   Find something
                 </Link>
               </div>

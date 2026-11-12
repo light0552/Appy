@@ -1,0 +1,251 @@
+/* ==================================================================
+   Admin — screen look picker
+   Three exclusive looks: colour/initials, ginger cat, black cat.
+   The profile colour stays the ring behind a photo.
+   ================================================================== */
+
+.admin-look {
+  margin-top: 22px;
+  max-width: 620px;
+}
+
+.admin-look .admin-swatch-label {
+  margin-top: 0;
+}
+
+.admin-look-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.admin-look-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+  color: var(--text);
+  text-align: left;
+  transition:
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease);
+}
+
+.admin-look-option:active {
+  transform: scale(0.98);
+}
+
+.admin-look-option.is-active {
+  border-color: var(--accent-line);
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--accent) 13%, transparent), transparent 72%),
+    color-mix(in srgb, var(--surface-2) 72%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 48%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent-glow) 44%, transparent);
+}
+
+.admin-look-avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  font-size: 13px;
+  border-radius: 50%;
+}
+
+.admin-look-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-look-copy strong {
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-look-copy small {
+  font-size: 10px;
+  color: var(--muted-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-look-colour {
+  margin-top: 14px;
+}
+
+.admin-look .admin-swatches.swatch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: none;
+  margin-top: 12px;
+}
+
+.admin-look .admin-swatches .swatch {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  flex: 0 0 38px;
+  aspect-ratio: auto;
+  border-radius: 11px;
+}
+
+.admin-look-hint {
+  margin-top: 9px;
+}
+
+.admin-ring-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 48%, transparent);
+  cursor: pointer;
+}
+
+.admin-ring-check input {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.admin-ring-check span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-ring-check strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.admin-ring-check small {
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
+
+/* Custom-colour wheel, disguised as one more swatch. */
+.swatch--custom {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: rgba(0, 0, 0, 0.62);
+  cursor: pointer;
+}
+
+.swatch--custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.swatch--custom span {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+}
+
+.swatch--custom:focus-within {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+.admin-rename .admin-look {
+  margin-top: 6px;
+  max-width: none;
+}
+
+.admin-rename .admin-look-grid {
+  gap: 6px;
+}
+
+.admin-rename .admin-look-option {
+  padding: 8px;
+  gap: 8px;
+  border-radius: 11px;
+}
+
+.admin-rename .admin-look-avatar {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  font-size: 11px;
+}
+
+.admin-rename .admin-look-copy strong {
+  font-size: 11.5px;
+  line-height: 1.15;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.admin-rename .admin-look-copy small {
+  display: none;
+}
+
+.admin-rename .admin-look .admin-swatches.swatch-grid {
+  gap: 6px;
+}
+
+.admin-rename .admin-look .swatch {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  flex-basis: 30px;
+}
+
+@media (max-width: 520px) {
+  .admin-look-option {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 9px;
+  }
+
+  .admin-look-copy strong,
+  .admin-look-copy small {
+    font-size: 10.5px;
+  }
+
+  .admin-look-avatar {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+}

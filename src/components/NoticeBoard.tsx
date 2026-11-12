@@ -50,73 +50,6 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-const BeaconIcon = (
-  <svg
-    className="notice-mark"
-    viewBox="0 0 32 32"
-    fill="none"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <defs>
-      <linearGradient
-        id="notice-beam-left"
-        x1="16"
-        y1="9.6"
-        x2="1.5"
-        y2="4.2"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="currentColor" stopOpacity="0.62" />
-        <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-      </linearGradient>
-      <linearGradient
-        id="notice-beam-right"
-        x1="16"
-        y1="9.6"
-        x2="30.5"
-        y2="4.2"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="currentColor" stopOpacity="0.62" />
-        <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-      </linearGradient>
-    </defs>
-
-    <path
-      className="notice-beam"
-      d="M15.6 8.4 1.5 3.6v9.7l14.1-2.5Z"
-      fill="url(#notice-beam-left)"
-    />
-    <path
-      className="notice-beam notice-beam--b"
-      d="M16.4 8.4 30.5 3.6v9.7l-14.1-2.5Z"
-      fill="url(#notice-beam-right)"
-    />
-
-    <path
-      d="M13 11.6h6l1.3 13.2H11.7L13 11.6Z"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M12.7 24.8h6.6"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-    <path
-      d="M13.5 14.5h5"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      opacity="0.55"
-    />
-    <circle className="notice-lamp" cx="16" cy="9.5" r="2.4" />
-  </svg>
-);
-
 const PhoneIcon = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
     <rect x="7" y="2.5" width="10" height="19" rx="2.6" stroke="currentColor" strokeWidth="1.7" />
@@ -132,12 +65,12 @@ const DesktopIcon = (
 );
 
 /**
- * House notice — the signal card pinned above the main content on app open.
- * It names the two ad-blocker setups the shelf is tuned for (Brave on
- * phones, uBlock Origin Lite on desktop Chrome). "Got it" is a permanent,
- * one-time acknowledgement per device: the card never returns on this
- * device, and only a new device / fresh storage sees it again. Dismissal
- * plays a short exit animation first, then unmounts.
+ * House rules — the small ticket pinned above the shelf on app open.
+ * It names the three ways into the cinema: Brave on phones, uBlock Origin
+ * Lite on desktop Chrome, and the private LIGHTH00K Android app. "Got it"
+ * is a permanent, one-time acknowledgement per device: the card never
+ * returns on this device, and only a new device / fresh storage sees it
+ * again. Dismissal plays a short exit animation first, then unmounts.
  */
 export default function NoticeBoard() {
   const [acknowledged, setAcknowledged] = useState<boolean>(() => readAcknowledged());
@@ -170,35 +103,27 @@ export default function NoticeBoard() {
     <section className="notice" role="status" aria-label="House notice">
       <div className={`notice-card${closing ? " notice-card--closing" : ""}`}>
         <span className="notice-hairline" aria-hidden="true" />
-        <span className="notice-sheen" aria-hidden="true" />
 
-        <div className="notice-beacon" aria-hidden="true">
-          <span className="notice-ring" />
-          <span className="notice-ring notice-ring--b" />
-          {BeaconIcon}
+        <div className="notice-seal" aria-hidden="true">
+          <img src="/brand/lighthook-cat.jpg" alt="" />
         </div>
 
         <div className="notice-copy">
           <p className="notice-eyebrow">
             <span className="notice-pip" aria-hidden="true" />
-            <span className="notice-eyebrow-text">House notice</span>
+            <span className="notice-eyebrow-text">House rules</span>
           </p>
           <h2 className="notice-title">
             Best watched with an{" "}
             <span className="notice-title-accent">ad blocker.</span>
           </h2>
           <p className="notice-lede">
-            Two setups, one minute — then the shelf runs clean.
-          </p>
-          {/* Short screens (360x640, landscape phones) get one compact line
-              instead of the two chips, so the notice never eats the fold. */}
-          <p className="notice-compact">
-            <strong>Brave Browser</strong> on iPhone &amp; Android ·{" "}
-            <strong>uBlock Origin Lite</strong> on Chrome
+            Two browsers, or the house app — one minute, then the shelf runs
+            clean.
           </p>
         </div>
 
-        <ul className="notice-chips">
+        <ul className="notice-chips" aria-label="Recommended setups">
           <li className="notice-chip">
             <span className="notice-chip-icon" aria-hidden="true">
               {PhoneIcon}
@@ -206,7 +131,7 @@ export default function NoticeBoard() {
             <span className="notice-chip-body">
               <span className="notice-chip-name">Brave Browser</span>
               <span className="notice-chip-detail">
-                iPhone &amp; Android · blocker built in
+                iPhone &amp; Android · built in
               </span>
             </span>
           </li>
@@ -222,14 +147,35 @@ export default function NoticeBoard() {
               </span>
             </span>
           </li>
+
+          <li className="notice-chip notice-chip--app">
+            <span
+              className="notice-chip-icon notice-chip-icon--app"
+              aria-hidden="true"
+            >
+              <img
+                src="/brand/avatar-ginger.webp"
+                alt=""
+                width={22}
+                height={22}
+                decoding="async"
+              />
+            </span>
+            <span className="notice-chip-body">
+              <span className="notice-chip-name">LIGHTH00K app</span>
+              <span className="notice-chip-detail">
+                Android only · request access from admin
+              </span>
+            </span>
+          </li>
         </ul>
 
         <div className="notice-actions">
           <button type="button" className="notice-got" onClick={dismiss}>
             <span className="notice-got-label">Got it</span>
             <svg
-              width="15"
-              height="15"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

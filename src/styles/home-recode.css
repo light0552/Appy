@@ -1,0 +1,273 @@
+/* ==================================================================
+   Home — the marquee and the shelves (RECODE skin)
+   Warm editorial header, an inset cinematic stage with a slate number,
+   and quieter, larger shelves. Loads after home.css.
+   ================================================================== */
+
+.home-header {
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+
+.home-header::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border) 14%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 38%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 60%,
+    var(--border) 86%,
+    transparent 100%
+  );
+  opacity: 0.7;
+}
+
+.home-greeting {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+@media (min-width: 768px) {
+  .home-greeting {
+    font-size: 20px;
+    font-weight: 600;
+  }
+}
+
+.home-house {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  margin-right: 18px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.home-house i {
+  width: 20px;
+  height: 1px;
+  background: var(--border-strong);
+}
+
+@media (min-width: 1024px) {
+  .home-house {
+    display: inline-flex;
+  }
+}
+
+.home .home-profile {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+/* The stage ---------------------------------------------------------- */
+
+.hero-edition {
+  position: absolute;
+  top: 24px;
+  right: 26px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
+}
+
+.hero-edition i {
+  width: 26px;
+  height: 1px;
+  background: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.hero .hero-scrim {
+  background:
+    radial-gradient(
+      64% 58% at 18% 88%,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      transparent 72%
+    ),
+    linear-gradient(
+      to top,
+      var(--bg) 0%,
+      color-mix(in srgb, var(--bg) 86%, transparent) 24%,
+      color-mix(in srgb, var(--bg) 20%, transparent) 62%,
+      color-mix(in srgb, var(--bg) 40%, transparent) 100%
+    ),
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--bg) 88%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 46%, transparent) 38%,
+      transparent 78%
+    );
+}
+
+.hero-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+}
+
+@media (max-width: 639px) {
+  .home .hero {
+    min-height: clamp(430px, 63dvh, 560px);
+  }
+
+  .home .hero-body {
+    padding-top: 14px;
+    padding-bottom: 22px;
+  }
+}
+
+.home .hero .hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(38px, 9vw, 58px);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-weight: 600;
+}
+
+.hero-overview {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.home .hero .hero-meta {
+  color: color-mix(in srgb, var(--text) 68%, transparent);
+}
+
+.home .hero .hero-rating {
+  color: var(--accent-bright);
+}
+
+.home .hero .cluster.hero-actions .btn {
+  min-height: 50px;
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 1024px) {
+  .hero {
+    min-height: clamp(500px, 64dvh, 610px);
+    margin: 6px 18px 0;
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    background: var(--surface);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 30px 80px rgba(0, 0, 0, 0.34);
+  }
+
+  .hero-art,
+  .hero-img {
+    border-radius: inherit;
+  }
+
+  .hero-body {
+    max-width: 660px;
+    padding: 40px clamp(40px, 5vw, 66px) 46px;
+  }
+
+  .home .hero .hero-title {
+    font-size: clamp(56px, 6.6vw, 86px);
+    line-height: 0.92;
+  }
+
+  .hero-overview {
+    max-width: 54ch;
+    font-size: 15px;
+  }
+
+  .hero-edition {
+    top: 30px;
+    right: 34px;
+  }
+}
+
+/* Shelves ------------------------------------------------------------ */
+
+.home .section {
+  margin-top: 46px;
+}
+
+.home .section-head {
+  padding: 0 var(--page-x);
+  margin-bottom: 14px;
+}
+
+.home .section-head h2 {
+  font-size: clamp(22px, 2.6vw, 28px);
+  letter-spacing: -0.03em;
+}
+
+.home .section-head h2::before {
+  width: 22px;
+  height: 1px;
+  align-self: center;
+  background: linear-gradient(90deg, var(--accent-bright), var(--accent));
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.home .section-head a,
+.home .section-head button {
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.home .row {
+  margin-top: 38px;
+}
+
+.home .row-scroller {
+  gap: 16px;
+  padding-top: 10px;
+  padding-bottom: 14px;
+}
+
+.home .row-poster {
+  width: 146px;
+}
+
+@media (min-width: 700px) {
+  .home .row-poster {
+    width: 174px;
+  }
+}
+
+.home .poster-title {
+  margin-top: 11px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.home .poster-sub {
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+}
+
+.home .poster-media {
+  border-radius: 15px;
+}
+
+/* A quiet end-stop under the last shelf. */
+.home::after {
+  content: "";
+  display: block;
+  width: 42px;
+  height: 1px;
+  margin: 52px auto 8px;
+  background: linear-gradient(90deg, transparent, var(--accent-line), transparent);
+}

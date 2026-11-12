@@ -26,6 +26,9 @@ export default function ServerChips({ mediaRef, ref, activeId, onSelect }: Serve
 
   return (
     <div className="chip-row server-chips" role="group" aria-label="Servers">
+      <span className="server-chips__label" aria-hidden="true">
+        Source
+      </span>
       {options.map(({ provider }) => {
         const active = provider.id === activeId;
         return (

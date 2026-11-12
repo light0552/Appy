@@ -38,7 +38,7 @@ function Guard({ children }: { children: ReactNode }) {
       <div className="boot" role="status" aria-label="Loading LIGHTH00K">
         <div className="boot-core">
           <div className="boot-mark" aria-hidden="true">
-            L
+            <img src="/brand/lighthook-cat.jpg" alt="" />
           </div>
           <div className="boot-wordmark" aria-hidden="true">
             LIGHTH00K

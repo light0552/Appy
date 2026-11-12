@@ -1,5 +1,8 @@
 export type MediaType = "movie" | "tv";
 
+/** The two illustrated screen faces an admin can assign. */
+export type ProfileAvatarId = "ginger" | "black";
+
 /** Minimal reference used by the provider registry. */
 export interface MediaRef {
   type: MediaType;
@@ -40,6 +43,10 @@ export interface ProfileMeta {
   id: string;
   name: string;
   color: string;
+  /** Optional illustrated screen face. Missing = coloured initials. */
+  avatar?: ProfileAvatarId;
+  /** False hides the colour ring around an illustrated face. Default true. */
+  avatarRing?: boolean;
   createdAt: number;
 }
 

@@ -1,124 +1,336 @@
 /* ==================================================================
-   Library — active profile's Watchlist / History shelf.
+   Library — the active profile's private shelf.
+   A membership card at the top, a refined watchlist/history control,
+   and prints mounted as warm tickets below.
    Tokens and shared primitives come from src/styles.css.
-   NOTE: styles.css loads AFTER this file in the cascade, so any rule
-   that overrides a shared primitive (.display, .segmented, .page …) is
-   scoped through a parent class so it wins the specificity tie
-   regardless of load order.
    ================================================================== */
 
 /* Page frame --------------------------------------------------------- */
 
-/* Positioned so the profile-tinted wash below can anchor to it. */
 .library-page {
   position: relative;
+  isolation: isolate;
 }
 
-/* The shared .page padding is a shorthand, so the top/bottom breathing
-   room has to out-specify it to survive. */
 .page.library-page {
   padding-top: calc(env(safe-area-inset-top) + 20px);
-  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  padding-bottom: calc(44px + env(safe-area-inset-bottom));
 }
 
-/* A profile-tinted wash across the top of the page: the shelf carries
-   the household member's own colour. */
+/* A warm wash only — the profile colour stays on the avatar, never on
+   the page chrome. */
 .library-page::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: 300px;
+  height: 380px;
+  z-index: -1;
   pointer-events: none;
   background:
     radial-gradient(
-      90% 100% at 10% -12%,
-      color-mix(in srgb, var(--library-color, var(--accent)) 22%, transparent) 0%,
-      transparent 64%
+      82% 90% at 10% -18%,
+      color-mix(in srgb, var(--accent) 11%, transparent) 0%,
+      transparent 66%
     ),
     radial-gradient(
-      70% 80% at 96% -20%,
-      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
-      transparent 62%
+      56% 66% at 94% -20%,
+      color-mix(in srgb, var(--accent) 5%, transparent) 0%,
+      transparent 68%
     );
 }
 
-.library-page > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* Header ------------------------------------------------------------- */
+/* Membership card ---------------------------------------------------- */
 
 .library-head {
-  display: flex;
-  flex-wrap: wrap;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px 14px;
+  gap: 18px;
+  padding: 22px 22px 22px 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  background:
+    linear-gradient(
+      112deg,
+      color-mix(in srgb, var(--accent) 7%, transparent) 0%,
+      transparent 46%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 42%, transparent) 0%,
+      color-mix(in srgb, var(--surface) 74%, transparent) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 26px 60px rgba(0, 0, 0, 0.3);
 }
 
-/* The profile medallion — the shared .avatar primitive tinted with the
-   profile's own colour (set inline as --library-color on the root). */
+/* The card's lit top edge. */
+.library-head::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-line) 22%,
+    color-mix(in srgb, var(--accent-bright) 62%, transparent) 48%,
+    var(--accent-line) 72%,
+    transparent 100%
+  );
+  opacity: 0.72;
+}
+
+/* A quiet engraved ring in the corner, like a house seal on a card. */
+.library-head::after {
+  content: "";
+  position: absolute;
+  top: -92px;
+  right: -58px;
+  width: 230px;
+  height: 230px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* The profile medallion is part of the card, warmed by the house lamp
+   while keeping the profile's own colour as its identity. */
 .library-page .library-avatar {
+  position: relative;
+  z-index: 1;
+  width: 68px;
+  height: 68px;
   flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
-  border-radius: 30%;
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: rgba(0, 0, 0, 0.74);
+  border-radius: 23px;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--accent-ink);
   background:
-    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.42), transparent 46%),
+    radial-gradient(115% 115% at 24% 16%, rgba(255, 255, 255, 0.34), transparent 46%),
     linear-gradient(
       160deg,
-      color-mix(in srgb, var(--library-color, var(--accent)) 74%, white) 0%,
-      var(--library-color, var(--accent)) 54%,
-      color-mix(in srgb, var(--library-color, var(--accent)) 82%, black) 100%
+      color-mix(in srgb, var(--library-color, var(--accent)) 18%, var(--accent-bright)) 0%,
+      color-mix(in srgb, var(--library-color, var(--accent)) 11%, var(--accent)) 58%,
+      color-mix(
+          in srgb,
+          var(--library-color, var(--accent)) 8%,
+          color-mix(in srgb, var(--accent) 68%, var(--bg))
+        )
+        100%
     );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.36),
-    0 6px 20px color-mix(in srgb, var(--library-color, var(--accent)) 30%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--library-color, var(--accent)) 26%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--library-color, var(--accent)) 26%, var(--accent-line)),
+    0 0 0 6px color-mix(in srgb, var(--accent) 6%, transparent),
+    0 14px 30px rgba(0, 0, 0, 0.36);
 }
 
 .library-head-text {
-  flex: 1 1 auto;
+  position: relative;
+  z-index: 1;
   min-width: 0;
 }
 
-/* Change-passcode entry point — calm glass pill, right-aligned in the
-   header and allowed to wrap onto its own row on narrow phones. */
-.library-passcode-btn {
+/* Beam-dot eyebrow. Scoped past the shared .eyebrow rule. */
+.library-page .library-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.library-eyebrow-dot {
+  width: 5px;
+  height: 5px;
   flex: 0 0 auto;
-  margin-left: auto;
+  border-radius: 999px;
+  background: var(--accent-bright);
+  box-shadow: 0 0 9px var(--accent-glow);
+}
+
+/* The profile name in the house display voice, plain cream — the card
+   carries the warmth, not a tinted gradient. */
+.page.library-page .library-title {
+  margin-top: 7px;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 600;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  color: var(--text);
+  background: none;
+  -webkit-text-fill-color: var(--text);
+}
+
+.library-page .library-count {
+  margin-top: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Change-passcode entry point — a quiet outline pill on the card. */
+.library-passcode-btn {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
-  color: var(--text);
+  background: color-mix(in srgb, var(--surface-2) 46%, transparent);
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: -0.005em;
+  font-weight: 600;
+  letter-spacing: 0.005em;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transition:
     transform var(--dur-fast) var(--ease),
+    color var(--dur-fast) ease,
     border-color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease;
+    background-color var(--dur-fast) ease;
 }
 
 .library-passcode-btn svg {
-  color: var(--library-color, var(--accent-bright));
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 
 .library-passcode-btn:active {
   transform: scale(0.97);
+}
+
+/* Refined segmented control ----------------------------------------- */
+
+.page.library-page .library-tabs {
+  display: flex;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 20px;
+  padding: 5px;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg) 56%, var(--surface-2));
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.34),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.page.library-page .library-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-med) ease,
+    transform var(--dur-fast) var(--ease);
+}
+
+.page.library-page .library-tabs button:active {
+  transform: scale(0.97);
+}
+
+/* Higher specificity than the shared segmented active rule so the warm
+   thumb wins regardless of stylesheet order. */
+.page.library-page .library-tabs button[aria-pressed="true"] {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 94%, transparent) 0%,
+      color-mix(in srgb, var(--accent-soft) 42%, transparent) 100%
+    ),
+    color-mix(in srgb, var(--surface-2) 40%, transparent);
+  color: var(--accent-bright);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 64%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.24);
+}
+
+/* The per-tab counter. */
+.library-tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 21px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
+}
+
+.page.library-page .library-tabs button[aria-pressed="true"] .library-tab-count {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+/* Shelf -------------------------------------------------------------- */
+
+.library-shelf {
+  margin-top: 30px;
+}
+
+.library-shelf-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.library-shelf-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.9vw, 29px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+/* A short beam of amber light, not a thick bar. */
+.library-shelf-head h2::before {
+  content: "";
+  width: 22px;
+  height: 1px;
+  flex: 0 0 auto;
+  align-self: center;
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--accent-bright), var(--accent));
+  box-shadow: 0 0 10px var(--accent-glow);
 }
 
 .library-shelf-actions {
@@ -129,166 +341,23 @@
   min-height: 44px;
 }
 
-/* Beam-dot eyebrow: a glowing pip before the caps label, tinted with the
-   profile colour. Scoped past the shared .eyebrow rule, which wins ties
-   (styles.css loads last). */
-.library-page .library-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--accent);
-}
-
-.library-eyebrow-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--library-color, var(--accent));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--library-color, var(--accent)) 55%, transparent);
-}
-
-/* The profile name tints toward the profile's own colour via the
-   --library-color custom property set inline from activeProfile.color.
-   Out-specifies the shared .display rule for the size. */
-.page.library-page .library-title {
-  margin-top: 2px;
-  font-size: clamp(25px, 6vw, 38px);
-  background-image: linear-gradient(
-    100deg,
-    var(--library-color, var(--accent-bright)) 0%,
-    color-mix(in srgb, var(--library-color, var(--accent)) 38%, var(--text)) 58%,
-    var(--text) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-}
-
-.library-count {
-  margin-top: 6px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-}
-
-/* Segmented control ------------------------------------------------- */
-
-.page.library-page .library-tabs {
-  margin-top: 18px;
-  padding: 5px;
-  gap: 4px;
-  border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 8px 22px rgba(0, 0, 0, 0.28);
-}
-
-/* Bump the shared segmented control to a comfortable iOS touch target
-   and give the active segment a springy, profile-lit feel. */
-.page.library-page .library-tabs button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 18px;
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  border-radius: var(--radius-pill);
-  transition:
-    background-color var(--dur-fast) ease,
-    color var(--dur-fast) ease,
-    transform var(--dur-fast) var(--ease),
-    box-shadow var(--dur-med) ease;
-}
-
-.page.library-page .library-tabs button:active {
-  transform: scale(0.96);
-}
-
-/* Higher specificity than the shared .segmented button[aria-pressed="true"]
-   rule so the profile-tinted treatment wins regardless of stylesheet order. */
-.page.library-page .library-tabs button[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--library-color, var(--accent)) 16%, transparent);
-  border-radius: var(--radius-pill);
-  color: var(--text);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--library-color, var(--accent)) 42%, transparent),
-    0 6px 18px color-mix(in srgb, var(--library-color, var(--accent)) 20%, transparent);
-}
-
-/* The per-tab counter. */
-.library-tab-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 750;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.07);
-  transition:
-    color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease;
-}
-
-.page.library-page .library-tabs button[aria-pressed="true"] .library-tab-count {
-  color: var(--accent-ink);
-  background: color-mix(in srgb, var(--library-color, var(--accent)) 82%, white);
-}
-
-/* Shelf -------------------------------------------------------------- */
-
-.library-shelf {
-  margin-top: 22px;
-}
-
-/* The shelf title carries the same lit beam bar as every other shelf
-   heading in the app. */
-.library-shelf-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.library-shelf-head h2 {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: clamp(17px, 2.2vw, 20px);
-  font-weight: 800;
-  letter-spacing: var(--tracking-tight);
-}
-
-.library-shelf-head h2::before {
-  content: "";
-  width: 3px;
-  height: 1.05em;
-  flex: 0 0 auto;
-  border-radius: var(--radius-pill);
-  background: var(--beam-gradient);
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
 /* History multi-select ----------------------------------------------- */
 
 .library-select-bar {
-  margin: 4px 0 16px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+  margin: 2px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      110deg,
+      color-mix(in srgb, var(--accent) 5%, transparent) 0%,
+      transparent 54%
+    ),
+    color-mix(in srgb, var(--surface-2) 72%, transparent);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 8px 22px rgba(0, 0, 0, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 32px rgba(0, 0, 0, 0.22);
 }
 
 .library-select-row {
@@ -300,8 +369,8 @@
 
 .library-select-count {
   font-size: 11.5px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
+  font-weight: 650;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--accent-bright);
   font-variant-numeric: tabular-nums;
@@ -319,6 +388,7 @@
 }
 
 .library-select-confirm p {
+  max-width: 64ch;
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted);
@@ -335,30 +405,37 @@
   min-height: 44px;
 }
 
-/* The card wrapper owns the selection ring; the poster itself stays
-   untouched so the shared card primitives keep working. */
+/* The card wrapper owns the selection ring; the poster primitive stays
+   untouched. */
 .library-select-item {
   position: relative;
   min-width: 0;
 }
 
-.library-select-item.is-selected .poster-media {
-  border-color: color-mix(in srgb, var(--accent-bright) 62%, transparent);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--accent) 78%, transparent),
-    0 0 28px color-mix(in srgb, var(--accent) 26%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
 .library-select-item.is-selected .poster-card {
-  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 9%, transparent) 0%,
+      transparent 54%
+    ),
+    color-mix(in srgb, var(--surface-2) 84%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent),
+    0 18px 38px rgba(0, 0, 0, 0.3),
+    0 0 26px color-mix(in srgb, var(--accent-glow) 36%, transparent);
 }
 
-/* A real checkbox with a 44px hit area, drawn as a glass tick box. */
+.library-select-item.is-selected .poster-media {
+  border-color: color-mix(in srgb, var(--accent-bright) 58%, transparent);
+}
+
+/* A real checkbox with a 44px hit area, drawn as a warm tick box. */
 .library-select-toggle {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 0;
+  right: 0;
   z-index: 2;
   display: grid;
   place-items: center;
@@ -378,13 +455,13 @@
 }
 
 .library-select-box {
-  width: 26px;
-  height: 26px;
   display: grid;
   place-items: center;
-  border-radius: 9px;
-  border: 1.5px solid rgba(255, 255, 255, 0.58);
-  background: color-mix(in srgb, var(--bg) 58%, transparent);
+  width: 25px;
+  height: 25px;
+  border: 1.5px solid color-mix(in srgb, var(--text) 58%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
   color: var(--accent-ink);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(10px);
@@ -398,7 +475,7 @@
 
 .library-select-toggle input:checked + .library-select-box {
   border-color: transparent;
-  background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+  background: var(--beam-gradient);
   box-shadow: 0 4px 16px var(--accent-glow);
 }
 
@@ -407,28 +484,180 @@
   outline-offset: 3px;
 }
 
-/* Grid -------------------------------------------------------------- */
+/* Grid --------------------------------------------------------------- */
 
-/* .poster-grid already carries --page-x padding; .page supplies it here
-   — this has to out-specify the shared rule to clear that padding. */
+/* .poster-grid contributes page padding; the page gutter already does
+   that job here. 2 / 3 / 4 / 5 columns of warm tickets. */
 .page.library-page .library-grid {
   padding: 0;
   margin-top: 2px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 12px;
+}
+
+@media (min-width: 560px) {
+  .page.library-page .library-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px 16px;
+  }
+}
+
+@media (min-width: 900px) {
+  .page.library-page .library-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 26px 20px;
+  }
+}
+
+@media (min-width: 1180px) {
+  .page.library-page .library-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 28px 22px;
+  }
+}
+
+.library-page .poster-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 9px 9px 13px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 46%, transparent) 0%,
+      transparent 46%
+    ),
+    color-mix(in srgb, var(--surface-2) 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 14px 30px rgba(0, 0, 0, 0.24);
+  transition:
+    transform var(--dur-med) var(--ease),
+    border-color var(--dur-med) ease,
+    background-color var(--dur-med) ease,
+    box-shadow var(--dur-med) ease;
+}
+
+.library-page .poster-media {
+  border-radius: 13px;
+  border-color: color-mix(in srgb, var(--border-strong) 62%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 18px rgba(0, 0, 0, 0.32);
 }
 
 .library-page .poster-title {
-  font-weight: 650;
-  letter-spacing: -0.012em;
+  margin-top: 12px;
+  padding: 0 3px;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  line-height: 1.32;
 }
 
 .library-page .poster-sub {
-  color: var(--muted-2);
+  margin-top: 4px;
+  padding: 0 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* A footnote under the history shelf. */
 .library-note {
-  margin: 20px 0 0;
+  margin: 22px 0 0;
   text-align: center;
+}
+
+/* Empty states ------------------------------------------------------ */
+/* Composed notes: stamp, house line, one clear action. */
+
+.page.library-page .empty-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+  padding: 30px 32px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  background:
+    radial-gradient(
+      90% 150% at 0% 0%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
+      transparent 56%
+    ),
+    color-mix(in srgb, var(--surface) 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 24px 58px rgba(0, 0, 0, 0.28);
+}
+
+.library-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  color: var(--accent-bright);
+  background:
+    radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 64%),
+    var(--surface-2);
+  border: 1px solid var(--accent-line);
+}
+
+.library-empty__copy {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.page.library-page .library-empty__eyebrow {
+  color: var(--accent);
+}
+
+.page.library-page .library-empty h3 {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3.1vw, 33px);
+  font-weight: 600;
+  line-height: 1.03;
+  letter-spacing: -0.034em;
+  text-align: left;
+  color: var(--text);
+}
+
+.page.library-page .library-empty p {
+  max-width: 58ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.library-empty__cta {
+  justify-self: end;
+}
+
+@media (max-width: 719px) {
+  .page.library-page .empty-state {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+    padding: 22px;
+  }
+
+  .library-empty__icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .library-empty__cta {
+    justify-self: start;
+  }
 }
 
 /* Change-passcode sheet --------------------------------------------- */
@@ -440,7 +669,7 @@
 .library-sheet-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
 }
 
 .library-sheet-icon {
@@ -455,25 +684,29 @@
     radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 66%),
     var(--surface-2);
   color: var(--accent-bright);
-  box-shadow: 0 0 24px var(--accent-glow);
 }
 
 .library-sheet-heading {
   min-width: 0;
 }
 
-.library-page .library-sheet-eyebrow {
+.page.library-page .library-sheet-eyebrow {
   color: var(--accent);
 }
 
-.library-sheet-heading h2 {
+.page.library-page .library-sheet-heading h2 {
   margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
 .library-sheet-sub {
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 13.5px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--muted);
 }
 
@@ -485,8 +718,8 @@
   display: block;
   margin: 14px 0 8px;
   font-size: 10.5px;
-  font-weight: 750;
-  letter-spacing: 0.09em;
+  font-weight: 650;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -500,12 +733,16 @@
   padding: 0 12px 0 14px;
   border-radius: 14px;
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--bg) 55%, var(--surface-2));
+  background: color-mix(in srgb, var(--bg) 42%, var(--surface-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .library-page .library-field:focus-within {
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--surface-2);
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    0 0 26px color-mix(in srgb, var(--accent-glow) 42%, transparent);
 }
 
 .library-page .library-field--error,
@@ -517,7 +754,7 @@
 .library-field-icon {
   flex: 0 0 auto;
   display: inline-flex;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 
 .library-field input {
@@ -535,7 +772,7 @@
 .library-passcode-rule {
   font-size: 11.5px;
   line-height: 1.4;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 
 .library-reveal-toggle {
@@ -551,7 +788,7 @@
   background: transparent;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   transition:
     background-color var(--dur-fast) ease,
     color var(--dur-fast) ease;
@@ -567,16 +804,17 @@
 
 .library-passcode-hint {
   margin-top: 14px;
-  padding: 10px 12px;
+  padding: 11px 13px;
   border: 1px solid var(--border);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 42%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-2) 56%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 54%, transparent);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--muted);
 }
 
-.library-page .library-sheet-error {
+.page.library-page .library-sheet-error {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -585,7 +823,7 @@
   border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
   border-radius: 12px;
   background: color-mix(in srgb, var(--danger-soft) 55%, transparent);
-  color: color-mix(in srgb, var(--danger) 82%, var(--text));
+  color: color-mix(in srgb, var(--danger) 78%, var(--text));
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1.45;
@@ -596,103 +834,53 @@
   margin-top: 1px;
 }
 
-.library-page .library-sheet .sheet-actions {
+.page.library-page .library-sheet .sheet-actions {
   display: flex;
   gap: 10px;
   margin-top: 22px;
 }
 
-.library-page .library-sheet .sheet-actions .btn {
+.page.library-page .library-sheet .sheet-actions .btn {
   flex: 1 1 0;
   min-height: 48px;
 }
 
-/* Empty states ------------------------------------------------------ */
-
-/* A designed panel instead of the bare shared empty state. */
-.page.library-page .empty-state {
-  padding: 48px 24px 52px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(
-    170deg,
-    color-mix(in srgb, var(--surface-2) 62%, transparent) 0%,
-    color-mix(in srgb, var(--surface) 38%, transparent) 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    var(--shadow-soft);
-}
-
-.library-empty__icon {
-  display: grid;
-  place-items: center;
-  width: 66px;
-  height: 66px;
-  margin-bottom: 4px;
-  border-radius: 22px;
-  color: var(--accent-bright);
-  background:
-    radial-gradient(120% 120% at 30% 18%, var(--accent-soft), transparent 62%),
-    var(--surface-2);
-  border: 1px solid var(--accent-line);
-  box-shadow: 0 0 34px var(--accent-glow);
-}
-
-.page.library-page .empty-state .btn {
-  margin-top: 10px;
-}
-
-/* On a wide screen the panel is capped and centred rather than stretching
-   the full content width. */
-@media (min-width: 768px) {
-  .page.library-page .empty-state {
-    max-width: 560px;
-    margin-inline: auto;
+/* Phones: the passcode action drops to its own row inside the card. */
+@media (max-width: 639px) {
+  .library-head {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 15px;
+    padding: 18px;
+    border-radius: 22px;
   }
-}
 
-@media (prefers-reduced-motion: no-preference) {
-  .library-empty__icon {
-    animation: library-icon-bob 3.8s var(--ease) infinite;
+  .library-page .library-avatar {
+    width: 58px;
+    height: 58px;
+    border-radius: 19px;
+    font-size: 20px;
   }
-}
 
-@keyframes library-icon-bob {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-3deg);
-  }
-  50% {
-    transform: translateY(-6px) rotate(3deg);
-  }
-}
-
-/* Phones: the passcode action drops to its own full-width row so the
-   profile name never has to squeeze. */
-@media (max-width: 479px) {
   .library-passcode-btn {
+    grid-column: 1 / -1;
     width: 100%;
-    margin-left: 0;
-  }
-}
-
-/* Tablet and up ----------------------------------------------------- */
-
-@media (min-width: 640px) {
-  .page.library-page .library-avatar {
-    width: 64px;
-    height: 64px;
-    font-size: 21px;
+    margin-top: 2px;
   }
 }
 
 /* Desktop (>= 1024px) ------------------------------------------------- */
 
 @media (min-width: 1024px) {
-  /* The nav already reserves the notch; the page starts clean. */
   .page.library-page {
-    padding-top: 26px;
+    padding-top: 28px;
+  }
+
+  .library-head {
+    padding: 26px 28px 26px 26px;
+  }
+
+  .library-shelf {
+    margin-top: 34px;
   }
 }
 
@@ -700,11 +888,9 @@
 
 @media (hover: hover) {
   .library-passcode-btn:hover {
+    color: var(--text);
     border-color: var(--accent-line);
-    background: color-mix(in srgb, var(--surface-3) 72%, transparent);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 22px var(--accent-glow);
+    background: color-mix(in srgb, var(--surface-3) 52%, transparent);
   }
 
   .library-reveal-toggle:hover {
@@ -718,13 +904,33 @@
 
   .page.library-page .library-tabs button:not([aria-pressed="true"]):hover {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--text) 5%, transparent);
   }
 
-  .page.library-page .library-tabs button[aria-pressed="true"]:hover {
-    background: color-mix(in srgb, var(--library-color, var(--accent)) 22%, transparent);
+  .library-page .poster-card:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface-3) 66%, transparent) 0%,
+        transparent 50%
+      ),
+      color-mix(in srgb, var(--surface-2) 84%, transparent);
     box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--library-color, var(--accent)) 50%, transparent),
-      0 8px 24px color-mix(in srgb, var(--library-color, var(--accent)) 24%, transparent);
+      inset 0 1px 0 rgba(255, 255, 255, 0.055),
+      0 22px 44px rgba(0, 0, 0, 0.34),
+      0 0 30px color-mix(in srgb, var(--accent-glow) 32%, transparent);
+  }
+
+  .library-page .poster-card:hover .poster-media {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 10px 26px rgba(0, 0, 0, 0.38);
+  }
+
+  .library-page .poster-card:hover .poster-title {
+    color: var(--accent-bright);
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import ProfileAvatar from "../components/ProfileAvatar";
 import {
   DEFAULT_SCREEN_PASSWORD,
   MAX_FAILED_ATTEMPTS,
@@ -8,9 +9,15 @@ import {
   credentialsFrom,
   type AdminCredential,
 } from "../lib/auth";
-import { MAX_PROFILES, PROFILE_COLORS, initials } from "../lib/profiles";
+import {
+  MAX_PROFILES,
+  PROFILE_AVATARS,
+  PROFILE_COLORS,
+} from "../lib/profiles";
 import { useSession } from "../lib/session";
+import type { ProfileAvatarId } from "../types";
 import "../styles/admin.css";
+import "../styles/admin-look.css";
 
 const DEFAULT_ADD_COLOR = PROFILE_COLORS[2];
 
@@ -99,6 +106,7 @@ const SearchIcon = (
 );
 
 function Swatches({ value, onPick }: { value: string; onPick: (color: string) => void }) {
+  const safeValue = /^#[0-9a-f]{6}$/i.test(value) ? value : "#e9a05a";
   return (
     <div className="swatch-grid admin-swatches">
       {PROFILE_COLORS.map((color) => (
@@ -112,6 +120,105 @@ function Swatches({ value, onPick }: { value: string; onPick: (color: string) =>
           onClick={() => onPick(color)}
         />
       ))}
+      <label
+        className="swatch swatch--custom"
+        style={{ "--swatch-color": safeValue, background: safeValue } as CSSProperties}
+        title="Custom colour"
+      >
+        <input
+          type="color"
+          value={safeValue}
+          onChange={(event) => onPick(event.target.value)}
+          aria-label="Custom colour"
+        />
+        <span aria-hidden="true">+</span>
+      </label>
+    </div>
+  );
+}
+
+function LookPicker({
+  name,
+  color,
+  avatar,
+  ring,
+  onPick,
+  onColor,
+  onRing,
+}: {
+  name: string;
+  color: string;
+  avatar: ProfileAvatarId | null;
+  ring: boolean;
+  onPick: (avatar: ProfileAvatarId | null) => void;
+  onColor: (color: string) => void;
+  onRing: (ring: boolean) => void;
+}) {
+  const options: ReadonlyArray<{
+    id: ProfileAvatarId | null;
+    label: string;
+    note: string;
+  }> = [
+    { id: null, label: "Colour", note: "Initials" },
+    ...PROFILE_AVATARS,
+  ];
+
+  return (
+    <div className="admin-look">
+      <p className="eyebrow admin-swatch-label">Screen look</p>
+      <div className="admin-look-grid" role="group" aria-label="Screen look">
+        {options.map((option) => {
+          const active = avatar === option.id;
+          return (
+            <button
+              key={option.id ?? "colour"}
+              type="button"
+              className={`admin-look-option${active ? " is-active" : ""}`}
+              aria-pressed={active}
+              aria-label={`${option.label} look`}
+              onClick={() => onPick(option.id)}
+            >
+              <ProfileAvatar
+                name={name || "?"}
+                color={color}
+                avatar={option.id ?? undefined}
+                ring={ring}
+                className="admin-look-avatar"
+              />
+              <span className="admin-look-copy">
+                <strong>{option.label}</strong>
+                <small>{option.note}</small>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {avatar === null ? (
+        <div className="admin-look-colour">
+          <Swatches value={color} onPick={onColor} />
+          <p className="tiny muted admin-look-hint">
+            Any colour works — pick a swatch or open the custom wheel.
+          </p>
+        </div>
+      ) : (
+        <p className="tiny muted admin-look-hint">
+          The screen colour can rim the photo, or stay off completely.
+        </p>
+      )}
+      {avatar !== null && (
+        <label className="admin-ring-check">
+          <input
+            type="checkbox"
+            checked={ring}
+            onChange={(event) => onRing(event.target.checked)}
+            aria-label="Show colour ring and glow"
+          />
+          <span>
+            <strong>Colour ring &amp; glow</strong>
+            <small>Turn off for a completely clean photo.</small>
+          </span>
+        </label>
+      )}
     </div>
   );
 }
@@ -178,7 +285,13 @@ function ScreenRow({
   onKick: (id: string) => Promise<void>;
   onRename: (
     id: string,
-    patch: { name?: string; color?: string; adminName?: string },
+    patch: {
+      name?: string;
+      color?: string;
+      avatar?: ProfileAvatarId | null;
+      avatarRing?: boolean;
+      adminName?: string;
+    },
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const [password, setPassword] = useState("");
@@ -192,14 +305,26 @@ function ScreenRow({
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(credential.name);
   const [draftColor, setDraftColor] = useState(credential.color);
+  const [draftAvatar, setDraftAvatar] = useState<ProfileAvatarId | null>(
+    credential.avatar ?? null,
+  );
+  const [draftRing, setDraftRing] = useState(credential.avatarRing !== false);
   const [draftAdminName, setDraftAdminName] = useState(credential.adminName ?? "");
   const [renameError, setRenameError] = useState<string | null>(null);
 
   useEffect(() => {
     setDraftName(credential.name);
     setDraftColor(credential.color);
+    setDraftAvatar(credential.avatar ?? null);
+    setDraftRing(credential.avatarRing !== false);
     setDraftAdminName(credential.adminName ?? "");
-  }, [credential.name, credential.color, credential.adminName]);
+  }, [
+    credential.name,
+    credential.color,
+    credential.avatar,
+    credential.avatarRing,
+    credential.adminName,
+  ]);
 
   const saveRename = async () => {
     if (pending) return;
@@ -214,6 +339,8 @@ function ScreenRow({
       const result = await onRename(credential.profileId, {
         name: nextName,
         color: draftColor,
+        avatar: draftAvatar,
+        avatarRing: draftRing,
         adminName: draftAdminName.trim(),
       });
       if (!result.ok) {
@@ -232,6 +359,8 @@ function ScreenRow({
     setEditing(false);
     setDraftName(credential.name);
     setDraftColor(credential.color);
+    setDraftAvatar(credential.avatar ?? null);
+    setDraftRing(credential.avatarRing !== false);
     setDraftAdminName(credential.adminName ?? "");
     setRenameError(null);
   };
@@ -325,13 +454,13 @@ function ScreenRow({
         <span className="admin-screen-index" aria-hidden="true">
           {String(index + 1).padStart(2, "0")}
         </span>
-        <span
-          className="avatar admin-avatar"
-          style={{ "--profile-color": credential.color } as CSSProperties}
-          aria-hidden="true"
-        >
-          {initials(credential.name)}
-        </span>
+        <ProfileAvatar
+          name={editing ? draftName : credential.name}
+          color={editing ? draftColor : credential.color}
+          avatar={editing ? (draftAvatar ?? undefined) : credential.avatar}
+          ring={editing ? draftRing : credential.avatarRing !== false}
+          className="admin-avatar"
+        />
         <div className="admin-screen-id">
           <div className="admin-screen-name-row">
             <p className="admin-screen-name truncate">{credential.name}</p>
@@ -395,7 +524,24 @@ function ScreenRow({
                 spellCheck={false}
                 aria-label={`Admin ref name for ${credential.name}`}
               />
-              <Swatches value={draftColor} onPick={setDraftColor} />
+              <LookPicker
+                name={draftName}
+                color={draftColor}
+                avatar={draftAvatar}
+                ring={draftRing}
+                onPick={(next) => {
+                  setDraftAvatar(next);
+                  setRenameError(null);
+                }}
+                onColor={(next) => {
+                  setDraftColor(next);
+                  setRenameError(null);
+                }}
+                onRing={(next) => {
+                  setDraftRing(next);
+                  setRenameError(null);
+                }}
+              />
               {renameError && (
                 <p className="sheet-error" role="alert">
                   {renameError}
@@ -630,6 +776,8 @@ export default function Admin() {
   const [password, setPassword] = useState(DEFAULT_SCREEN_PASSWORD);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [color, setColor] = useState(DEFAULT_ADD_COLOR);
+  const [avatar, setAvatar] = useState<ProfileAvatarId | null>(null);
+  const [avatarRing, setAvatarRing] = useState(true);
   const [adminName, setAdminName] = useState("");
   const [temporaryNew, setTemporaryNew] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -647,7 +795,7 @@ export default function Admin() {
     return (
       <div className="boot">
         <div className="boot-mark" aria-label="Loading admin">
-          L
+          <img src="/brand/lighthook-cat.jpg" alt="" />
         </div>
       </div>
     );
@@ -666,7 +814,9 @@ export default function Admin() {
         <div className="admin-console">
           <div className="admin-console-top">
             <span className="admin-console-brand">
-              <span className="admin-brand-mark admin-brand-mark--console" aria-hidden="true">L</span>
+              <span className="admin-brand-mark admin-brand-mark--console" aria-hidden="true">
+                <img src="/brand/lighthook-cat.jpg" alt="" />
+              </span>
               <span className="admin-console-brand-text">
                 <strong>LIGHTHOOK</strong>
                 <small>HOUSE ADMIN</small>
@@ -681,8 +831,9 @@ export default function Admin() {
           <div className="admin-vault-seal" aria-hidden="true">
             <span className="admin-seal-ring admin-seal-ring--outer" />
             <span className="admin-seal-ring admin-seal-ring--dash" />
-            <span className="admin-seal-ring admin-seal-ring--inner" />
-            <span className="admin-seal-core">{LockIcon}</span>
+            <span className="admin-seal-cat">
+              <img src="/brand/lighthook-cat.jpg" alt="" />
+            </span>
           </div>
 
           <div className="admin-console-intro">
@@ -722,7 +873,6 @@ export default function Admin() {
               Admin passcode
             </label>
             <div className="admin-input-wrap admin-login-field">
-              <span className="admin-prompt" aria-hidden="true">›</span>
               <input
                 id="admin-password"
                 type={showAdminPassword ? "text" : "password"}
@@ -862,6 +1012,8 @@ export default function Admin() {
       const result = await adminAddProfile(name, color, password, {
         adminName: adminName.trim() || undefined,
         temporary: temporaryNew,
+        avatar: avatar ?? undefined,
+        avatarRing,
       });
       if (!result.ok) {
         setAddError(result.error);
@@ -870,6 +1022,8 @@ export default function Admin() {
       setName("");
       setPassword(DEFAULT_SCREEN_PASSWORD);
       setColor(DEFAULT_ADD_COLOR);
+      setAvatar(null);
+      setAvatarRing(true);
       setAdminName("");
       setTemporaryNew(false);
       setAddNotice(`Added ${result.profile.name}.`);
@@ -886,7 +1040,9 @@ export default function Admin() {
 
       <header className="admin-masthead">
         <div className="admin-masthead-id">
-          <span className="admin-brand-mark admin-brand-mark--sm" aria-hidden="true">L</span>
+          <span className="admin-brand-mark admin-brand-mark--sm" aria-hidden="true">
+            <img src="/brand/lighthook-cat.jpg" alt="" />
+          </span>
           <div className="admin-masthead-titles">
             <p className="eyebrow">Lighthook · house admin</p>
             <h1 className="display admin-title">Control room</h1>
@@ -927,9 +1083,9 @@ export default function Admin() {
 
       <section className="admin-telemetry" aria-label="Household summary">
         <div className="admin-telemetry-head">
-          <span className="eyebrow">Live telemetry</span>
+          <span className="eyebrow">The house at a glance</span>
           <span className="admin-mono admin-telemetry-code">
-            REGISTRY / {String(credentials.length).padStart(2, "0")} UNITS
+            REGISTRY / {String(credentials.length).padStart(2, "0")} SCREENS
           </span>
         </div>
         <div className="admin-gauges">
@@ -1044,8 +1200,27 @@ export default function Admin() {
               />
             </label>
           </div>
-          <p className="eyebrow admin-swatch-label">Colour ID</p>
-          <Swatches value={color} onPick={setColor} />
+          <LookPicker
+            name={name}
+            color={color}
+            avatar={avatar}
+            ring={avatarRing}
+            onPick={(next) => {
+              setAvatar(next);
+              setAddError(null);
+              setAddNotice(null);
+            }}
+            onColor={(next) => {
+              setColor(next);
+              setAddError(null);
+              setAddNotice(null);
+            }}
+            onRing={(next) => {
+              setAvatarRing(next);
+              setAddError(null);
+              setAddNotice(null);
+            }}
+          />
           <label className="admin-check admin-check--add">
             <input
               type="checkbox"
@@ -1136,7 +1311,7 @@ export default function Admin() {
             SHOWING {String(visibleCredentials.length).padStart(2, "0")} / {String(credentials.length).padStart(2, "0")}
           </span>
           <span className={`admin-mono admin-filter-flag${filterActive ? " is-active" : ""}`}>
-            {filterActive ? "FILTER ACTIVE" : "ALL UNITS"}
+            {filterActive ? "FILTER ACTIVE" : "ALL SCREENS"}
           </span>
         </div>
 

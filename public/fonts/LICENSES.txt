@@ -1,0 +1,17 @@
+LIGHTH00K — self-hosted typefaces
+=================================
+
+Both families are licensed under the SIL Open Font License, Version 1.1.
+The full license text is available at https://openfontlicense.org.
+
+Bricolage Grotesque
+  Copyright 2022 The Bricolage Grotesque Project Authors
+  https://github.com/ateliertriay/bricolage
+  File: bricolage-latin.woff2 (latin subset, variable weight 200–800)
+
+Inter
+  Copyright 2016 The Inter Project Authors
+  https://github.com/rsms/inter
+  File: inter-latin.woff2 (latin subset, variable weight 300–800)
+
+The files are bundled so the installed app keeps its typography offline.

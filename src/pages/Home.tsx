@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { Link } from "react-router-dom";
+import ProfileAvatar from "../components/ProfileAvatar";
 import PosterCard from "../components/PosterCard";
 import Row from "../components/Row";
 import {
@@ -18,11 +19,11 @@ import {
   getTrending,
   posterUrl,
 } from "../lib/tmdb";
-import { initials } from "../lib/profiles";
 import { liveHistory, mediaKey } from "../lib/store";
 import { useSession } from "../lib/session";
-import type { HistoryItem, Media } from "../types";
+import type { HistoryItem, Media, ProfileMeta } from "../types";
 import "../styles/home.css";
+import "../styles/home-recode.css";
 
 interface SectionState {
   items: Media[] | null;
@@ -171,30 +172,51 @@ function IconFault() {
 
 /* Header --------------------------------------------------------------- */
 
-function HomeHeader({ name, color }: { name: string; color: string }) {
+function HomeHeader({
+  name,
+  color,
+  avatar,
+  ring,
+}: {
+  name: string;
+  color: string;
+  avatar?: ProfileMeta["avatar"];
+  ring?: boolean;
+}) {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   return (
     <header className="home-header">
       <Link className="home-brand" to="/" aria-label="LIGHTH00K, back to the front page">
-        <span className="home-brand__mark" aria-hidden="true">
-          L
-        </span>
+        <img
+          className="home-brand__mark"
+          src="/brand/lighthook-cat.jpg"
+          alt=""
+          aria-hidden="true"
+        />
         <span className="home-brand__name">LIGHTH00K</span>
       </Link>
 
-      <p className="home-greeting truncate">Back on the shelf, {name}.</p>
+      <p className="home-greeting truncate">
+        {greeting}, {name}.
+      </p>
+
+      <span className="home-house" aria-hidden="true">
+        Private cinema <i /> Household only
+      </span>
 
       <Link
         className="home-profile"
         to="/profiles"
         aria-label={`Active profile ${name}. Switch profile.`}
       >
-        <span
-          className="avatar home-profile__avatar"
-          style={color ? ({ "--profile-color": color } as CSSProperties) : undefined}
-          aria-hidden="true"
-        >
-          {initials(name)}
-        </span>
+        <ProfileAvatar
+          name={name}
+          color={color}
+          avatar={avatar}
+          ring={ring !== false}
+          className="home-profile__avatar"
+        />
         <span className="home-profile__name truncate">{name}</span>
       </Link>
     </header>
@@ -218,6 +240,9 @@ function Hero({ media, playHref }: { media: Media; playHref: string }) {
 
   return (
     <section className="hero" aria-label={`Featured: ${media.title}`}>
+      <span className="hero-edition" aria-hidden="true">
+        No. 01 <i /> Feature
+      </span>
       {art && (
         <div className="hero-art">
           <img
@@ -467,6 +492,8 @@ export default function Home() {
       <HomeHeader
         name={activeProfile?.name ?? "friend"}
         color={activeProfile?.color ?? ""}
+        avatar={activeProfile?.avatar}
+        ring={activeProfile?.avatarRing !== false}
       />
 
       {hero ? (

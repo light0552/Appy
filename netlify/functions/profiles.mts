@@ -50,8 +50,12 @@ interface ProfileMeta {
   id: string;
   name: string;
   color: string;
+  avatar?: ProfileAvatarId;
+  avatarRing?: boolean;
   createdAt: number;
 }
+
+type ProfileAvatarId = "ginger" | "black";
 
 interface ProfileState {
   profileId: string;
@@ -71,7 +75,7 @@ const MAX_PREFS_KEYS = 64;
 const MAX_PREF_KEY_LENGTH = 64;
 const MAX_PREFS_BYTES = 16 * 1024;
 const MAX_BODY_BYTES = 512 * 1024;
-const DEFAULT_COLOR = "#8b5cf6";
+const DEFAULT_COLOR = "#e9a05a";
 const ID_PATTERN = /^[a-z0-9-]{1,64}$/;
 const COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/;
@@ -79,9 +83,13 @@ const CONTROL_GLOBAL = /[\u0000-\u001f\u007f-\u009f]/g;
 const textEncoder = new TextEncoder();
 
 const SEEDS = [
-  { id: "sam", name: "Sam", color: "#00acc1" },
-  { id: "mellu", name: "Mellu", color: "#ff6b9d" },
+  { id: "sam", name: "Sam", color: "#5f9ea0" },
+  { id: "mellu", name: "Mellu", color: "#c95d7a" },
 ] satisfies ReadonlyArray<Omit<ProfileMeta, "createdAt">>;
+
+function isAvatar(value: unknown): value is ProfileAvatarId {
+  return value === "ginger" || value === "black";
+}
 
 type BlobStore = ReturnType<typeof getStore>;
 
@@ -178,13 +186,22 @@ function sanitizeIndex(value: unknown): ProfileMeta[] | null {
 
     const name = normalizeName(entry.name) ?? entry.id;
     const color = isColor(entry.color) ? entry.color : DEFAULT_COLOR;
+    const avatar = isAvatar(entry.avatar) ? entry.avatar : undefined;
+    const avatarRing = entry.avatarRing === false ? false : undefined;
     const createdAt =
       typeof entry.createdAt === "number" && Number.isFinite(entry.createdAt)
         ? entry.createdAt
         : Date.now();
 
     seen.add(entry.id);
-    out.push({ id: entry.id, name, color, createdAt });
+    out.push({
+      id: entry.id,
+      name,
+      color,
+      ...(avatar ? { avatar } : {}),
+      ...(avatarRing === false ? { avatarRing: false } : {}),
+      createdAt,
+    });
   }
 
   return out;
@@ -386,10 +403,29 @@ async function route(req: Request): Promise<Response> {
       const color = parsed.body.color === undefined ? DEFAULT_COLOR : parsed.body.color;
       if (!isColor(color)) return json({ error: "invalid_color" }, 400);
 
+      if (
+        parsed.body.avatar !== undefined &&
+        parsed.body.avatar !== null &&
+        !isAvatar(parsed.body.avatar)
+      ) {
+        return json({ error: "invalid_avatar" }, 400);
+      }
+      const avatar = isAvatar(parsed.body.avatar) ? parsed.body.avatar : undefined;
+
+      if (
+        parsed.body.avatarRing !== undefined &&
+        typeof parsed.body.avatarRing !== "boolean"
+      ) {
+        return json({ error: "invalid_avatar_ring" }, 400);
+      }
+      const avatarRing = parsed.body.avatarRing === false ? false : undefined;
+
       const profile: ProfileMeta = {
         id: nextProfileId(name, new Set(index.map((entry) => entry.id))),
         name,
         color,
+        ...(avatar ? { avatar } : {}),
+        ...(avatarRing === false ? { avatarRing: false } : {}),
         createdAt: Date.now(),
       };
 
@@ -421,7 +457,29 @@ async function route(req: Request): Promise<Response> {
         color = metaValue.color;
       }
 
-      const profile: ProfileMeta = { ...existing, name, color };
+      let avatar = existing.avatar;
+      if (metaValue.avatar !== undefined) {
+        if (metaValue.avatar === null) avatar = undefined;
+        else if (isAvatar(metaValue.avatar)) avatar = metaValue.avatar;
+        else return json({ error: "invalid_avatar" }, 400);
+      }
+
+      let avatarRing = existing.avatarRing;
+      if (metaValue.avatarRing !== undefined) {
+        if (typeof metaValue.avatarRing !== "boolean") {
+          return json({ error: "invalid_avatar_ring" }, 400);
+        }
+        avatarRing = metaValue.avatarRing ? undefined : false;
+      }
+
+      const profile: ProfileMeta = {
+        id: existing.id,
+        name,
+        color,
+        ...(avatar ? { avatar } : {}),
+        ...(avatarRing === false ? { avatarRing: false } : {}),
+        createdAt: existing.createdAt,
+      };
       await store.setJSON(
         INDEX_KEY,
         index.map((entry) => (entry.id === id ? profile : entry)),

@@ -1,5 +1,20 @@
 # Lighthook QA audit
 
+## RECODE smoke (full stack)
+
+The recode preview needs the real functions, so start the full-stack server:
+
+```
+npm run dev:live                       # netlify dev on http://localhost:8888
+node scripts/qa/recode-smoke.mjs       # 31 checks + screenshots in .screens/smoke
+```
+
+It walks the token system, house notice (Brave/uBlock/private app), profiles
+unlock, home, search, library, browse, title, watch, admin, screen-look picker,
+mobile layout, fonts/icons and 404 checks. `BASE=...` overrides the origin.
+
+## Household rules audit
+
 `audit.mjs` drives the real app in headless Chrome (via `puppeteer-core`) and
 checks the household rules end to end. It talks to the dev server the same way
 a family member would — clicks, typing, reading the DOM — so a PASS means the
@@ -10,9 +25,9 @@ feature actually works in the browser, not just that a unit passed.
 Dev server must be up first (Chrome + Node are preinstalled on this machine):
 
 ```
-npm run dev            # from E:\OPENCODE\Appy
+npm run dev:live       # from E:\OPENCODE\RECODE (full stack on :8888)
 $env:QA_ADMIN_KEY = "<the admin password>"   # never stored in this repo
-node scripts/qa/audit.mjs
+node scripts/qa/audit.mjs --base=http://localhost:8888
 ```
 
 `QA_ADMIN_KEY` is required by the admin-backed suites (`audit`, `auth`,
