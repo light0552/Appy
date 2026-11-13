@@ -586,6 +586,7 @@
   position: absolute;
   right: -2px;
   bottom: -2px;
+  z-index: 4;
   width: 27px;
   height: 27px;
   display: grid;
@@ -1115,6 +1116,7 @@
   position: absolute;
   right: 0;
   bottom: 0;
+  z-index: 4;
   width: 30px;
   height: 30px;
   display: grid;
