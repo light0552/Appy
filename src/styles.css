@@ -1399,11 +1399,16 @@ ol {
   user-select: none;
 }
 
-/* Illustrated screen faces keep the page's ring/halo but replace the
-   gradient-and-initials fill with the photograph. */
-.avatar--photo {
-  overflow: hidden;
+/* Illustrated screen faces: a clean clipped photo with an outer-only
+   neon rim. Nothing is painted over the image itself. */
+.avatar.avatar--photo {
+  position: relative;
+  overflow: visible;
   background: transparent;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--profile-color, var(--accent)) 74%, transparent),
+    0 0 11px color-mix(in srgb, var(--profile-color, var(--accent)) 55%, transparent),
+    0 0 28px color-mix(in srgb, var(--profile-color, var(--accent)) 30%, transparent);
 }
 
 .avatar-photo {
@@ -1412,15 +1417,17 @@ ol {
   border-radius: inherit;
   object-fit: cover;
   display: block;
-  border: 2px solid color-mix(in srgb, var(--profile-color, var(--accent)) 68%, transparent);
-}
-
-.avatar--no-ring .avatar-photo {
-  border-color: transparent;
+  border: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .avatar.avatar--no-ring {
-  box-shadow: inset 0 0 0 1px var(--border);
+  box-shadow: none;
+}
+
+.avatar.avatar--no-ring .avatar-photo {
+  border: 0;
 }
 
 /* A ringless photo also loses the coloured halo behind it. */

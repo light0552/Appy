@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Player from "../components/Player";
 import ServerChips from "../components/ServerChips";
+import Sheet from "../components/Sheet";
 import {
   availableProviders,
   DEFAULT_PROVIDER_ID,
@@ -53,6 +54,62 @@ function positiveInt(raw: string | null, fallback: number): number {
  */
 function isNavigableSeason(entry: SeasonSummary): boolean {
   return entry.seasonNumber > 0 && entry.episodeCount > 0;
+}
+
+/**
+ * Per-title provider memory. Deliberately local, not a synced profile pref: a
+ * title that plays better on the backup server remembers that on this device
+ * only, and every other title keeps the household default.
+ */
+const PROVIDER_MEMORY_PREFIX = "lighthook.titleProvider.v1";
+
+function providerMemoryKey(type: MediaType, tmdbId: number): string {
+  return `${PROVIDER_MEMORY_PREFIX}.${type}.${tmdbId}`;
+}
+
+function readTitleProvider(type: MediaType, tmdbId: number): string | null {
+  try {
+    const saved = window.localStorage.getItem(providerMemoryKey(type, tmdbId));
+    return saved && saved.trim() ? saved.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberTitleProvider(type: MediaType, tmdbId: number, providerId: string) {
+  try {
+    window.localStorage.setItem(providerMemoryKey(type, tmdbId), providerId);
+  } catch {
+    // Private mode: playback still works, it just forgets the title's server.
+  }
+}
+
+/** Document fullscreen, including the provider's own fullscreen button (which
+ *  fullscreens the iframe itself) and Safari's webkit spelling. */
+interface FullscreenDocument extends Document {
+  webkitFullscreenElement?: Element | null;
+  webkitIsFullScreen?: boolean;
+  onwebkitfullscreenchange?: ((this: Document, ev: Event) => void) | null;
+}
+
+function activeFullscreen(): boolean {
+  const doc = document as FullscreenDocument;
+  if (document.fullscreenElement ?? doc.webkitFullscreenElement) return true;
+  return doc.webkitIsFullScreen === true;
+}
+
+function shortRuntime(minutes: number | null): string | null {
+  if (!minutes || minutes <= 0) return null;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours > 0 ? `${hours}h ${rest}m` : `${rest}m`;
+}
+
+function shortDate(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 interface EpisodeRef {
@@ -133,6 +190,40 @@ const SourceIcon = (
     />
   </svg>
 );
+
+/** Episode stack for the "Seasons & episodes" trigger. */
+const EpisodesIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="4.6" rx="1.6" stroke="currentColor" strokeWidth="1.7" />
+    <rect x="3" y="10.4" width="18" height="4.6" rx="1.6" stroke="currentColor" strokeWidth="1.7" />
+    <rect x="3" y="16.8" width="12.5" height="3.4" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
+  </svg>
+);
+
+const ChevronDownIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="m5 9 7 7 7-7"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const ChevronRightIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="m9 5 7 7-7 7"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 
 export default function Watch() {
   const params = useParams();
@@ -219,14 +310,34 @@ export default function Watch() {
   );
 
   const options = useMemo(() => availableProviders(mediaRef), [mediaRef]);
+
+  /**
+   * Last server used for THIS title on this device. The stored value is read for
+   * the current title during render (not copied into state), so moving between
+   * titles never flashes the previous title's server for a frame; a fresh
+   * selection is kept alongside the title key it belongs to.
+   */
+  const titleKey = `${type ?? "movie"}:${tmdbId}`;
+  const storedTitleProvider = useMemo(
+    () => (type && validId ? readTitleProvider(type, tmdbId) : null),
+    [type, validId, tmdbId],
+  );
+  const [providerChoice, setProviderChoice] = useState<{ key: string; id: string } | null>(
+    null,
+  );
+  const titleProvider =
+    providerChoice && providerChoice.key === titleKey ? providerChoice.id : storedTitleProvider;
+
   const providerPrefsVersion = session.state.prefs.providerPrefsVersion ?? 0;
-  // Ignore a saved server from before a provider-list change. The migration
-  // below writes the new default once; after that a deliberate user choice is
-  // honored again.
-  const preferred =
-    providerPrefsVersion >= PROVIDER_PREFS_VERSION
-      ? preferredUrl(mediaRef, session.state.prefs.preferredProvider)
-      : null;
+  // Precedence: this title's own server, then the household default. A saved
+  // server from before a provider-list change is ignored until the migration
+  // below writes the new default once; after that a deliberate choice counts.
+  const savedProviderId =
+    titleProvider ??
+    (providerPrefsVersion >= PROVIDER_PREFS_VERSION
+      ? session.state.prefs.preferredProvider
+      : undefined);
+  const preferred = preferredUrl(mediaRef, savedProviderId);
 
   const setPrefs = session.setPrefs;
   useEffect(() => {
@@ -240,12 +351,105 @@ export default function Watch() {
   const [probeWinner, setProbeWinner] = useState<string | null>(null);
   const interactedRef = useRef(false);
   const recordedRef = useRef<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  /**
+   * Bumped on every deliberate fresh request (server switch, next server, or
+   * Reload). Combined with the title/season/episode/provider identity it keys
+   * the Player, so the iframe is torn down and rebuilt rather than re-pointed.
+   */
+  const [playToken, setPlayToken] = useState(0);
   const [showWatchdog, setShowWatchdog] = useState(false);
 
-  // A new title/episode starts with a fresh watchdog state.
+  /* ---------------------------------------------------------------- */
+  /* Seasons & episodes panel                                          */
+  /* ---------------------------------------------------------------- */
+
+  const [seasonsOpen, setSeasonsOpen] = useState(false);
+  const [panelSeason, setPanelSeason] = useState<number | null>(null);
+  const [panelDetail, setPanelDetail] = useState<SeasonDetail | null>(null);
+  const [panelLoading, setPanelLoading] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const panelCacheRef = useRef<Map<number, SeasonDetail>>(new Map());
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // A new title starts with an empty season cache and a closed panel.
+  useEffect(() => {
+    panelCacheRef.current = new Map();
+    setSeasonsOpen(false);
+    setPanelSeason(null);
+    setPanelDetail(null);
+    setPanelError(null);
+  }, [type, tmdbId]);
+
+  // Follow document/iframe fullscreen: the panel must not be offered inside it.
+  useEffect(() => {
+    const doc = document as FullscreenDocument;
+    const sync = () => {
+      const active = activeFullscreen();
+      setIsFullscreen(active);
+      if (active) setSeasonsOpen(false);
+    };
+    const previous = doc.onwebkitfullscreenchange ?? null;
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    doc.onwebkitfullscreenchange = sync;
+    return () => {
+      document.removeEventListener("fullscreenchange", sync);
+      doc.onwebkitfullscreenchange = previous;
+    };
+  }, []);
+
+  const openSeasons = useCallback(() => {
+    const target = season ?? 1;
+    // The page already holds this season's episodes — seed the panel with them
+    // so opening it never flashes a skeleton over data we have.
+    if (seasonDetail?.seasonNumber === target) {
+      panelCacheRef.current.set(target, seasonDetail);
+    }
+    setPanelSeason(target);
+    setSeasonsOpen(true);
+  }, [season, seasonDetail]);
+
+  // Fetch the panel's season on demand (the current season is already cached by
+  // the page effect above, other seasons load when the user picks them).
+  useEffect(() => {
+    if (!seasonsOpen || type !== "tv" || !validId || panelSeason === null) return;
+
+    const cached = panelCacheRef.current.get(panelSeason);
+    if (cached) {
+      setPanelDetail(cached);
+      setPanelLoading(false);
+      setPanelError(null);
+      return;
+    }
+
+    let alive = true;
+    setPanelLoading(true);
+    setPanelError(null);
+
+    getSeason(tmdbId, panelSeason)
+      .then((data) => {
+        if (!alive) return;
+        panelCacheRef.current.set(panelSeason, data);
+        setPanelDetail(data);
+        setPanelLoading(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setPanelDetail(null);
+        setPanelError("Couldn’t load this season.");
+        setPanelLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [seasonsOpen, type, tmdbId, validId, panelSeason]);
+
+  // A new title/episode starts with a fresh watchdog and probe state.
   useEffect(() => {
     setShowWatchdog(false);
+    setProbeWinner(null);
+    interactedRef.current = false;
   }, [type, tmdbId, season, episode]);
 
   // Background reachability check. It never delays the first iframe — the first
@@ -324,31 +528,50 @@ export default function Watch() {
     (id: string) => {
       interactedRef.current = true;
       setShowWatchdog(false);
-      if (id !== currentOption?.provider.id) {
-        session.setPrefs({ preferredProvider: id });
-      } else {
-        setReloadKey((value) => value + 1);
+      setProbeWinner(null);
+      // Always a fresh document, even when re-tapping the active chip: that is
+      // the "start this stream over" gesture.
+      setPlayToken((value) => value + 1);
+      // Remembered for THIS title only (local, never a synced profile pref):
+      // another title keeps the household default.
+      if (type && validId) {
+        setProviderChoice({ key: titleKey, id });
+        rememberTitleProvider(type, tmdbId, id);
       }
     },
-    [currentOption, session],
+    [type, validId, tmdbId, titleKey],
   );
 
   /** Cycles to the next available server in registry order, wrapping around. */
   const advanceServer = useCallback(() => {
     interactedRef.current = true;
     setShowWatchdog(false);
+    setProbeWinner(null);
+    setPlayToken((value) => value + 1);
     if (options.length < 2) return;
     const index = options.findIndex(
       (option) => option.provider.id === currentOption?.provider.id,
     );
     const next = options[(index + 1) % options.length];
-    session.setPrefs({ preferredProvider: next.provider.id });
-  }, [currentOption, options, session]);
+    if (type && validId) {
+      setProviderChoice({ key: titleKey, id: next.provider.id });
+      rememberTitleProvider(type, tmdbId, next.provider.id);
+    }
+  }, [currentOption, options, type, validId, tmdbId, titleKey]);
 
   const reloadStream = useCallback(() => {
     setShowWatchdog(false);
-    setReloadKey((value) => value + 1);
+    setPlayToken((value) => value + 1);
   }, []);
+
+  /** Jump to an episode from the panel; also closes it. */
+  const goToEpisode = useCallback(
+    (targetSeason: number, targetEpisode: number) => {
+      setSeasonsOpen(false);
+      navigate(`/watch/tv/${tmdbId}?s=${targetSeason}&e=${targetEpisode}`);
+    },
+    [navigate, tmdbId],
+  );
 
   const goBack = useCallback(() => {
     const state = window.history.state as { idx?: number } | null;
@@ -436,6 +659,18 @@ export default function Watch() {
     return later ? { season: later.seasonNumber, episode: 1 } : null;
   }, [detail, season, episode, seasonLength]);
 
+  /** Seasons the panel lists: regular seasons in order, then Specials last. */
+  const seriesSeasons =
+    detail?.type === "tv"
+      ? detail.seasons
+          .filter((entry) => entry.episodeCount > 0)
+          .sort((a, b) => {
+            if (a.seasonNumber === 0) return 1;
+            if (b.seasonNumber === 0) return -1;
+            return a.seasonNumber - b.seasonNumber;
+          })
+      : [];
+
   if (!type || !validId) return <Navigate to="/" replace />;
 
   /* ---------------------------------------------------------------- */
@@ -446,7 +681,15 @@ export default function Watch() {
     <div className="player-page watch">
       <div className="watch-stage">
         {url ? (
-          <Player key={reloadKey} url={url} title={frameTitle} onTimeout={handleTimeout} />
+          <Player
+            key={`${type}:${tmdbId}:${season ?? "m"}:${episode ?? "m"}:${
+              currentOption?.provider.id ?? "none"
+            }:${playToken}`}
+            url={url}
+            nonce={playToken}
+            title={frameTitle}
+            onTimeout={handleTimeout}
+          />
         ) : (
           <div className="watch-empty">
             <div className="watch-empty-card">
@@ -625,7 +868,153 @@ export default function Watch() {
             </span>
           </div>
         )}
+
+        {/* Two persistent, non-fullscreen tools: every season/episode, and a
+            one-tap walk to the next server when a cut looks wrong. */}
+        <div className="watch-tools">
+          {type === "tv" && !isFullscreen && (
+            <button
+              type="button"
+              className="btn btn-secondary watch-tools__btn watch-seasons-trigger"
+              onClick={openSeasons}
+              aria-haspopup="dialog"
+              aria-expanded={seasonsOpen}
+              aria-label="Seasons & episodes"
+            >
+              {EpisodesIcon}
+              <span className="watch-tools__label">Seasons &amp; episodes</span>
+              <span className="watch-tools__label watch-tools__label--short">Episodes</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary watch-tools__btn watch-switch"
+            onClick={options.length > 1 ? advanceServer : reloadStream}
+            aria-label="Wrong cut? Try another server"
+          >
+            {SwapIcon}
+            <span className="watch-tools__label">Wrong cut? Try another server</span>
+            <span className="watch-tools__label watch-tools__label--short">
+              Try another server
+            </span>
+          </button>
+        </div>
       </footer>
+
+      {seasonsOpen && !isFullscreen && type === "tv" && (
+        <Sheet
+          title="Seasons & episodes"
+          onClose={() => setSeasonsOpen(false)}
+          className="watch-sheet"
+        >
+          <div className="watch-sheet-head">
+            <p className="eyebrow watch-sheet-eyebrow">Browse the series</p>
+            <h2>Seasons &amp; episodes</h2>
+            <p className="watch-sheet-sub">
+              {detail?.title ?? "This series"}
+              {episodeBadge ? ` · now on ${episodeBadge.replace(" · ", " ")}` : ""}
+            </p>
+          </div>
+
+          <div className="watch-sheet-seasons" role="group" aria-label="Seasons">
+            {seriesSeasons.map((entry) => {
+              const active = (panelSeason ?? season) === entry.seasonNumber;
+              return (
+                <button
+                  key={entry.seasonNumber}
+                  type="button"
+                  className={`watch-season-tile${
+                    active ? " watch-season-tile--active" : ""
+                  }`}
+                  aria-pressed={active}
+                  aria-label={entry.name}
+                  onClick={() => setPanelSeason(entry.seasonNumber)}
+                >
+                  <span className="watch-season-tile__num" aria-hidden="true">
+                    {entry.seasonNumber === 0 ? "SP" : entry.seasonNumber}
+                  </span>
+                  <span className="watch-season-tile__name">{entry.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {seriesSeasons.length === 0 && (
+            <p className="watch-sheet-note">
+              {detailFailed
+                ? "Season list unavailable — playback still works."
+                : detail
+                  ? "No seasons listed for this series."
+                  : "Loading seasons…"}
+            </p>
+          )}
+
+          <div
+            className="watch-sheet-list"
+            data-season={panelDetail?.seasonNumber ?? ""}
+            aria-busy={panelLoading || undefined}
+          >
+            {panelLoading && (
+              <>
+                <span className="skeleton skeleton--text watch-sheet-sk" aria-hidden="true" />
+                <span className="skeleton skeleton--text watch-sheet-sk" aria-hidden="true" />
+                <span className="skeleton skeleton--text watch-sheet-sk" aria-hidden="true" />
+              </>
+            )}
+
+            {!panelLoading && panelError && (
+              <p className="watch-sheet-note" role="alert">
+                {panelError}
+              </p>
+            )}
+
+            {!panelLoading && !panelError && panelDetail?.episodes.length === 0 && (
+              <p className="watch-sheet-note">No episodes listed for this season.</p>
+            )}
+
+            {!panelLoading &&
+              !panelError &&
+              panelDetail?.episodes.map((ep) => {
+                const current =
+                  panelDetail.seasonNumber === season && ep.episodeNumber === episode;
+                const runtime = shortRuntime(ep.runtime);
+                const air = shortDate(ep.airDate);
+                return (
+                  <button
+                    key={ep.episodeNumber}
+                    type="button"
+                    className={`watch-sheet-ep${
+                      current ? " watch-sheet-ep--current" : ""
+                    }`}
+                    aria-current={current ? "true" : undefined}
+                    aria-label={`Season ${panelDetail.seasonNumber} episode ${
+                      ep.episodeNumber
+                    }${ep.name ? ` — ${ep.name}` : ""}`}
+                    onClick={() => goToEpisode(panelDetail.seasonNumber, ep.episodeNumber)}
+                  >
+                    <span className="watch-sheet-ep__num" aria-hidden="true">
+                      {String(ep.episodeNumber).padStart(2, "0")}
+                    </span>
+                    <span className="watch-sheet-ep__copy">
+                      <span className="watch-sheet-ep__title">
+                        {ep.name || `Episode ${ep.episodeNumber}`}
+                      </span>
+                      <span className="watch-sheet-ep__meta">
+                        <span>{`E${ep.episodeNumber}`}</span>
+                        {runtime && <span>{runtime}</span>}
+                        {air && <span>{air}</span>}
+                        {current && <span className="watch-sheet-ep__now">Now playing</span>}
+                      </span>
+                    </span>
+                    <span className="watch-sheet-ep__go" aria-hidden="true">
+                      {ChevronRightIcon}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 }

@@ -41,6 +41,12 @@ interface ScreenRecord {
   lastSelfChangeAt?: number;
   /** Admin-only reference name; never shown on the picker. */
   adminName?: string;
+  /**
+   * Access expiry (epoch ms, UTC). Absent means the screen never expires.
+   * Admin-only to set; enforced on verify/resume and surfaced as a safe
+   * `expired` flag (never the passcode) on the public status.
+   */
+  expiresAt?: number;
   failedAttempts: number;
   blocked: boolean;
   updatedAt: number;
@@ -99,6 +105,9 @@ const MIN_PASSWORD_LENGTH = 4;
 const MAX_PASSWORD_LENGTH = 64;
 const ID_PATTERN = /^[a-z0-9-]{1,64}$/;
 const MAX_BODY_BYTES = 16 * 1024;
+/** Access durations the admin may assign; whole days only. */
+const MAX_ACCESS_DAYS = 3650;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const SCRYPT_N = 16384;
 const SCRYPT_R = 8;
@@ -249,6 +258,31 @@ function normalizeAdminName(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, 48) : "";
 }
 
+/**
+ * True once the screen's access window has ended. A missing/invalid value is
+ * "never expires", so records written before this feature keep working.
+ */
+function isExpired(record: ScreenRecord, now = Date.now()): boolean {
+  return (
+    typeof record.expiresAt === "number" &&
+    Number.isFinite(record.expiresAt) &&
+    record.expiresAt > 0 &&
+    record.expiresAt <= now
+  );
+}
+
+/** Whole positive days (1..MAX_ACCESS_DAYS) or null when the value is invalid. */
+function normalizeAccessDays(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const days = Math.floor(value);
+  if (days !== value || days < 1 || days > MAX_ACCESS_DAYS) return null;
+  return days;
+}
+
+function expiresAtFromDays(days: number, base: number): number {
+  return base + days * DAY_MS;
+}
+
 /* ------------------------------------------------------------------ */
 /* Store                                                               */
 /* ------------------------------------------------------------------ */
@@ -375,10 +409,24 @@ async function seedScreen(
   return record;
 }
 
-function publicStatus(index: AuthIndex): Record<string, { blocked: boolean; failedAttempts: number }> {
-  const out: Record<string, { blocked: boolean; failedAttempts: number }> = {};
+function publicStatus(index: AuthIndex): Record<
+  string,
+  { blocked: boolean; failedAttempts: number; expiresAt?: number; expired: boolean }
+> {
+  const out: Record<
+    string,
+    { blocked: boolean; failedAttempts: number; expiresAt?: number; expired: boolean }
+  > = {};
   for (const [id, record] of Object.entries(index.screens)) {
-    out[id] = { blocked: record.blocked, failedAttempts: record.failedAttempts };
+    out[id] = {
+      blocked: record.blocked,
+      failedAttempts: record.failedAttempts,
+      // Safe metadata only: whether access ended and when. Never the passcode.
+      ...(typeof record.expiresAt === "number" && Number.isFinite(record.expiresAt)
+        ? { expiresAt: record.expiresAt }
+        : {}),
+      expired: isExpired(record),
+    };
   }
   return out;
 }
@@ -613,6 +661,25 @@ async function route(req: Request): Promise<Response> {
         });
       }
 
+      // An expired screen never verifies, even with the right passcode. The
+      // passcode itself is untouched, so extending the window restores access.
+      if (isExpired(record)) {
+        const previous = readCookie(req, SESSION_COOKIE);
+        if (previous) await deleteToken(store, tokenHash(previous));
+        return json(
+          {
+            ok: false,
+            blocked: false,
+            expired: true,
+            failedAttempts: record.failedAttempts,
+            attemptsLeft: Math.max(0, MAX_FAILED_ATTEMPTS - record.failedAttempts),
+            error: "expired",
+          },
+          403,
+          { "set-cookie": clearSessionCookie(req) },
+        );
+      }
+
       const good = await verifyHash(password, record);
       if (good) {
         record.failedAttempts = 0;
@@ -742,6 +809,17 @@ async function route(req: Request): Promise<Response> {
         });
       }
 
+      // Expiry is checked on every poll: an active session ends on the next
+      // `resume` once its screen's access window closes.
+      if (isExpired(screen)) {
+        await deleteToken(store, hash);
+        return json(
+          { ok: false, blocked: false, expired: true, error: "expired" },
+          403,
+          { "set-cookie": clearSessionCookie(req) },
+        );
+      }
+
       if (screen.blocked) {
         return json({ ok: false, blocked: true, error: "blocked" }, 403, {
           "set-cookie": clearSessionCookie(req),
@@ -792,6 +870,7 @@ async function route(req: Request): Promise<Response> {
       if (!screen) return json({ error: "invalid_token" }, 401);
       ensureScreenSecurity(screen);
       if (screen.blocked) return json({ error: "blocked" }, 403);
+      if (isExpired(screen)) return json({ error: "expired", expired: true }, 403);
 
       const hash = tokenHash(changeToken);
       const change = await getChange(store, hash);
@@ -857,6 +936,9 @@ async function route(req: Request): Promise<Response> {
       const screen = await seedScreen(store, index, profileId);
       if (screen.blocked) {
         return json({ error: "blocked", blocked: true }, 403);
+      }
+      if (isExpired(screen)) {
+        return json({ error: "expired", expired: true }, 403);
       }
 
       const good = await verifyHash(currentPassword, screen);
@@ -965,6 +1047,8 @@ async function route(req: Request): Promise<Response> {
         // is kept: only the passcode changed.
         lastSelfChangeAt: 0,
         adminName: index.screens[profileId]?.adminName,
+        // Resetting the passcode must not silently reset the access window.
+        expiresAt: index.screens[profileId]?.expiresAt,
         failedAttempts: 0,
         blocked: false,
         updatedAt: now,
@@ -1026,6 +1110,19 @@ async function route(req: Request): Promise<Response> {
       if (!profileId) return json({ error: "invalid_profile" }, 400);
       const password = normalizePassword(body.password, DEFAULT_SCREEN_PASSWORD);
       if (!password) return json({ error: "invalid_password" }, 400);
+      // Absent/null means "no expiry"; anything else must be whole days > 0.
+      const rawAccessDays = body.accessDays;
+      const accessDays =
+        rawAccessDays === undefined || rawAccessDays === null
+          ? null
+          : normalizeAccessDays(rawAccessDays);
+      if (
+        rawAccessDays !== undefined &&
+        rawAccessDays !== null &&
+        accessDays === null
+      ) {
+        return json({ error: "invalid_expiry" }, 400);
+      }
       const temporary = body.temporary === true;
       const adminName = normalizeAdminName(body.adminName);
       const hash = await makeHash(password);
@@ -1042,12 +1139,49 @@ async function route(req: Request): Promise<Response> {
         mustChange: temporary,
         lastSelfChangeAt: 0,
         adminName,
+        ...(accessDays !== null
+          ? { expiresAt: expiresAtFromDays(accessDays, now) }
+          : {}),
         failedAttempts: 0,
         blocked: false,
         updatedAt: now,
       };
       await writeIndex(store, index);
       return json({ ok: true, screens: publicStatus(index) });
+    }
+
+    case "adminSetExpiry": {
+      // Admin-only access window control. `clear` removes the expiry entirely;
+      // otherwise whole days are added — from "now" for a reset, or from the
+      // current window when extending (an expired screen restarts from now).
+      const profileId = normalizeProfileId(body.profileId);
+      if (!profileId) return json({ error: "invalid_profile" }, 400);
+      const record = index.screens[profileId];
+      if (!record) return json({ error: "not_found" }, 404);
+
+      const clear = body.clear === true || body.expiresAt === null;
+      if (clear) {
+        delete record.expiresAt;
+      } else {
+        const days = normalizeAccessDays(body.days);
+        if (days === null) return json({ error: "invalid_expiry" }, 400);
+        const now = Date.now();
+        const future =
+          typeof record.expiresAt === "number" && record.expiresAt > now
+            ? record.expiresAt
+            : now;
+        const base = body.extend === true ? Math.max(now, future) : now;
+        record.expiresAt = expiresAtFromDays(days, base);
+      }
+
+      record.updatedAt = Date.now();
+      await writeIndex(store, index);
+      return json({
+        ok: true,
+        expiresAt: typeof record.expiresAt === "number" ? record.expiresAt : null,
+        expired: isExpired(record),
+        screens: publicStatus(index),
+      });
     }
 
     case "adminRemove": {
@@ -1079,6 +1213,8 @@ async function route(req: Request): Promise<Response> {
           adminName?: string;
           mustChange?: boolean;
           lastSelfChangeAt?: number;
+          expiresAt: number | null;
+          expired: boolean;
         }
       > = {};
       let migrated = false;
@@ -1105,6 +1241,11 @@ async function route(req: Request): Promise<Response> {
           adminName: record.adminName ?? "",
           mustChange: record.mustChange === true,
           lastSelfChangeAt: record.lastSelfChangeAt ?? 0,
+          expiresAt:
+            typeof record.expiresAt === "number" && Number.isFinite(record.expiresAt)
+              ? record.expiresAt
+              : null,
+          expired: isExpired(record),
         };
       }
       for (const id of ids.slice(0, 50)) {
@@ -1116,6 +1257,8 @@ async function route(req: Request): Promise<Response> {
             adminName: "",
             mustChange: false,
             lastSelfChangeAt: 0,
+            expiresAt: null,
+            expired: false,
           };
         }
       }
@@ -1155,6 +1298,8 @@ async function route(req: Request): Promise<Response> {
           mustChange: false,
           lastSelfChangeAt: 0,
           adminName: existing?.adminName,
+          // A legacy passcode import must not clear an access window.
+          expiresAt: existing?.expiresAt,
           failedAttempts: 0,
           blocked: false,
           updatedAt: now,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import Sheet from "../components/Sheet";
 import { backdropUrl, getSeason, getTitle, posterUrl, profileUrl } from "../lib/tmdb";
 import { useSession } from "../lib/session";
 import { liveHistory, mediaKey } from "../lib/store";
@@ -106,6 +107,38 @@ const ChevronIcon = (
   </svg>
 );
 
+const ChevronDownIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    aria-hidden="true"
+  >
+    <path d="m5 9 7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+/** Stacked discs — the season picker's mark. */
+const SeasonsIcon = (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    aria-hidden="true"
+  >
+    <ellipse cx="12" cy="6.5" rx="7.5" ry="2.9" />
+    <path d="M4.5 6.5v5c0 1.6 3.4 2.9 7.5 2.9s7.5-1.3 7.5-2.9v-5" />
+    <path d="M4.5 11.5v5c0 1.6 3.4 2.9 7.5 2.9s7.5-1.3 7.5-2.9v-5" />
+  </svg>
+);
+
+
 const StillIcon = (
   <svg
     width="22"
@@ -196,6 +229,7 @@ export default function Title() {
   const [attempt, setAttempt] = useState(0);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [seasonsOpen, setSeasonsOpen] = useState(false);
 
   const [seasonDetail, setSeasonDetail] = useState<SeasonDetail | null>(null);
   const [seasonLoading, setSeasonLoading] = useState(false);
@@ -210,6 +244,7 @@ export default function Title() {
     setError(null);
     setDetail(null);
     setOverviewOpen(false);
+    setSeasonsOpen(false);
     setSelectedSeason(null);
 
     getTitle(type, tmdbId)
@@ -229,10 +264,14 @@ export default function Title() {
     };
   }, [type, tmdbId, validId, attempt]);
 
-  // Default the season picker to the first season that has episodes.
+  // Default the season picker to the first regular season that has episodes.
+  // TMDB lists a show's "Specials" as season 0 — often with many episodes —
+  // so it must never win the default just by being first in the array.
   useEffect(() => {
     if (!detail || detail.type !== "tv") return;
-    const first = detail.seasons.find((s) => s.episodeCount > 0);
+    const first =
+      detail.seasons.find((s) => s.seasonNumber > 0 && s.episodeCount > 0) ??
+      detail.seasons.find((s) => s.episodeCount > 0);
     setSelectedSeason((prev) => prev ?? first?.seasonNumber ?? null);
   }, [detail]);
 
@@ -269,6 +308,10 @@ export default function Title() {
 
   const retry = () => setAttempt((value) => value + 1);
   const retrySeason = () => setSeasonAttempt((value) => value + 1);
+  const chooseSeason = (seasonNumber: number) => {
+    setSelectedSeason(seasonNumber);
+    setSeasonsOpen(false);
+  };
 
   if (!type || !validId) return <Navigate to="/" replace />;
 
@@ -393,7 +436,21 @@ export default function Title() {
   }
   if (detail.status) pills.push({ key: "status", label: detail.status, tone: "quiet" });
 
-  const visibleSeasons = detail.seasons.filter((s) => s.episodeCount > 0);
+  // Regular seasons in order, then "Specials" (TMDB season 0) last: the picker
+  // and rail read as a season list, not a season list with a detour at the top.
+  const visibleSeasons = detail.seasons
+    .filter((s) => s.episodeCount > 0)
+    .sort((a, b) => {
+      if (a.seasonNumber === 0) return 1;
+      if (b.seasonNumber === 0) return -1;
+      return a.seasonNumber - b.seasonNumber;
+    });
+  // The picker reads out the season on screen, never "all seasons" when one is
+  // chosen — the sheet behind it is what actually lists them all.
+  const selectedSeasonEntry = visibleSeasons.find(
+    (entry) => entry.seasonNumber === selectedSeason,
+  );
+  const seasonPickerLabel = selectedSeasonEntry?.name ?? "All seasons";
 
   return (
     <div className="title-page">
@@ -483,7 +540,7 @@ export default function Title() {
         )}
 
         {detail.type === "tv" && visibleSeasons.length > 0 && (
-          <section className="title-section">
+          <section className="title-section title-episodes">
             <div className="title-section-head">
               <h2 className="title-section-title">
                 <span className="title-section-index" aria-hidden="true">
@@ -497,9 +554,30 @@ export default function Title() {
                 </span>
               )}
               <span className="title-section-rule" aria-hidden="true" />
+              {/* The reliable control: opens every season in a sheet, so a
+                  WebView that cannot swipe the chip rail still reaches S10. */}
+              <button
+                type="button"
+                className="title-season-picker"
+                onClick={() => setSeasonsOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={seasonsOpen}
+                aria-label={`Choose a season — ${seasonPickerLabel}, ${visibleSeasons.length} available`}
+              >
+                <span className="title-season-picker__mark" aria-hidden="true">
+                  {SeasonsIcon}
+                </span>
+                <span className="title-season-picker__label">{seasonPickerLabel}</span>
+                <span className="title-season-picker__meta" aria-hidden="true">
+                  {visibleSeasons.length}
+                </span>
+                <span className="title-season-picker__chevron" aria-hidden="true">
+                  {ChevronDownIcon}
+                </span>
+              </button>
             </div>
 
-            <div className="chip-row title-seasons" role="group" aria-label="Seasons">
+            <div className="chip-row title-seasons scroll-x" role="group" aria-label="Seasons">
               {visibleSeasons.map((s) => (
                 <button
                   key={s.seasonNumber}
@@ -584,6 +662,63 @@ export default function Title() {
               </ul>
             )}
           </section>
+        )}
+
+        {detail.type === "tv" && visibleSeasons.length > 0 && seasonsOpen && (
+          <Sheet
+            title="All seasons"
+            onClose={() => setSeasonsOpen(false)}
+            className="title-season-sheet"
+          >
+            <div className="season-sheet-head">
+              <p className="eyebrow">Season picker</p>
+              <h2>All seasons</h2>
+              <p className="season-sheet-sub">
+                {detail.title} · {visibleSeasons.length}{" "}
+                {visibleSeasons.length === 1 ? "season" : "seasons"}
+              </p>
+            </div>
+
+            <ul className="season-grid">
+              {visibleSeasons.map((s) => {
+                const active = selectedSeason === s.seasonNumber;
+                const art = posterUrl(s.posterPath, "w185");
+                const airYear = s.airDate ? s.airDate.slice(0, 4) : null;
+                return (
+                  <li key={s.seasonNumber}>
+                    <button
+                      type="button"
+                      className={`season-card${active ? " season-card--active" : ""}`}
+                      aria-pressed={active}
+                      aria-label={`${s.name}, ${s.episodeCount} episodes`}
+                      onClick={() => chooseSeason(s.seasonNumber)}
+                    >
+                      <span className="season-card__art" aria-hidden="true">
+                        {art ? (
+                          <img src={art} alt="" loading="lazy" decoding="async" />
+                        ) : (
+                          <span className="season-card__num">
+                            {s.seasonNumber === 0 ? "SP" : s.seasonNumber}
+                          </span>
+                        )}
+                      </span>
+                      <span className="season-card__copy">
+                        <span className="season-card__name">{s.name}</span>
+                        <span className="season-card__meta">
+                          {s.episodeCount} {s.episodeCount === 1 ? "episode" : "episodes"}
+                          {airYear ? ` · ${airYear}` : ""}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p className="season-sheet-foot">
+              Pick a season to load its episodes here.
+            </p>
+          </Sheet>
         )}
 
         {detail.cast.length > 0 && (

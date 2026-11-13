@@ -1412,6 +1412,113 @@
   background: var(--danger-soft);
 }
 
+/* Access duration ------------------------------------------------- */
+
+.admin-access {
+  margin-top: 18px;
+  padding: 13px 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+}
+
+.admin-access .admin-label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.admin-access-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-access-custom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-access-custom input,
+.admin-expiry-days {
+  width: 88px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 30%, var(--surface-2));
+  color: var(--text);
+  font-family: var(--admin-mono);
+  font-size: 16px;
+  letter-spacing: 0.03em;
+}
+
+.admin-access-custom input:focus,
+.admin-expiry-days:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: var(--focus-ring);
+}
+
+.admin-access-note {
+  margin-top: 10px;
+}
+
+.admin-expiry {
+  padding-top: 2px;
+}
+
+.admin-expiry .admin-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.admin-expiry-state {
+  font-family: var(--admin-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+
+.admin-expiry-detail {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.admin-expiry.is-expired .admin-expiry-state {
+  color: var(--warn);
+}
+
+.admin-expiry.is-none .admin-expiry-state {
+  color: var(--muted-2);
+}
+
+.admin-expiry-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-expiry-row .btn {
+  min-height: 44px;
+}
+
+.admin-expiry-clear {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.admin-expired-badge {
+  border-color: color-mix(in srgb, var(--danger) 38%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+
 /* Checkbox rows --------------------------------------------------- */
 
 .admin-check {

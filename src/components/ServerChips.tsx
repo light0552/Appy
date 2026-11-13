@@ -17,6 +17,10 @@ export interface ServerChipsProps {
 /**
  * One chip per provider that can address the current media. VidFast/Vidsrc
  * vanish automatically when imdbId is missing — no special-casing needed here.
+ *
+ * Registry order is the switch order: VidSpark is server 1, VidLink server 2,
+ * then VidFast and Videasy. Chips carry `data-provider` so the switch path and
+ * QA can both name the server that is actually playing.
  */
 export default function ServerChips({ mediaRef, ref, activeId, onSelect }: ServerChipsProps) {
   const media = mediaRef ?? ref;
@@ -25,7 +29,12 @@ export default function ServerChips({ mediaRef, ref, activeId, onSelect }: Serve
   const options = availableProviders(media);
 
   return (
-    <div className="chip-row server-chips" role="group" aria-label="Servers">
+    <div
+      className="chip-row server-chips scroll-x"
+      role="group"
+      aria-label="Servers"
+      title="Servers — tap another to switch"
+    >
       <span className="server-chips__label" aria-hidden="true">
         Source
       </span>
@@ -36,7 +45,9 @@ export default function ServerChips({ mediaRef, ref, activeId, onSelect }: Serve
             key={provider.id}
             type="button"
             className={`chip${active ? " chip--active" : ""}`}
+            data-provider={provider.id}
             aria-pressed={active}
+            title={provider.hint}
             onClick={() => onSelect(provider.id)}
           >
             {provider.name}

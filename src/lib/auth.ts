@@ -34,11 +34,20 @@ export interface ProfileAuthRecord {
   mustChange?: boolean;
   /** When the user last changed their own passcode (adminList only). */
   lastSelfChangeAt?: number;
+  /** Access expiry (epoch ms, UTC) from the server; absent means no expiry. */
+  expiresAt?: number;
+  /** True once the access window has ended; set by the server status. */
+  expired?: boolean;
 }
 
 export type ProfileAuthMap = Record<string, ProfileAuthRecord>;
 
-export type ProfileAuthError = "wrong_password" | "blocked" | "missing" | "unreachable";
+export type ProfileAuthError =
+  | "wrong_password"
+  | "blocked"
+  | "missing"
+  | "unreachable"
+  | "expired";
 
 export interface ProfileAuthResult {
   ok: boolean;
@@ -67,6 +76,9 @@ export interface AdminCredential {
   adminName?: string;
   mustChange?: boolean;
   lastSelfChangeAt?: number;
+  /** Access expiry (epoch ms) as read back by adminList; undefined = never. */
+  expiresAt?: number;
+  expired: boolean;
 }
 
 const ENDPOINT = "/api/auth";
@@ -267,6 +279,10 @@ function mapFromScreens(screens: unknown, now = Date.now()): ProfileAuthMap {
 
   for (const [id, raw] of Object.entries(screens)) {
     if (!isRecord(raw)) continue;
+    const expiresAt =
+      typeof raw.expiresAt === "number" && Number.isFinite(raw.expiresAt)
+        ? raw.expiresAt
+        : undefined;
     map[id] = {
       profileId: id,
       failedAttempts: toCount(raw.failedAttempts),
@@ -279,6 +295,8 @@ function mapFromScreens(screens: unknown, now = Date.now()): ProfileAuthMap {
       adminName: typeof raw.adminName === "string" ? raw.adminName : undefined,
       mustChange: raw.mustChange === true,
       lastSelfChangeAt: toCount(raw.lastSelfChangeAt),
+      expiresAt,
+      expired: raw.expired === true || (expiresAt !== undefined && expiresAt <= now),
     };
   }
   return map;
@@ -346,9 +364,11 @@ function resultFromVerify(data: Record<string, unknown>): ProfileAuthResult {
   const serverError = typeof data.error === "string" ? data.error : null;
   const error: ProfileAuthError | undefined = ok
     ? undefined
-    : serverError === "blocked" || blocked
-      ? "blocked"
-      : "wrong_password";
+    : serverError === "expired"
+      ? "expired"
+      : serverError === "blocked" || blocked
+        ? "blocked"
+        : "wrong_password";
 
   const token = typeof data.token === "string" && data.token.length >= 20 ? data.token : undefined;
   const changeToken =
@@ -384,6 +404,7 @@ export async function verifyProfilePassword(
 
     // Fold this screen's fresh state into the last full snapshot so callers
     // replacing their authMap do not lose every other screen's status.
+    const previous = lastKnownMap[profileId];
     const map: ProfileAuthMap = {
       ...lastKnownMap,
       [profileId]: {
@@ -392,6 +413,12 @@ export async function verifyProfilePassword(
         blocked: result.blocked,
         updatedAt: Date.now(),
         hasPassword: true,
+        ...(previous?.expiresAt !== undefined ? { expiresAt: previous.expiresAt } : {}),
+        expired: result.ok
+          ? false
+          : result.error === "expired"
+            ? true
+            : previous?.expired === true,
       },
     };
     remember(map);
@@ -407,7 +434,8 @@ export async function verifyProfilePassword(
       // must complete first.
       clearDeviceToken(profileId);
       clearRemembered(profileId);
-    } else if (result.blocked) {
+    } else if (result.blocked || result.error === "expired") {
+      // No stale device session may outlive a block or an expired window.
       clearDeviceToken(profileId);
       clearRemembered(profileId);
     }
@@ -415,6 +443,13 @@ export async function verifyProfilePassword(
   } catch (err) {
     const code = errorCode(err);
     const isMissing = code === "invalid_profile" || code === "invalid_password";
+    const isExpiredError = code === "expired";
+
+    if (isExpiredError) {
+      clearDeviceToken(profileId);
+      clearRemembered(profileId);
+      setProfileUnlocked(profileId, false);
+    }
 
     // Best-effort snapshot for the UI; never throws, and falls back to the
     // in-memory map when the service is still unreachable.
@@ -427,7 +462,7 @@ export async function verifyProfilePassword(
         blocked: false,
         failedAttempts: 0,
         attemptsLeft: MAX_FAILED_ATTEMPTS,
-        error: isMissing ? "missing" : "unreachable",
+        error: isExpiredError ? "expired" : isMissing ? "missing" : "unreachable",
       },
       map,
     };
@@ -672,7 +707,12 @@ export async function adminUnblock(profileId: string): Promise<ProfileAuthMap> {
 export async function adminAddRecord(
   profileId: string,
   password = DEFAULT_SCREEN_PASSWORD,
-  options: { temporary?: boolean; adminName?: string } = {},
+  options: {
+    temporary?: boolean;
+    adminName?: string;
+    /** Access window in whole days from now; null/absent means no expiry. */
+    accessDays?: number | null;
+  } = {},
 ): Promise<ProfileAuthMap> {
   const map = await adminCall({
     action: "adminAdd",
@@ -680,9 +720,28 @@ export async function adminAddRecord(
     password: password.slice(0, MAX_SCREEN_PASSWORD_LENGTH),
     temporary: options.temporary === true,
     adminName: options.adminName?.trim() ?? "",
+    accessDays: options.accessDays ?? null,
   });
   setProfileUnlocked(profileId, false);
   return map;
+}
+
+/**
+ * Admin-only access window control. `extend` adds days on top of the current
+ * expiry (or from now when already expired); otherwise days restart from now.
+ * `clear` removes the expiry entirely. Validation is enforced server-side.
+ */
+export async function adminSetScreenExpiry(
+  profileId: string,
+  options: { days?: number; extend?: boolean; clear?: boolean },
+): Promise<ProfileAuthMap> {
+  return adminCall({
+    action: "adminSetExpiry",
+    profileId,
+    ...(options.clear
+      ? { clear: true }
+      : { days: options.days, extend: options.extend === true }),
+  });
 }
 
 /** Rotates the server session epoch; every device for these screens must re-enter. */
@@ -792,6 +851,8 @@ export function credentialsFrom(
       adminName: record?.adminName ?? "",
       mustChange: record?.mustChange === true,
       lastSelfChangeAt: record?.lastSelfChangeAt ?? 0,
+      ...(record?.expiresAt !== undefined ? { expiresAt: record.expiresAt } : {}),
+      expired: record?.expired === true,
     };
   });
 }

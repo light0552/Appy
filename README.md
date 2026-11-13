@@ -101,9 +101,18 @@ The RECODE skin lives in `src/styles.css` as tokens and shared primitives:
   tickets on the right, full-width on desktop and a tight editorial stack on phones.
 - **Screen looks:** the admin can give each screen the ginger cat, the black cat, or
   coloured initials with any custom colour. A per-screen switch removes the colour
-  ring and glow for a completely clean photo. Existing screens keep their initials
+  ring and neon glow for a completely clean photo. Existing screens keep their initials
   until changed.
-- **House notice:** three ways to watch clean — Brave, uBlock Origin Lite, or the
+- **Access windows:** an admin can set No expiry / 1 day / 1 week / 1 month / custom
+  days when adding or editing a screen. Expired screens stay visible but locked;
+  the server rejects unlock/resume and the admin can extend the window.
+- **Seasons:** a season picker sheet on the title page and a collapsible Seasons &
+  episodes sheet on Watch make every season reachable even when a WebView will not
+  scroll a chip row.
+- **Server switching:** changing an episode, server, or movie remounts a fresh player
+  document; a "Wrong cut? Try another server" action and per-title memory handle
+  provider files that are genuinely cut.
+- **House notice:** three ways to watch clean - Brave, uBlock Origin Lite, or the
   private LIGHTH00K Android app (request access from the admin).
 - **Page CSS:** each page imports its own stylesheet; the new `*-recode.css` files
   hold page-scoped overrides where the original skin needed replacing.

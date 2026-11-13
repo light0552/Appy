@@ -11,17 +11,19 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = (process.env.BASE || "http://localhost:8888").replace(/\/+$/, "");
 const CHROME =
   process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const OUT = path.join("E:\\OPENCODE\\RECODE", ".screens", "smoke");
+const OUT = path.join(ROOT, ".screens", "smoke");
 const PASSWORD = process.env.SCREEN_PASSWORD || "1234";
 
 fs.mkdirSync(OUT, { recursive: true });
 
-const envText = fs.readFileSync(path.join("E:\\OPENCODE\\RECODE", ".env"), "utf8");
+const envText = fs.readFileSync(path.join(ROOT, ".env"), "utf8");
 const adminPassword =
   process.env.ADMIN_PASSWORD ||
   (envText.match(/^ADMIN_PASSWORD=(.*)$/m) || [])[1]?.trim() ||

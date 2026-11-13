@@ -103,6 +103,11 @@ export interface SessionValue {
     temporary?: boolean,
   ) => Promise<void>;
   adminUnblockProfile: (id: string) => Promise<void>;
+  /** Admin-only access window: extend, reset from now, or clear entirely. */
+  adminSetScreenExpiry: (
+    id: string,
+    options: { days?: number; extend?: boolean; clear?: boolean },
+  ) => Promise<void>;
   adminRenameProfile: (
     id: string,
     patch: {
@@ -122,6 +127,8 @@ export interface SessionValue {
       temporary?: boolean;
       avatar?: ProfileAvatarId;
       avatarRing?: boolean;
+      /** Access window in whole days; null/absent keeps the screen permanent. */
+      accessDays?: number | null;
     },
   ) => Promise<AddProfileResult>;
   adminDeleteProfile: (id: string) => Promise<void>;
@@ -322,7 +329,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       let active =
         storedActive && auth.isProfileUnlocked(storedActive)
           ? withMeta.find(
-              (profile) => profile.id === storedActive && !nextAuth[profile.id]?.blocked,
+              (profile) =>
+                profile.id === storedActive &&
+                !nextAuth[profile.id]?.blocked &&
+                !nextAuth[profile.id]?.expired,
             )
           : undefined;
 
@@ -331,7 +341,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // is sent automatically.
       if (!active && storedActive) {
         const candidate = withMeta.find(
-          (profile) => profile.id === storedActive && !nextAuth[profile.id]?.blocked,
+          (profile) =>
+            profile.id === storedActive &&
+            !nextAuth[profile.id]?.blocked &&
+            !nextAuth[profile.id]?.expired,
         );
         if (candidate && (await auth.resumeProfile(storedActive))) {
           active = candidate;
@@ -458,6 +471,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     stateRef.current = emptyState("");
     setState(emptyState(""));
   }, [ready, profiles, activeId]);
+
+  // Access expiry is server state: the moment a status refresh reports it, this
+  // device signs out locally. SessionGuard's 15s resume poll catches the same
+  // thing from the server on every guarded route.
+  useEffect(() => {
+    if (!ready || !activeId) return;
+    if (authMap[activeId]?.expired !== true) return;
+
+    auth.clearLocalSession(activeId);
+    setActiveId(null);
+    stateRef.current = emptyState("");
+    setState(emptyState(""));
+    void kvDel(KEY_ACTIVE);
+  }, [ready, activeId, authMap]);
 
   /* ---------------------------------------------------------------- */
   /* Profile actions                                                   */
@@ -708,6 +735,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await auth.adminUnblock(id);
     setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
   }, []);
+
+  const adminSetScreenExpiry = useCallback(
+    async (
+      id: string,
+      options: { days?: number; extend?: boolean; clear?: boolean },
+    ) => {
+      await auth.adminSetScreenExpiry(id, options);
+      setAuthMap(await auth.loadAdminPasswords(profilesRef.current.map((profile) => profile.id)));
+    },
+    [],
+  );
 
   /**
    * Admin-only rename/recolour/ref-label. Name and colour go to the profiles
@@ -985,6 +1023,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       logoutAdmin,
       adminSetProfilePassword,
       adminUnblockProfile,
+      adminSetScreenExpiry,
       adminRenameProfile,
       adminAddProfile,
       adminDeleteProfile,
@@ -1014,6 +1053,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       logoutAdmin,
       adminSetProfilePassword,
       adminUnblockProfile,
+      adminSetScreenExpiry,
       adminRenameProfile,
       adminAddProfile,
       adminDeleteProfile,

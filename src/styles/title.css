@@ -460,13 +460,38 @@
   opacity: 0.7;
 }
 
-/* Season chips: quiet brass tabs with a clear active state. */
+/* Season chips: quiet brass tabs with a clear active state. The sheet
+   behind the picker is the reliable control — this rail is the quick
+   one, so it must survive WebView touch handling: one row, no wrap,
+   horizontal panning only, and a fading right edge as the affordance. */
 .title-page .title-seasons {
   gap: 7px;
   margin-bottom: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  padding: 2px 20px 2px 2px;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 18px), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    #000 0,
+    #000 calc(100% - 18px),
+    transparent 100%
+  );
+}
+
+.title-page .title-seasons::-webkit-scrollbar {
+  display: none;
 }
 
 .title-page .title-seasons .chip {
+  flex: 0 0 auto;
   min-height: 44px;
   padding: 0 16px;
   border-color: var(--border);
@@ -499,6 +524,249 @@
     background: var(--surface-2);
     color: var(--text);
   }
+}
+
+/* Season picker ------------------------------------------------------ */
+/* A real control next to the Episodes header: it opens the sheet with
+   every season, so reachability no longer depends on swiping a rail. */
+
+.title-season-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  align-self: center;
+  min-height: 42px;
+  padding: 0 12px 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-3) 72%, transparent) 0%,
+      var(--surface-2) 100%
+    ),
+    var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 6px 16px rgba(0, 0, 0, 0.28);
+  touch-action: manipulation;
+  transition:
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease);
+}
+
+.title-season-picker:active {
+  transform: scale(0.97);
+}
+
+.title-season-picker__mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.title-season-picker__label {
+  color: var(--text);
+}
+
+.title-season-picker__meta {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg) 52%, transparent);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.title-season-picker__chevron {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.title-season-picker[aria-expanded="true"] {
+  border-color: var(--accent-line);
+}
+
+.title-season-picker[aria-expanded="true"] .title-season-picker__chevron {
+  transform: rotate(180deg);
+  color: var(--accent-bright);
+}
+
+@media (hover: hover) {
+  .title-season-picker:hover {
+    border-color: var(--accent-line);
+    color: var(--text);
+  }
+}
+
+/* On the narrowest phones the section count gives way to the picker. */
+@media (max-width: 430px) {
+  .title-episodes .title-section-count {
+    display: none;
+  }
+}
+
+/* Season sheet -------------------------------------------------------- */
+
+.sheet.sheet.title-season-sheet {
+  display: flex;
+  flex-direction: column;
+  max-width: 540px;
+  max-height: min(86dvh, 760px);
+}
+
+.season-sheet-head {
+  flex: 0 0 auto;
+  padding-right: 46px;
+}
+
+.season-sheet-head h2 {
+  margin-top: 6px;
+}
+
+.season-sheet-sub {
+  margin-top: 7px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.season-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 9px;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 16px;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.season-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+  color: var(--text);
+  text-align: left;
+  touch-action: manipulation;
+  transition:
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease);
+}
+
+.season-card:active {
+  transform: scale(0.98);
+}
+
+.season-card__art {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 56px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-3);
+  color: var(--accent-bright);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.season-card__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.season-card__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.season-card__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-card__meta {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.season-card--active {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent-soft) 74%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 42%, transparent);
+}
+
+@media (hover: hover) {
+  .season-card:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-3);
+  }
+
+  .season-card--active:hover {
+    border-color: var(--accent-line);
+    background: color-mix(in srgb, var(--accent-soft) 86%, transparent);
+  }
+}
+
+.season-sheet-foot {
+  flex: 0 0 auto;
+  margin-top: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* Episodes ---------------------------------------------------------- */

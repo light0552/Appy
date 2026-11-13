@@ -664,6 +664,44 @@
   color: var(--muted);
 }
 
+/* Expired screen — remains visible, locked, and quiet. */
+
+.profile-tile--expired .profile-tile__select {
+  border-color: color-mix(in srgb, var(--muted) 24%, transparent);
+}
+
+.profile-tile--expired .profile-avatar {
+  filter: grayscale(0.92) brightness(0.7);
+  opacity: 0.5;
+}
+
+.profile-tile--expired .profile-halo {
+  background: radial-gradient(
+    circle at 50% 48%,
+    color-mix(in srgb, var(--muted) 16%, transparent) 0%,
+    transparent 68%
+  );
+  opacity: 0.25;
+}
+
+.profile-tile--expired .profile-name {
+  color: var(--muted);
+}
+
+.profile-tile--expired .profile-status {
+  max-width: 15ch;
+  color: var(--muted-2);
+  font-size: 8px;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+}
+
+.profile-badge--expired {
+  background: color-mix(in srgb, var(--muted) 20%, var(--surface-3));
+  color: var(--muted);
+}
+
 /* Tile text --------------------------------------------------------- */
 
 .profile-tile__meta {
@@ -1182,6 +1220,12 @@
   box-shadow: 0 4px 14px var(--accent-glow);
 }
 
+.unlock-avatar-badge--expired {
+  background: color-mix(in srgb, var(--muted) 22%, var(--surface-3));
+  color: var(--muted);
+  box-shadow: none;
+}
+
 .profiles-page .unlock-field {
   margin-top: 0;
   min-height: 54px;
@@ -1333,6 +1377,27 @@
   max-width: 34ch;
   font-size: 13px;
   line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Expired access: same quiet panel language as blocked, without alarm. */
+
+.profiles-page .unlock-head--expired .unlock-eyebrow {
+  color: var(--muted-2);
+}
+
+.unlock-expired {
+  border-color: color-mix(in srgb, var(--muted) 24%, transparent);
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--surface-3) 58%, transparent) 0%,
+    color-mix(in srgb, var(--surface-2) 42%, transparent) 100%
+  );
+}
+
+.unlock-expired-icon {
+  border-color: color-mix(in srgb, var(--muted) 30%, transparent);
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
   color: var(--muted);
 }
 

@@ -41,8 +41,9 @@ interface ForcedChangeApi {
 
 interface UnlockSheet {
   profile: ProfileMeta;
-  /** "unlock" asks for the pass; "choose" is the forced first-login change. */
-  step: "unlock" | "choose";
+  /** "unlock" asks for the pass; "choose" is the forced first-login change;
+   * "expired" is a quiet blocked sheet with no password field. */
+  step: "unlock" | "choose" | "expired";
   password: string;
   error: string | null;
   pending: boolean;
@@ -63,6 +64,8 @@ const MISSING_MESSAGE =
   "This screen has no passcode yet. Ask the admin to set one.";
 const BLOCKED_MESSAGE =
   "This screen is blocked. Contact admin (the person who gave you access) to unblock it.";
+const EXPIRED_MESSAGE =
+  "This screen's access has expired. Contact admin to extend it — your passcode stays the same.";
 
 /**
  * Maps an unlock failure to user-facing copy. The attempts-left sentence is
@@ -80,6 +83,8 @@ function unlockErrorMessage(
       return MISSING_MESSAGE;
     case "blocked":
       return BLOCKED_MESSAGE;
+    case "expired":
+      return EXPIRED_MESSAGE;
     case "wrong_password":
     default: {
       const left = Math.max(0, Math.min(MAX_ATTEMPTS, Math.floor(attemptsLeft)));
@@ -296,6 +301,23 @@ export default function Profiles() {
   }, [sheet]);
 
   const pick = async (profile: ProfileMeta) => {
+    // An expired screen never opens the passcode sheet — it can only show the
+    // quiet "contact admin" state, even while a stale tab flag says active.
+    if (authMap[profile.id]?.expired === true) {
+      setSheet({
+        profile,
+        step: "expired",
+        password: "",
+        error: null,
+        pending: false,
+        reveal: false,
+        changeToken: null,
+        newPassword: "",
+        confirmPassword: "",
+        revealPasscode: false,
+      });
+      return;
+    }
     if (activeProfile?.id === profile.id) {
       navigate("/", { replace: true });
       return;
@@ -376,6 +398,24 @@ export default function Profiles() {
       if (result.ok) {
         setSheet(null);
         navigate("/", { replace: true });
+        return;
+      }
+
+      // The access window closed between rendering and unlocking: swap to the
+      // quiet expired sheet rather than counting this as a wrong passcode.
+      if (result.error === "expired") {
+        setSheet((current) =>
+          current
+            ? {
+                ...current,
+                step: "expired",
+                password: "",
+                reveal: false,
+                pending: false,
+                error: null,
+              }
+            : current,
+        );
         return;
       }
 
@@ -493,6 +533,9 @@ export default function Profiles() {
 
   const blocked = sheet ? authMap[sheet.profile.id]?.blocked === true : false;
   const failedAttempts = sheet ? authMap[sheet.profile.id]?.failedAttempts ?? 0 : 0;
+  const sheetExpired = sheet
+    ? sheet.step === "expired" || authMap[sheet.profile.id]?.expired === true
+    : false;
 
   return (
     <div className="page profiles-page">
@@ -668,13 +711,18 @@ export default function Profiles() {
             ) : (
               <div className="profile-grid">
                 {filteredProfiles.map((profile, index) => {
-                  const active = activeProfile?.id === profile.id;
+                  const isExpired = authMap[profile.id]?.expired === true;
+                  const active = activeProfile?.id === profile.id && !isExpired;
                   const isBlocked = authMap[profile.id]?.blocked === true;
                   return (
                     <div
                       key={profile.id}
                       className={`profile-tile${active ? " profile-tile--active" : ""}${
-                        isBlocked ? " profile-tile--blocked" : ""
+                        isExpired
+                          ? " profile-tile--expired"
+                          : isBlocked
+                            ? " profile-tile--blocked"
+                            : ""
                       }`}
                       style={{ "--tile-index": index } as CSSProperties}
                     >
@@ -685,9 +733,11 @@ export default function Profiles() {
                         aria-label={
                           active
                             ? `Continue as ${profile.name}`
-                            : isBlocked
-                              ? `${profile.name} is blocked. Open for details on contacting admin.`
-                              : `Unlock ${profile.name} with a password`
+                            : isExpired
+                              ? `${profile.name} access has expired. Open for details on contacting admin.`
+                              : isBlocked
+                                ? `${profile.name} is blocked. Open for details on contacting admin.`
+                                : `Unlock ${profile.name} with a password`
                         }
                       >
                         <span
@@ -710,9 +760,11 @@ export default function Profiles() {
                             className={`profile-badge${
                               active
                                 ? " profile-badge--active"
-                                : isBlocked
-                                  ? " profile-badge--blocked"
-                                  : ""
+                                : isExpired
+                                  ? " profile-badge--expired"
+                                  : isBlocked
+                                    ? " profile-badge--blocked"
+                                    : ""
                             }`}
                             aria-hidden="true"
                           >
@@ -729,6 +781,8 @@ export default function Profiles() {
                                 Continue
                                 <ArrowGlyph />
                               </>
+                            ) : isExpired ? (
+                              "Expired — contact admin"
                             ) : isBlocked ? (
                               "Blocked"
                             ) : (
@@ -787,9 +841,11 @@ export default function Profiles() {
           title={
             sheet.step === "choose"
               ? "Choose your passcode"
-              : blocked
-                ? `${sheet.profile.name} is blocked`
-                : `Unlock ${sheet.profile.name}`
+              : sheetExpired
+                ? `${sheet.profile.name} access expired`
+                : blocked
+                  ? `${sheet.profile.name} is blocked`
+                  : `Unlock ${sheet.profile.name}`
           }
           onClose={closeSheet}
           className="profiles-unlock-sheet"
@@ -797,7 +853,7 @@ export default function Profiles() {
           <div
             className={`unlock-head${
               blocked && sheet.step === "unlock" ? " unlock-head--blocked" : ""
-            }`}
+            }${sheetExpired ? " unlock-head--expired" : ""}`}
           >
             <span
               className={`unlock-avatar-wrap${
@@ -815,8 +871,13 @@ export default function Profiles() {
                 ring={sheet.profile.avatarRing !== false}
                 className="unlock-avatar"
               />
-              {blocked && sheet.step === "unlock" && (
+              {blocked && sheet.step === "unlock" && !sheetExpired && (
                 <span className="unlock-avatar-badge" aria-hidden="true">
+                  <LockGlyph size={13} />
+                </span>
+              )}
+              {sheetExpired && (
+                <span className="unlock-avatar-badge unlock-avatar-badge--expired" aria-hidden="true">
                   <LockGlyph size={13} />
                 </span>
               )}
@@ -829,9 +890,11 @@ export default function Profiles() {
             <p className="eyebrow unlock-eyebrow">
               {sheet.step === "choose"
                 ? "One-time pass"
-                : blocked
-                  ? "Screen blocked"
-                  : "Password required"}
+                : sheetExpired
+                  ? "Access expired"
+                  : blocked
+                    ? "Screen blocked"
+                    : "Password required"}
             </p>
             <h2 className="unlock-name">
               {sheet.step === "choose" ? "Choose your passcode" : sheet.profile.name}
@@ -840,6 +903,11 @@ export default function Profiles() {
               <p className="unlock-sub">
                 Set a passcode you&apos;ll remember. It replaces the one-time pass
                 and unlocks {sheet.profile.name} from now on.
+              </p>
+            ) : sheetExpired ? (
+              <p className="unlock-sub">
+                Access for this screen has ended. Admin can extend it without
+                changing the passcode.
               </p>
             ) : (
               !blocked && (
@@ -977,6 +1045,32 @@ export default function Profiles() {
                 </button>
               </div>
             </form>
+          ) : sheetExpired ? (
+            <>
+              <div className="unlock-blocked unlock-expired" role="status">
+                <span
+                  className="unlock-blocked-icon unlock-expired-icon"
+                  aria-hidden="true"
+                >
+                  <LockGlyph size={20} />
+                </span>
+                <h3>Contact admin</h3>
+                <p>
+                  This screen&apos;s access window has ended. Contact admin to extend
+                  it — the passcode stays the same, so nothing else changes.
+                </p>
+              </div>
+              <div className="sheet-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={closeSheet}
+                  autoFocus
+                >
+                  Back to screens
+                </button>
+              </div>
+            </>
           ) : blocked ? (
             <>
               <div className="unlock-blocked" role="status">

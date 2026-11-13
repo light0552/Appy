@@ -225,10 +225,81 @@ function LookPicker({
 
 function statusLabel(credential: AdminCredential): string {
   if (credential.blocked) return "Blocked";
+  if (credential.expired) return "Expired";
   if (credential.failedAttempts > 0) {
     return `${credential.failedAttempts} / ${MAX_FAILED_ATTEMPTS} attempts`;
   }
   return "Active";
+}
+
+/** Access-duration presets for the add form and row editor. */
+type AccessPreset = "none" | "1d" | "1w" | "1m" | "custom";
+
+const ACCESS_PRESETS: ReadonlyArray<{ id: AccessPreset; label: string; days: number | null }> = [
+  { id: "none", label: "No expiry", days: null },
+  { id: "1d", label: "1 day", days: 1 },
+  { id: "1w", label: "1 week", days: 7 },
+  { id: "1m", label: "1 month", days: 30 },
+  { id: "custom", label: "Custom days", days: null },
+];
+
+const MAX_ACCESS_DAYS = 3650;
+
+/** Whole days for a preset ("invalid" when the custom field is not usable). */
+function daysFromPreset(
+  preset: AccessPreset,
+  custom: string,
+): number | null | "invalid" {
+  if (preset === "custom") {
+    const days = Number(custom);
+    if (!Number.isInteger(days) || days < 1 || days > MAX_ACCESS_DAYS) return "invalid";
+    return days;
+  }
+  return ACCESS_PRESETS.find((entry) => entry.id === preset)?.days ?? null;
+}
+
+function formatExpiryDate(expiresAt: number): string {
+  return new Date(expiresAt).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Local-date wording plus a days-remaining line for the registry row. */
+function expiryView(credential: AdminCredential): {
+  tone: "none" | "active" | "expired";
+  date: string;
+  detail: string;
+  headline: string;
+} {
+  if (credential.expiresAt === undefined) {
+    return {
+      tone: "none",
+      date: "",
+      headline: "No expiry",
+      detail: "Access stays open until an admin sets a window.",
+    };
+  }
+  const date = formatExpiryDate(credential.expiresAt);
+  if (credential.expired) {
+    return {
+      tone: "expired",
+      date,
+      headline: `Expired ${date}`,
+      detail: "Extend the window to restore this screen's access.",
+    };
+  }
+  const days = Math.max(
+    1,
+    Math.ceil((credential.expiresAt - Date.now()) / 86_400_000),
+  );
+  return {
+    tone: "active",
+    date,
+    headline: `Until ${date}`,
+    detail: `Expires in ${days} ${days === 1 ? "day" : "days"}.`,
+  };
 }
 
 /**
@@ -243,6 +314,8 @@ function failureText(error: unknown, fallback: string): string {
       switch (code) {
         case "invalid_password":
           return `Passcodes need ${MIN_SCREEN_PASSWORD_LENGTH} to ${MAX_SCREEN_PASSWORD_LENGTH} characters.`;
+        case "invalid_expiry":
+          return "Access must be a whole number of days greater than zero.";
         case "admin_required":
           return "Admin sign-in expired. Lock admin and sign in again.";
         case "not_found":
@@ -271,6 +344,7 @@ function ScreenRow({
   onToggleSelect,
   onSetPassword,
   onUnblock,
+  onSetExpiry,
   onRemove,
   onKick,
   onRename,
@@ -281,6 +355,10 @@ function ScreenRow({
   onToggleSelect: (id: string) => void;
   onSetPassword: (id: string, password: string, temporary?: boolean) => Promise<void>;
   onUnblock: (id: string) => Promise<void>;
+  onSetExpiry: (
+    id: string,
+    options: { days?: number; extend?: boolean; clear?: boolean },
+  ) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onKick: (id: string) => Promise<void>;
   onRename: (
@@ -311,6 +389,7 @@ function ScreenRow({
   const [draftRing, setDraftRing] = useState(credential.avatarRing !== false);
   const [draftAdminName, setDraftAdminName] = useState(credential.adminName ?? "");
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [expiryDays, setExpiryDays] = useState("7");
 
   useEffect(() => {
     setDraftName(credential.name);
@@ -406,6 +485,30 @@ function ScreenRow({
     }
   };
 
+  const updateExpiry = async (options: {
+    days?: number;
+    extend?: boolean;
+    clear?: boolean;
+  }) => {
+    if (pending) return;
+    if (
+      options.days !== undefined &&
+      (!Number.isInteger(options.days) || options.days < 1)
+    ) {
+      setActionError("Enter a whole number of days greater than zero.");
+      return;
+    }
+    setPending(true);
+    setActionError(null);
+    try {
+      await onSetExpiry(credential.profileId, options);
+    } catch (error) {
+      setActionError(failureText(error, "Couldn't update that access window."));
+    } finally {
+      setPending(false);
+    }
+  };
+
   const remove = async () => {
     if (pending) return;
     setPending(true);
@@ -435,6 +538,12 @@ function ScreenRow({
 
   const blocked = credential.blocked;
   const warning = !blocked && credential.failedAttempts > 0;
+  const expiry = expiryView(credential);
+  const parsedExpiryDays = Number(expiryDays);
+  const expiryDaysValid =
+    Number.isInteger(parsedExpiryDays) &&
+    parsedExpiryDays >= 1 &&
+    parsedExpiryDays <= MAX_ACCESS_DAYS;
 
   return (
     <li
@@ -475,6 +584,9 @@ function ScreenRow({
             >
               {statusLabel(credential)}
             </span>
+            {credential.expired && (
+              <span className="admin-onetime-badge admin-expired-badge">Access expired</span>
+            )}
             {credential.mustChange && (
               <span className="admin-onetime-badge">One-time · change pending</span>
             )}
@@ -571,9 +683,11 @@ function ScreenRow({
               <p className="tiny muted admin-screen-hint">
                 {blocked
                   ? `Locked after ${MAX_FAILED_ATTEMPTS} failed attempts — unblock to restore access`
-                  : warning
-                    ? "Wrong passcodes are counting toward the auto-lock"
-                    : "Ready to unlock with its household passcode"}
+                  : credential.expired
+                    ? "Access window ended — extend it to restore this screen"
+                    : warning
+                      ? "Wrong passcodes are counting toward the auto-lock"
+                      : "Ready to unlock with its household passcode"}
               </p>
               {credential.adminName && (
                 <p className="admin-ref">ref: {credential.adminName}</p>
@@ -671,6 +785,54 @@ function ScreenRow({
           </label>
         </div>
 
+        <div className={`admin-expiry is-${expiry.tone}`}>
+          <span className="admin-label">Access</span>
+          <p className="admin-expiry-state">{expiry.headline}</p>
+          <p className="admin-expiry-detail">{expiry.detail}</p>
+          <div className="admin-expiry-row">
+            <input
+              type="number"
+              min={1}
+              max={MAX_ACCESS_DAYS}
+              step={1}
+              inputMode="numeric"
+              className="admin-expiry-days"
+              value={expiryDays}
+              onChange={(event) => {
+                setExpiryDays(event.target.value);
+                setActionError(null);
+              }}
+              aria-label={`Access days for ${credential.name}`}
+            />
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              onClick={() =>
+                void updateExpiry({ days: parsedExpiryDays, extend: true })
+              }
+              disabled={pending || !expiryDaysValid}
+            >
+              Extend
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onClick={() => void updateExpiry({ days: parsedExpiryDays })}
+              disabled={pending || !expiryDaysValid}
+            >
+              Reset
+            </button>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost admin-expiry-clear"
+            onClick={() => void updateExpiry({ clear: true })}
+            disabled={pending || expiry.tone === "none"}
+          >
+            No expiry
+          </button>
+        </div>
+
         <div className="admin-row-buttons">
           <button
             type="button"
@@ -759,6 +921,7 @@ export default function Admin() {
     logoutAdmin,
     adminSetProfilePassword,
     adminUnblockProfile,
+    adminSetScreenExpiry,
     adminRenameProfile,
     adminAddProfile,
     adminDeleteProfile,
@@ -780,6 +943,8 @@ export default function Admin() {
   const [avatarRing, setAvatarRing] = useState(true);
   const [adminName, setAdminName] = useState("");
   const [temporaryNew, setTemporaryNew] = useState(false);
+  const [accessPreset, setAccessPreset] = useState<AccessPreset>("none");
+  const [customDays, setCustomDays] = useState("14");
   const [addError, setAddError] = useState<string | null>(null);
   const [addNotice, setAddNotice] = useState<string | null>(null);
   const [addPending, setAddPending] = useState(false);
@@ -1007,6 +1172,11 @@ export default function Admin() {
     if (addPending) return;
     setAddError(null);
     setAddNotice(null);
+    const accessDays = daysFromPreset(accessPreset, customDays);
+    if (accessDays === "invalid") {
+      setAddError("Enter a whole number of days greater than zero.");
+      return;
+    }
     setAddPending(true);
     try {
       const result = await adminAddProfile(name, color, password, {
@@ -1014,6 +1184,7 @@ export default function Admin() {
         temporary: temporaryNew,
         avatar: avatar ?? undefined,
         avatarRing,
+        accessDays,
       });
       if (!result.ok) {
         setAddError(result.error);
@@ -1026,6 +1197,8 @@ export default function Admin() {
       setAvatarRing(true);
       setAdminName("");
       setTemporaryNew(false);
+      setAccessPreset("none");
+      setCustomDays("14");
       setAddNotice(`Added ${result.profile.name}.`);
     } catch (error) {
       setAddError(failureText(error, "Couldn't add that screen. Try again."));
@@ -1033,6 +1206,14 @@ export default function Admin() {
       setAddPending(false);
     }
   };
+
+  const addAccessDays = daysFromPreset(accessPreset, customDays);
+  const addAccessSummary =
+    addAccessDays === "invalid"
+      ? "Enter a whole number of days greater than zero."
+      : addAccessDays === null
+        ? "Access never expires."
+        : `Access ends ${formatExpiryDate(Date.now() + addAccessDays * 86_400_000)}.`;
 
   return (
     <div className="page admin-page admin-page--dash">
@@ -1239,6 +1420,46 @@ export default function Admin() {
               </span>
             </span>
           </label>
+          <div className="admin-access" role="group" aria-label="Screen access duration">
+            <span className="admin-label">Access</span>
+            <div className="admin-access-presets">
+              {ACCESS_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className={`chip${accessPreset === preset.id ? " chip--active" : ""}`}
+                  aria-pressed={accessPreset === preset.id}
+                  onClick={() => {
+                    setAccessPreset(preset.id);
+                    setAddError(null);
+                    setAddNotice(null);
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            {accessPreset === "custom" && (
+              <label className="admin-access-custom">
+                <span className="tiny muted">Days</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_ACCESS_DAYS}
+                  step={1}
+                  inputMode="numeric"
+                  value={customDays}
+                  onChange={(event) => {
+                    setCustomDays(event.target.value);
+                    setAddError(null);
+                    setAddNotice(null);
+                  }}
+                  aria-label="Custom access duration in days"
+                />
+              </label>
+            )}
+            <p className="tiny muted admin-access-note">{addAccessSummary}</p>
+          </div>
           {addError && (
             <p className="sheet-error" role="alert">
               {addError}
@@ -1387,6 +1608,7 @@ export default function Admin() {
                 onToggleSelect={toggleSelect}
                 onSetPassword={adminSetProfilePassword}
                 onUnblock={adminUnblockProfile}
+                onSetExpiry={adminSetScreenExpiry}
                 onRemove={async (id) => {
                   await adminDeleteProfile(id);
                   setSelectedIds((previous) => previous.filter((value) => value !== id));
